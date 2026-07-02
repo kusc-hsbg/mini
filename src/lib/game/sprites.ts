@@ -202,7 +202,8 @@ export function drawTile(
       ctx.fillRect(x + ((col % 2) * 8 + 16) % TILE, y + 18, 1, 8);
       break;
     }
-    case "B": {
+    case "B":
+    case "b": {
       ctx.fillStyle = "rgba(251,191,36,0.16)";
       ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
       ctx.strokeStyle = "rgba(251,191,36,0.7)";
@@ -212,7 +213,63 @@ export function drawTile(
       ctx.font = "14px serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("🏍️", x + TILE / 2, y + TILE / 2);
+      ctx.fillText(ch === "b" ? "🏎️" : "🏍️", x + TILE / 2, y + TILE / 2);
+      break;
+    }
+    case "r": {
+      // 레이싱 연석: 빨강/흰색 스트라이프
+      const half = TILE / 2;
+      for (let iy = 0; iy < 2; iy++) {
+        for (let ix = 0; ix < 2; ix++) {
+          ctx.fillStyle = (ix + iy + col + row) % 2 === 0 ? "#d64545" : "#f3f4f6";
+          ctx.fillRect(x + ix * half, y + iy * half, half, half);
+        }
+      }
+      ctx.fillStyle = "rgba(0,0,0,0.12)";
+      ctx.fillRect(x, y + TILE - 3, TILE, 3);
+      break;
+    }
+    case "a": {
+      // 서킷 아스팔트: 미세 질감 + 간헐적 스키드 마크
+      ctx.fillStyle = "rgba(255,255,255,0.035)";
+      if (rnd > 0.55) ctx.fillRect(x + 4 + Math.floor(rnd * 14), y + 6 + Math.floor(rnd * 16), 5, 2);
+      if (rnd > 0.93) {
+        ctx.strokeStyle = "rgba(0,0,0,0.25)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x + 4, y + 26);
+        ctx.quadraticCurveTo(x + 14, y + 14, x + 28, y + 8);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "^": {
+      // 스피드 부스트: 노란 더블 셰브론 (게더 그랑프리 스타일)
+      ctx.fillStyle = "rgba(251,191,36,0.12)";
+      ctx.fillRect(x, y, TILE, TILE);
+      ctx.fillStyle = "#fbbf24";
+      for (const oy of [4, 14]) {
+        ctx.beginPath();
+        ctx.moveTo(x + 6, y + oy + 10);
+        ctx.lineTo(x + 16, y + oy);
+        ctx.lineTo(x + 26, y + oy + 10);
+        ctx.lineTo(x + 26, y + oy + 14);
+        ctx.lineTo(x + 16, y + oy + 4);
+        ctx.lineTo(x + 6, y + oy + 14);
+        ctx.closePath();
+        ctx.fill();
+      }
+      break;
+    }
+    case "F": {
+      // 체커 무늬 (출발/결승선)
+      const s = 8;
+      for (let iy = 0; iy < TILE / s; iy++) {
+        for (let ix = 0; ix < TILE / s; ix++) {
+          ctx.fillStyle = (ix + iy) % 2 === 0 ? "#e5e7eb" : "#1f2430";
+          ctx.fillRect(x + ix * s, y + iy * s, s, s);
+        }
+      }
       break;
     }
   }
@@ -668,6 +725,112 @@ export function drawObject(
       ctx.globalAlpha = 1;
       break;
     }
+    case "cone": {
+      // 라바콘 — 레이스 장애물
+      ctx.fillStyle = "rgba(0,0,0,0.18)";
+      ctx.beginPath();
+      ctx.ellipse(x + 16, y + 27, 9, 3.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#f97316";
+      ctx.beginPath();
+      ctx.moveTo(x + 16, y + 4);
+      ctx.lineTo(x + 24, y + 26);
+      ctx.lineTo(x + 8, y + 26);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#fff7ed";
+      ctx.fillRect(x + 11, y + 15, 10, 4);
+      ctx.fillStyle = "#c2410c";
+      ctx.fillRect(x + 6, y + 25, 20, 4);
+      break;
+    }
+    case "tires": {
+      // 타이어 스택 방벽
+      ctx.fillStyle = "rgba(0,0,0,0.18)";
+      ctx.beginPath();
+      ctx.ellipse(x + 16, y + 28, 12, 3.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      for (let i = 0; i < 3; i++) {
+        const ty = y + 22 - i * 7;
+        ctx.fillStyle = "#1f2430";
+        ctx.beginPath();
+        ctx.ellipse(x + 16, ty, 13, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#374151";
+        ctx.beginPath();
+        ctx.ellipse(x + 16, ty - 1.5, 13, 5.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#111827";
+        ctx.beginPath();
+        ctx.ellipse(x + 16, ty - 1.5, 6, 2.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = "#ef4444";
+      ctx.fillRect(x + 4, y + 12, 6, 3);
+      ctx.fillRect(x + 22, y + 12, 6, 3);
+      break;
+    }
+    case "podium": {
+      // 시상대 1/2/3위
+      const steps: [number, number, string, string][] = [
+        [0, 14, "#9ca3af", "2"], // 왼쪽 2위
+        [32, 6, "#facc15", "1"], // 가운데 1위
+        [64, 20, "#b45309", "3"], // 오른쪽 3위
+      ];
+      ctx.fillStyle = "rgba(0,0,0,0.2)";
+      ctx.fillRect(x + 2, y + h - 5, w - 4, 5);
+      for (const [ox, top, colr, num] of steps) {
+        ctx.fillStyle = colr;
+        ctx.fillRect(x + ox + 2, y + top, 28, h - top - 2);
+        ctx.fillStyle = lighten(colr, 0.2);
+        ctx.fillRect(x + ox + 2, y + top, 28, 5);
+        ctx.fillStyle = "#111827";
+        ctx.font = "bold 13px ui-sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(num, x + ox + 16, y + top + (h - top) / 2 + 2);
+      }
+      break;
+    }
+    case "flag": {
+      // 체커 깃발 폴
+      ctx.fillStyle = "#4b5563";
+      ctx.fillRect(x + 14, y - 14, 3, 42);
+      const wave = Math.sin(t / 250) * 2;
+      for (let iy = 0; iy < 3; iy++) {
+        for (let ix = 0; ix < 4; ix++) {
+          ctx.fillStyle = (ix + iy) % 2 === 0 ? "#f9fafb" : "#111827";
+          ctx.fillRect(x + 17 + ix * 4, y - 13 + iy * 4 + (ix > 1 ? wave : 0), 4, 4);
+        }
+      }
+      break;
+    }
+    case "grandstand": {
+      // 계단식 관중석
+      ctx.fillStyle = "rgba(0,0,0,0.2)";
+      ctx.fillRect(x + 2, y + h - 5, w - 4, 5);
+      const rows = ["#3b82c4", "#2f6da8", "#25588c"];
+      for (let i = 0; i < 3; i++) {
+        const ry = y + 4 + i * 16;
+        ctx.fillStyle = rows[i];
+        ctx.fillRect(x + 2, ry, w - 4, 14);
+        ctx.fillStyle = "rgba(255,255,255,0.15)";
+        ctx.fillRect(x + 2, ry, w - 4, 3);
+        // 관중 (색점)
+        for (let s2 = 0; s2 < 5; s2++) {
+          const px2 = x + 8 + s2 * 18 + ((i * 7) % 6);
+          ctx.fillStyle = ["#fbbf24", "#f472b6", "#4ade80", "#f87171", "#a78bfa"][(s2 + i) % 5];
+          ctx.beginPath();
+          ctx.arc(px2, ry + 8, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#f1c27d";
+          ctx.beginPath();
+          ctx.arc(px2, ry + 3.5, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      break;
+    }
     case "custom": {
       const url = o.props?.url;
       const img = url ? getImage(url) : null;
@@ -727,6 +890,75 @@ export function drawObjectTop(
 
 // ---------- 캐릭터 (픽셀아트) ----------
 
+// 고카트 (발 좌표 기준) — 그랑프리용, 플레이어 상의 색으로 도색.
+function drawKart(
+  ctx: CanvasRenderingContext2D,
+  fx: number,
+  fy: number,
+  dir: Direction,
+  t: number,
+  color: string
+) {
+  const spin = (t / 50) % (Math.PI * 2);
+  ctx.save();
+  ctx.translate(fx, fy);
+  const sideways = dir === "left" || dir === "right";
+  if (dir === "left") ctx.scale(-1, 1);
+
+  const wheel = (wx: number, wy: number, r: number) => {
+    ctx.fillStyle = "#111827";
+    ctx.beginPath();
+    ctx.arc(wx, wy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#9ca3af";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(wx + Math.cos(spin) * (r - 2), wy + Math.sin(spin) * (r - 2));
+    ctx.lineTo(wx - Math.cos(spin) * (r - 2), wy - Math.sin(spin) * (r - 2));
+    ctx.stroke();
+  };
+
+  if (sideways) {
+    // 옆모습: 낮고 긴 카트 + 앞뒤 바퀴
+    ctx.fillStyle = darken(color, 0.15);
+    roundRect(ctx, -18, -13, 36, 10, 4); // 차체
+    ctx.fill();
+    ctx.fillStyle = color;
+    roundRect(ctx, -18, -13, 36, 5, 4);
+    ctx.fill();
+    ctx.fillStyle = "#374151";
+    ctx.fillRect(-4, -20, 3, 9); // 핸들 축
+    ctx.fillRect(-8, -21, 10, 3); // 핸들
+    ctx.fillStyle = darken(color, 0.35);
+    ctx.fillRect(12, -18, 6, 6); // 앞 스포일러
+    ctx.fillRect(-20, -16, 5, 8); // 뒤 스포일러
+    wheel(-12, -2, 7);
+    wheel(12, -2, 7);
+    // 번호 원
+    ctx.fillStyle = "#f9fafb";
+    ctx.beginPath();
+    ctx.arc(2, -9, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // 정면/후면: 넓은 카트 + 양쪽 바퀴
+    wheel(-13, -3, 6);
+    wheel(13, -3, 6);
+    ctx.fillStyle = darken(color, 0.15);
+    roundRect(ctx, -11, -16, 22, 15, 5);
+    ctx.fill();
+    ctx.fillStyle = color;
+    roundRect(ctx, -11, -16, 22, 7, 5);
+    ctx.fill();
+    ctx.fillStyle = "#374151";
+    ctx.fillRect(-7, -19, 14, 4); // 범퍼/핸들
+    ctx.fillStyle = "#f9fafb";
+    ctx.beginPath();
+    ctx.arc(0, -8, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 // 오토바이 (발 좌표 기준)
 function drawBike(
   ctx: CanvasRenderingContext2D,
@@ -778,8 +1010,11 @@ export interface CharacterExtras {
   status?: UserStatus;
   hand?: boolean;
   speaking?: boolean;
-  atDesk?: boolean;
+  dancing?: boolean;
+  vehicle?: "bike" | "kart";
 }
+
+const OUTLINE = "rgba(18,22,34,0.55)";
 
 // 메인 캐릭터 렌더. (cx, cy) = 발(바닥 접점) 좌표. 픽셀 유닛 2px.
 export function drawCharacter(
@@ -796,8 +1031,21 @@ export function drawCharacter(
   extras?: CharacterExtras
 ) {
   const u = 2; // 픽셀 유닛
+  const dancing = !!extras?.dancing && !moving && !onBike;
   const step = moving ? Math.floor(t / 130) % 4 : 0; // 걷기 프레임 0..3
-  const bob = moving ? (step % 2 === 1 ? -1 : 0) : Math.sin(t / 500) > 0.6 ? -0.5 : 0;
+  const danceBeat = Math.floor(t / 200) % 2; // 춤 비트
+  const bob = moving
+    ? step % 2 === 1
+      ? -1
+      : 0
+    : dancing
+      ? danceBeat === 0
+        ? -1.5
+        : 0
+      : Math.sin(t / 500) > 0.6
+        ? -0.5
+        : 0;
+  const ghost = app.special === "ghost";
 
   // 그림자
   ctx.fillStyle = "rgba(0,0,0,0.28)";
@@ -805,76 +1053,118 @@ export function drawCharacter(
   ctx.ellipse(cx, cy, onBike ? 18 : 9, 4, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  if (onBike) drawBike(ctx, cx, cy - 2, dir, moving ? t : 0);
+  if (onBike) {
+    if (extras?.vehicle === "kart") drawKart(ctx, cx, cy - 2, dir, moving ? t : 0, app.color);
+    else drawBike(ctx, cx, cy - 2, dir, moving ? t : 0);
+  }
 
   ctx.save();
   ctx.translate(Math.round(cx), Math.round(cy + bob * u - (onBike ? 8 : 0)));
+  if (ghost) {
+    ctx.globalAlpha = 0.72;
+  }
+  if (dancing && danceBeat === 1) {
+    ctx.rotate(0.06); // 좌우 리듬
+  } else if (dancing) {
+    ctx.rotate(-0.06);
+  }
 
-  const skin = app.skin;
-  const top = app.color;
-  const pants = app.pants ?? "#1f2937";
-  const hairC = app.hairColor ?? "#4b3621";
+  const skin = ghost ? "#e8ecf7" : app.skin;
+  const top = ghost ? "#dfe5f2" : app.color;
+  const pants = ghost ? "#cfd6e8" : app.pants ?? "#1f2937";
+  const shoesC = ghost ? "#cfd6e8" : app.shoes ?? "#292524";
+  const hairC = ghost ? "#f3f5fb" : app.hairColor ?? "#4b3621";
   const side = dir === "left" ? -1 : dir === "right" ? 1 : 0;
-
-  // ----- 다리 (걷기 애니메이션) -----
-  const legLift = [0, 2, 0, 2];
-  const lA = moving ? legLift[step] : 0;
-  const lB = moving ? legLift[(step + 2) % 4] : 0;
-  ctx.fillStyle = pants;
-  if (dir === "left" || dir === "right") {
-    ctx.fillRect(-3 * u + side * u, -6 * u - lA, 3 * u, 6 * u - lA * 0 + lA * 0);
-    ctx.fillRect(0 * u + side * u, -6 * u - lB, 3 * u, 6 * u);
-    ctx.fillRect(-3 * u + side * u, -6 * u - lA, 3 * u, 6 * u);
-  } else {
-    ctx.fillRect(-4 * u, -6 * u - lA, 3.5 * u, 6 * u + lA);
-    ctx.fillRect(0.5 * u, -6 * u - lB, 3.5 * u, 6 * u + lB);
-  }
-  // 신발
-  ctx.fillStyle = "#292524";
-  if (dir === "left" || dir === "right") {
-    ctx.fillRect(-3 * u + side * u, -1.5 * u - lA, 3 * u, 1.5 * u);
-    ctx.fillRect(0 * u + side * u, -1.5 * u - lB, 3 * u, 1.5 * u);
-  } else {
-    ctx.fillRect(-4 * u, -1.5 * u - lA, 3.5 * u, 1.5 * u);
-    ctx.fillRect(0.5 * u, -1.5 * u - lB, 3.5 * u, 1.5 * u);
-  }
-
-  // ----- 몸통(상의) -----
   const bodyTop = -14 * u;
-  ctx.fillStyle = top;
-  roundRect(ctx, -5 * u, bodyTop, 10 * u, 8.5 * u, 3);
-  ctx.fill();
-  ctx.fillStyle = darken(top, 0.18);
-  ctx.fillRect(-5 * u, bodyTop + 6.5 * u, 10 * u, 2 * u);
-  if (dir !== "up") {
-    ctx.fillStyle = lighten(top, 0.1);
-    ctx.fillRect(-5 * u + u, bodyTop + u, 3 * u, 1.5 * u);
+
+  // ----- 망토 (몸 뒤) -----
+  if (app.special === "cape" && !ghost) {
+    const flap = moving || dancing ? Math.sin(t / 120) * 2 : Math.sin(t / 600) * 1;
+    ctx.fillStyle = "#dc2626";
+    ctx.beginPath();
+    ctx.moveTo(-5 * u, bodyTop + u);
+    ctx.lineTo(5 * u, bodyTop + u);
+    ctx.lineTo(6.5 * u + flap, 0.5 * u);
+    ctx.lineTo(-6.5 * u - flap, 0.5 * u);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#991b1b";
+    ctx.fillRect(-5 * u, bodyTop + u, 10 * u, 1.2 * u);
   }
 
-  // ----- 팔 (스윙) -----
+  // ----- 다리 + 신발 -----
+  if (ghost) {
+    // 유령: 다리 대신 물결 꼬리
+    ctx.fillStyle = top;
+    ctx.beginPath();
+    ctx.moveTo(-5 * u, bodyTop + 8 * u);
+    ctx.lineTo(5 * u, bodyTop + 8 * u);
+    ctx.lineTo(5 * u, -2 * u);
+    for (let i = 0; i < 4; i++) {
+      const wx = 5 * u - (i + 0.5) * 2.5 * u;
+      const wy = i % 2 === 0 ? 0.5 * u + Math.sin(t / 300) * 1.5 : -2 * u;
+      ctx.lineTo(wx, wy);
+    }
+    ctx.lineTo(-5 * u, -2 * u);
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    const legLift = [0, 2, 0, 2];
+    const lA = moving ? legLift[step] : dancing ? danceBeat * 2 : 0;
+    const lB = moving ? legLift[(step + 2) % 4] : dancing ? (1 - danceBeat) * 2 : 0;
+    ctx.fillStyle = pants;
+    if (dir === "left" || dir === "right") {
+      ctx.fillRect(-3 * u + side * u, -6 * u - lA, 3 * u, 6 * u);
+      ctx.fillRect(0 * u + side * u, -6 * u - lB, 3 * u, 6 * u);
+    } else {
+      ctx.fillRect(-4 * u, -6 * u - lA, 3.5 * u, 6 * u + lA);
+      ctx.fillRect(0.5 * u, -6 * u - lB, 3.5 * u, 6 * u + lB);
+    }
+    ctx.fillStyle = shoesC;
+    if (dir === "left" || dir === "right") {
+      ctx.fillRect(-3 * u + side * u, -1.5 * u - lA, 3.5 * u, 1.5 * u);
+      ctx.fillRect(0 * u + side * u, -1.5 * u - lB, 3.5 * u, 1.5 * u);
+    } else {
+      ctx.fillRect(-4 * u, -1.5 * u - lA, 3.5 * u, 1.5 * u);
+      ctx.fillRect(0.5 * u, -1.5 * u - lB, 3.5 * u, 1.5 * u);
+    }
+  }
+
+  // ----- 몸통(상의) — 스타일별 -----
+  drawTop(ctx, u, bodyTop, top, app.topStyle ?? "tshirt", dir, ghost);
+
+  // ----- 팔 (스윙/춤/손들기) -----
   const armSwing = moving ? (step === 1 ? 2 : step === 3 ? -2 : 0) : 0;
-  ctx.fillStyle = darken(top, 0.1);
+  const armC = app.topStyle === "suit" && !ghost ? darken("#2b3040", 0.05) : darken(top, 0.1);
+  ctx.fillStyle = armC;
   const handRaised = extras?.hand;
-  if (dir === "left" || dir === "right") {
+  if (dancing && dir !== "left" && dir !== "right") {
+    // 춤: 양팔 번갈아 번쩍
+    const upL = danceBeat === 0;
+    if (upL) {
+      ctx.fillRect(-7 * u, bodyTop - 5 * u, 2.5 * u, 7 * u);
+      ctx.fillRect(4.5 * u, bodyTop + u, 2.5 * u, 6 * u);
+    } else {
+      ctx.fillRect(-7 * u, bodyTop + u, 2.5 * u, 6 * u);
+      ctx.fillRect(4.5 * u, bodyTop - 5 * u, 2.5 * u, 7 * u);
+    }
+    ctx.fillStyle = skin;
+    if (upL) ctx.fillRect(-7 * u, bodyTop - 7 * u, 2.5 * u, 2.5 * u);
+    else ctx.fillRect(4.5 * u, bodyTop - 7 * u, 2.5 * u, 2.5 * u);
+  } else if (dir === "left" || dir === "right") {
     ctx.fillRect(side * 4 * u - u, bodyTop + 1.5 * u + armSwing, 2.5 * u, 6 * u);
+    ctx.fillStyle = skin;
+    ctx.fillRect(side * 4 * u - u, bodyTop + 7 * u + armSwing, 2.5 * u, 2 * u);
   } else {
     ctx.fillRect(-7 * u, bodyTop + u + armSwing, 2.5 * u, 6 * u);
     if (handRaised) {
-      // 오른팔 번쩍
       ctx.fillRect(4.5 * u, bodyTop - 6 * u, 2.5 * u, 7 * u);
       ctx.fillStyle = skin;
       ctx.fillRect(4.5 * u, bodyTop - 8 * u, 2.5 * u, 2.5 * u);
-      ctx.fillStyle = darken(top, 0.1);
+      ctx.fillRect(-7 * u, bodyTop + 6.5 * u + armSwing, 2.5 * u, 2 * u);
     } else {
       ctx.fillRect(4.5 * u, bodyTop + u - armSwing, 2.5 * u, 6 * u);
-    }
-  }
-  // 손
-  if (!handRaised) {
-    ctx.fillStyle = skin;
-    if (dir === "left" || dir === "right") {
-      ctx.fillRect(side * 4 * u - u, bodyTop + 7 * u + armSwing, 2.5 * u, 2 * u);
-    } else {
+      ctx.fillStyle = skin;
       ctx.fillRect(-7 * u, bodyTop + 6.5 * u + armSwing, 2.5 * u, 2 * u);
       ctx.fillRect(4.5 * u, bodyTop + 6.5 * u - armSwing, 2.5 * u, 2 * u);
     }
@@ -885,15 +1175,34 @@ export function drawCharacter(
   ctx.fillStyle = skin;
   roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
   ctx.fill();
+  // 외곽선 (게더 스타일의 또렷한 실루엣)
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = 1.2;
+  roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
+  ctx.stroke();
 
   // ----- 머리카락 -----
   drawHair(ctx, u, headTop, app.hair ?? "short", hairC, dir);
 
-  // ----- 얼굴 -----
-  if (dir !== "up") drawFacePixel(ctx, u, headTop, dir, app.face, skin);
+  // ----- 얼굴/수염/안경 -----
+  if (dir !== "up") {
+    drawFacePixel(ctx, u, headTop, dir, app.face, skin);
+    drawFacialHair(ctx, u, headTop, dir, app.facialHair ?? "none", hairC);
+    drawGlasses(ctx, u, headTop, dir, app.glasses ?? "none");
+  }
 
   // ----- 모자 -----
   drawHatPixel(ctx, u, headTop, app.hat, top);
+
+  // 춤 음표
+  if (dancing) {
+    ctx.globalAlpha = 0.9;
+    ctx.font = "11px serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#a5b4fc";
+    ctx.fillText(danceBeat === 0 ? "♪" : "♫", 8 * u, headTop - 4 * u);
+    ctx.globalAlpha = ghost ? 0.72 : 1;
+  }
 
   ctx.restore();
 
@@ -935,6 +1244,127 @@ export function drawCharacter(
     ctx.font = "14px serif";
     ctx.fillText("✋", cx + boxW / 2 + 10, labelY - 1);
   }
+}
+
+// 상의 스타일별 몸통 렌더 (티셔츠/후디/정장/줄무늬)
+function drawTop(
+  ctx: CanvasRenderingContext2D,
+  u: number,
+  bodyTop: number,
+  color: string,
+  style: string,
+  dir: Direction,
+  ghost: boolean
+) {
+  const H = 8.5 * u;
+  if (style === "suit" && !ghost) {
+    // 정장: 짙은 자켓 + 셔츠 + 넥타이
+    ctx.fillStyle = "#2b3040";
+    roundRect(ctx, -5 * u, bodyTop, 10 * u, H, 3);
+    ctx.fill();
+    if (dir !== "up") {
+      ctx.fillStyle = "#f3f4f6";
+      ctx.beginPath();
+      ctx.moveTo(-1.5 * u, bodyTop);
+      ctx.lineTo(1.5 * u, bodyTop);
+      ctx.lineTo(0, bodyTop + 3.5 * u);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = color;
+      ctx.fillRect(-0.6 * u, bodyTop + 0.5 * u, 1.2 * u, 3.5 * u); // 넥타이
+    }
+  } else {
+    ctx.fillStyle = color;
+    roundRect(ctx, -5 * u, bodyTop, 10 * u, H, 3);
+    ctx.fill();
+    if (style === "stripe") {
+      ctx.fillStyle = ghost ? "rgba(255,255,255,0.5)" : lighten(color, 0.45);
+      ctx.fillRect(-5 * u, bodyTop + 1.5 * u, 10 * u, 1.2 * u);
+      ctx.fillRect(-5 * u, bodyTop + 4.2 * u, 10 * u, 1.2 * u);
+    } else if (style === "hoodie") {
+      // 후드 라인 + 주머니 + 끈
+      ctx.fillStyle = darken(color, 0.2);
+      roundRect(ctx, -5 * u, bodyTop - 0.8 * u, 10 * u, 2.2 * u, 3); // 후드 뭉치
+      ctx.fill();
+      if (dir !== "up") {
+        ctx.fillStyle = darken(color, 0.25);
+        roundRect(ctx, -2.5 * u, bodyTop + 4.5 * u, 5 * u, 2.5 * u, 2); // 주머니
+        ctx.fill();
+        ctx.fillStyle = "#f3f4f6";
+        ctx.fillRect(-1.2 * u, bodyTop + 1 * u, 0.7 * u, 2.2 * u); // 끈
+        ctx.fillRect(0.5 * u, bodyTop + 1 * u, 0.7 * u, 2.2 * u);
+      }
+    } else if (dir !== "up") {
+      ctx.fillStyle = lighten(color, 0.1);
+      ctx.fillRect(-5 * u + u, bodyTop + u, 3 * u, 1.5 * u);
+    }
+    ctx.fillStyle = darken(color, 0.18);
+    ctx.fillRect(-5 * u, bodyTop + 6.5 * u, 10 * u, 2 * u);
+  }
+  // 외곽선
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = 1.2;
+  roundRect(ctx, -5 * u, bodyTop, 10 * u, H, 3);
+  ctx.stroke();
+}
+
+// 수염
+function drawFacialHair(
+  ctx: CanvasRenderingContext2D,
+  u: number,
+  headTop: number,
+  dir: Direction,
+  kind: string,
+  color: string
+) {
+  if (kind === "none") return;
+  const off = dir === "left" ? -1.5 * u : dir === "right" ? 1.5 * u : 0;
+  const mouthY = headTop + 7.5 * u;
+  ctx.fillStyle = color;
+  if (kind === "mustache") {
+    ctx.fillRect(off - 2.2 * u, mouthY - 1.2 * u, 4.4 * u, 1.1 * u);
+  } else if (kind === "beard") {
+    ctx.fillRect(off - 3.5 * u, mouthY - 0.5 * u, 7 * u, 2.5 * u);
+    ctx.fillRect(off - 2.2 * u, mouthY - 1.4 * u, 4.4 * u, 1 * u);
+  } else if (kind === "goatee") {
+    ctx.fillRect(off - 1.2 * u, mouthY + 0.4 * u, 2.4 * u, 1.6 * u);
+  }
+}
+
+// 안경
+function drawGlasses(
+  ctx: CanvasRenderingContext2D,
+  u: number,
+  headTop: number,
+  dir: Direction,
+  kind: string
+) {
+  if (kind === "none") return;
+  const off = dir === "left" ? -1.5 * u : dir === "right" ? 1.5 * u : 0;
+  const eyeY = headTop + 4.5 * u;
+  const ex = 2.5 * u;
+  if (kind === "sunglasses") {
+    ctx.fillStyle = "#111827";
+    ctx.fillRect(off - ex - 1.6 * u, eyeY - 1.1 * u, (ex + 1.6 * u) * 2, 1 * u);
+    ctx.fillRect(off - ex - 1.4 * u, eyeY - 1.1 * u, 2.8 * u, 2.6 * u);
+    ctx.fillRect(off + ex - 1.4 * u, eyeY - 1.1 * u, 2.8 * u, 2.6 * u);
+    return;
+  }
+  ctx.strokeStyle = "#1f2937";
+  ctx.lineWidth = 1;
+  if (kind === "round") {
+    ctx.beginPath();
+    ctx.arc(off - ex, eyeY, 1.6 * u, 0, Math.PI * 2);
+    ctx.arc(off + ex, eyeY, 1.6 * u, 0, Math.PI * 2);
+    ctx.stroke();
+  } else {
+    ctx.strokeRect(off - ex - 1.4 * u, eyeY - 1.2 * u, 2.8 * u, 2.4 * u);
+    ctx.strokeRect(off + ex - 1.4 * u, eyeY - 1.2 * u, 2.8 * u, 2.4 * u);
+  }
+  ctx.beginPath();
+  ctx.moveTo(off - ex + 1.4 * u, eyeY - 0.2 * u);
+  ctx.lineTo(off + ex - 1.4 * u, eyeY - 0.2 * u);
+  ctx.stroke();
 }
 
 function drawHair(
@@ -1021,15 +1451,15 @@ function drawFacePixel(
   const eyeY = headTop + 4.5 * u;
   const ex = 2.5 * u;
 
+  ctx.fillStyle = "#1f2937";
   if (face === "cool") {
-    ctx.fillStyle = "#111827";
-    ctx.fillRect(off - ex - 1.5 * u, eyeY - u, (ex + 1.5 * u) * 2, u);
-    ctx.fillRect(off - ex - u, eyeY - u, 2.5 * u, 2.5 * u);
-    ctx.fillRect(off + ex - 1.5 * u, eyeY - u, 2.5 * u, 2.5 * u);
+    // 무표정: 일자 눈 + 일자 입
+    ctx.fillRect(off - ex - u, eyeY - u * 0.4, 2 * u, u * 0.9);
+    ctx.fillRect(off + ex - u, eyeY - u * 0.4, 2 * u, u * 0.9);
+    ctx.fillStyle = darken(skin, 0.45);
+    ctx.fillRect(off - 1.2 * u, eyeY + 3 * u, 2.4 * u, u * 0.7);
     return;
   }
-
-  ctx.fillStyle = "#1f2937";
   if (face === "wink") {
     ctx.fillRect(off - ex - u, eyeY - u / 2, 1.5 * u, 1.5 * u);
     ctx.fillRect(off + ex - 1.5 * u, eyeY, 2.5 * u, u * 0.7);

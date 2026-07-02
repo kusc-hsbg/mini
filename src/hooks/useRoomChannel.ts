@@ -32,6 +32,7 @@ const EVENTS: RtEventName[] = [
   "wb",
   "map-update",
   "desk-update",
+  "race",
 ];
 
 // 한 방의 실시간 채널 (Supabase Realtime presence + broadcast).

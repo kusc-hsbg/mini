@@ -1,21 +1,20 @@
 -- =====================================================================
--- PixelTown (Gather Town Clone) — Supabase 전체 스키마
--- Supabase Dashboard > SQL Editor 에 전체를 붙여넣고 실행하세요.
--- 여러 번 실행해도 안전합니다 (idempotent).
+-- PixelTown (Gather Town Clone) ??Supabase ?꾩껜 ?ㅽ궎留?-- Supabase Dashboard > SQL Editor ???꾩껜瑜?遺숈뿬?ｊ퀬 ?ㅽ뻾?섏꽭??
+-- ?щ윭 踰??ㅽ뻾?대룄 ?덉쟾?⑸땲??(idempotent).
 -- =====================================================================
 
-create extension if not exists pgcrypto;
+create extension if not exists pgcrypto with schema extensions;
 
 -- ---------------------------------------------------------------
--- profiles: 유저 프로필 + 캐릭터 외형 + 상태
+-- profiles: ?좎? ?꾨줈??+ 罹먮┃???명삎 + ?곹깭
 -- ---------------------------------------------------------------
 create table if not exists public.profiles (
   id             uuid primary key references auth.users(id) on delete cascade,
   username       text unique,
   display_name   text not null default 'Player',
   skin           text not null default '#f1c27d',
-  color          text not null default '#6c8cff',   -- 상의
-  pants          text not null default '#1f2937',   -- 하의
+  color          text not null default '#6c8cff',   -- ?곸쓽
+  pants          text not null default '#1f2937',   -- ?섏쓽
   hair           text not null default 'short',
   hair_color     text not null default '#4b3621',
   hat            text not null default 'none',
@@ -26,12 +25,18 @@ create table if not exists public.profiles (
   updated_at     timestamptz not null default now()
 );
 
--- 기존 배포 업그레이드용
+-- 湲곗〈 諛고룷 ?낃렇?덉씠?쒖슜
 alter table public.profiles add column if not exists pants text not null default '#1f2937';
 alter table public.profiles add column if not exists hair text not null default 'short';
 alter table public.profiles add column if not exists hair_color text not null default '#4b3621';
 alter table public.profiles add column if not exists status text not null default 'available';
 alter table public.profiles add column if not exists status_message text;
+-- avatar v2 (top style / shoes / facial hair / glasses / special costume)
+alter table public.profiles add column if not exists top_style text not null default 'tshirt';
+alter table public.profiles add column if not exists shoes text not null default '#292524';
+alter table public.profiles add column if not exists facial_hair text not null default 'none';
+alter table public.profiles add column if not exists glasses text not null default 'none';
+alter table public.profiles add column if not exists special text not null default 'none';
 
 alter table public.profiles enable row level security;
 
@@ -78,7 +83,7 @@ create trigger profiles_touch before update on public.profiles
   for each row execute function public.touch_updated_at();
 
 -- ---------------------------------------------------------------
--- spaces: 가상 공간 (고유 URL slug 보유)
+-- spaces: 媛??怨듦컙 (怨좎쑀 URL slug 蹂댁쑀)
 -- ---------------------------------------------------------------
 create table if not exists public.spaces (
   id              uuid primary key default gen_random_uuid(),
@@ -89,21 +94,21 @@ create table if not exists public.spaces (
   is_public       boolean not null default true,
   has_password    boolean not null default false,
   require_login   boolean not null default false,
-  allowed_domains text[],           -- 이메일 도메인 제한 (null = 제한 없음)
+  allowed_domains text[],           -- ?대찓???꾨찓???쒗븳 (null = ?쒗븳 ?놁쓬)
   guest_checkin   boolean not null default false,
   created_at      timestamptz not null default now()
 );
 
--- 비밀번호 해시는 별도 테이블 (RLS로 완전 차단, RPC로만 접근)
+-- 鍮꾨?踰덊샇 ?댁떆??蹂꾨룄 ?뚯씠釉?(RLS濡??꾩쟾 李⑤떒, RPC濡쒕쭔 ?묎렐)
 create table if not exists public.space_secrets (
   space_id      uuid primary key references public.spaces(id) on delete cascade,
   password_hash text not null
 );
 alter table public.space_secrets enable row level security;
--- (정책 없음 = 아무도 직접 접근 불가; security definer 함수만 사용)
+-- (?뺤콉 ?놁쓬 = ?꾨Т??吏곸젒 ?묎렐 遺덇?; security definer ?⑥닔留??ъ슜)
 
 -- ---------------------------------------------------------------
--- space_members: 역할 (admin / moderator / mapmaker / member)
+-- space_members: ??븷 (admin / moderator / mapmaker / member)
 -- ---------------------------------------------------------------
 create table if not exists public.space_members (
   space_id   uuid not null references public.spaces(id) on delete cascade,
@@ -114,7 +119,7 @@ create table if not exists public.space_members (
   primary key (space_id, user_id)
 );
 
--- RLS 재귀를 피하기 위한 helper (security definer)
+-- RLS ?ш?瑜??쇳븯湲??꾪븳 helper (security definer)
 create or replace function public.is_space_member(p_space uuid, p_user uuid)
 returns boolean language sql stable security definer set search_path = public as $$
   select exists (
@@ -185,7 +190,7 @@ drop policy if exists "admin remove or leave" on public.space_members;
 create policy "admin remove or leave" on public.space_members for delete
   using (user_id = auth.uid() or public.is_space_admin(space_id, auth.uid()));
 
--- 스페이스 생성 시: 오너를 admin 멤버로 + 기본 방 3개 생성
+-- ?ㅽ럹?댁뒪 ?앹꽦 ?? ?ㅻ꼫瑜?admin 硫ㅻ쾭濡?+ 湲곕낯 諛?3媛??앹꽦
 create or replace function public.handle_new_space()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
@@ -193,9 +198,10 @@ begin
   values (new.id, new.owner_id, 'admin')
   on conflict do nothing;
   insert into public.rooms (space_id, name, template_key, sort_order) values
-    (new.id, '타운 스퀘어', 'plaza', 0),
-    (new.id, '픽셀 오피스', 'office', 1),
-    (new.id, '선셋 파크', 'garden', 2);
+    (new.id, 'Main Plaza', 'plaza', 0),
+    (new.id, 'Office', 'office', 1),
+    (new.id, 'Garden', 'garden', 2),
+    (new.id, 'Grand Prix Circuit', 'circuit', 3);
   return new;
 end;
 $$;
@@ -204,9 +210,9 @@ drop trigger if exists on_space_created on public.spaces;
 create trigger on_space_created after insert on public.spaces
   for each row execute function public.handle_new_space();
 
--- 비밀번호 설정/검증 RPC
+-- 鍮꾨?踰덊샇 ?ㅼ젙/寃利?RPC
 create or replace function public.set_space_password(p_space uuid, p_password text)
-returns void language plpgsql security definer set search_path = public as $$
+returns void language plpgsql security definer set search_path = public, extensions as $$
 begin
   if not public.is_space_admin(p_space, auth.uid()) then
     raise exception 'not allowed';
@@ -216,7 +222,7 @@ begin
     update public.spaces set has_password = false where id = p_space;
   else
     insert into public.space_secrets (space_id, password_hash)
-    values (p_space, crypt(p_password, gen_salt('bf')))
+    values (p_space, extensions.crypt(p_password, extensions.gen_salt('bf')))
     on conflict (space_id) do update set password_hash = excluded.password_hash;
     update public.spaces set has_password = true where id = p_space;
   end if;
@@ -224,20 +230,20 @@ end;
 $$;
 
 create or replace function public.verify_space_password(p_space uuid, p_password text)
-returns boolean language sql stable security definer set search_path = public as $$
+returns boolean language sql stable security definer set search_path = public, extensions as $$
   select exists (
     select 1 from public.space_secrets
-    where space_id = p_space and password_hash = crypt(p_password, password_hash)
+    where space_id = p_space and password_hash = extensions.crypt(p_password, password_hash)
   );
 $$;
 
 -- ---------------------------------------------------------------
--- space_bans: 밴 목록 (유저 id 또는 게스트 key)
+-- space_bans: 諛?紐⑸줉 (?좎? id ?먮뒗 寃뚯뒪??key)
 -- ---------------------------------------------------------------
 create table if not exists public.space_bans (
   id         uuid primary key default gen_random_uuid(),
   space_id   uuid not null references public.spaces(id) on delete cascade,
-  target_key text not null,          -- auth uid 또는 guest_xxx
+  target_key text not null,          -- auth uid ?먮뒗 guest_xxx
   target_name text,
   reason     text,
   created_by uuid references auth.users(id) on delete set null,
@@ -258,14 +264,13 @@ create policy "mods unban" on public.space_bans for delete
   using (public.is_space_mod(space_id, auth.uid()));
 
 -- ---------------------------------------------------------------
--- rooms: 스페이스 안의 개별 맵
--- ---------------------------------------------------------------
+-- rooms: ?ㅽ럹?댁뒪 ?덉쓽 媛쒕퀎 留?-- ---------------------------------------------------------------
 create table if not exists public.rooms (
   id           uuid primary key default gen_random_uuid(),
   space_id     uuid not null references public.spaces(id) on delete cascade,
   name         text not null,
   template_key text not null default 'plaza',
-  map_data     jsonb,               -- 맵 에디터 수정본 (null = 템플릿 그대로)
+  map_data     jsonb,               -- 留??먮뵒???섏젙蹂?(null = ?쒗뵆由?洹몃?濡?
   sort_order   int not null default 0,
   created_at   timestamptz not null default now()
 );
@@ -305,7 +310,7 @@ create policy "admins delete rooms" on public.rooms for delete
   using (public.is_space_admin(space_id, auth.uid()));
 
 -- ---------------------------------------------------------------
--- desks: 데스크 지정 (오브젝트 id 기준)
+-- desks: ?곗뒪??吏??(?ㅻ툕?앺듃 id 湲곗?)
 -- ---------------------------------------------------------------
 create table if not exists public.desks (
   id         uuid primary key default gen_random_uuid(),
@@ -341,14 +346,14 @@ create trigger desks_touch before update on public.desks
   for each row execute function public.touch_updated_at();
 
 -- ---------------------------------------------------------------
--- desk_notes: 데스크에 남기는 쪽지/선물 (비동기)
+-- desk_notes: ?곗뒪?ъ뿉 ?④린??履쎌?/?좊Ъ (鍮꾨룞湲?
 -- ---------------------------------------------------------------
 create table if not exists public.desk_notes (
   id             uuid primary key default gen_random_uuid(),
   space_id       uuid not null references public.spaces(id) on delete cascade,
   desk_object_id text not null,
   to_user        uuid not null references auth.users(id) on delete cascade,
-  from_name      text not null default '익명',
+  from_name      text not null default 'anonymous',
   message        text not null,
   gift           text,
   read           boolean not null default false,
@@ -374,7 +379,7 @@ create policy "delete own notes" on public.desk_notes for delete
   using (to_user = auth.uid());
 
 -- ---------------------------------------------------------------
--- meetings: 회의 예약 (내부 캘린더, .ics 내보내기 지원)
+-- meetings: ?뚯쓽 ?덉빟 (?대? 罹섎┛?? .ics ?대낫?닿린 吏??
 -- ---------------------------------------------------------------
 create table if not exists public.meetings (
   id            uuid primary key default gen_random_uuid(),
@@ -409,13 +414,13 @@ create policy "creator deletes meetings" on public.meetings for delete
   using (created_by = auth.uid() or public.is_space_admin(space_id, auth.uid()));
 
 -- ---------------------------------------------------------------
--- dm_messages: 1:1 다이렉트 메시지 (로그인 유저 간 영속 저장)
+-- dm_messages: 1:1 ?ㅼ씠?됲듃 硫붿떆吏 (濡쒓렇???좎? 媛??곸냽 ???
 -- ---------------------------------------------------------------
 create table if not exists public.dm_messages (
   id         uuid primary key default gen_random_uuid(),
   space_id   uuid references public.spaces(id) on delete cascade,
   from_id    uuid not null references auth.users(id) on delete cascade,
-  from_name  text not null default '',
+  from_name      text not null default 'anonymous',
   to_id      uuid not null references auth.users(id) on delete cascade,
   body       text not null,
   created_at timestamptz not null default now()
@@ -433,7 +438,7 @@ create policy "read own dm" on public.dm_messages for select
   using (auth.uid() = from_id or auth.uid() = to_id);
 
 -- ---------------------------------------------------------------
--- bulletin_posts: 게시판 오브젝트의 글
+-- bulletin_posts: 寃뚯떆???ㅻ툕?앺듃??湲
 -- ---------------------------------------------------------------
 create table if not exists public.bulletin_posts (
   id          uuid primary key default gen_random_uuid(),
@@ -441,7 +446,7 @@ create table if not exists public.bulletin_posts (
   room_id     uuid not null references public.rooms(id) on delete cascade,
   object_id   text not null,
   author_id   uuid references auth.users(id) on delete set null,
-  author_name text not null default '익명',
+  author_name text not null default 'anonymous',
   content     text not null,
   url         text,
   created_at  timestamptz not null default now()
@@ -462,11 +467,11 @@ create policy "author or mod delete post" on public.bulletin_posts for delete
   using (author_id = auth.uid() or public.is_space_mod(space_id, auth.uid()));
 
 -- ---------------------------------------------------------------
--- whiteboards: 화이트보드 영속화 (URL 공유용)
+-- whiteboards: ?붿씠?몃낫???곸냽??(URL 怨듭쑀??
 -- ---------------------------------------------------------------
 create table if not exists public.whiteboards (
   id         uuid primary key default gen_random_uuid(),
-  board_key  text unique not null,   -- "<spaceId>:<objectId>" 또는 "annot:<...>"
+  board_key  text unique not null,   -- "<spaceId>:<objectId>" ?먮뒗 "annot:<...>"
   space_id   uuid references public.spaces(id) on delete cascade,
   ops        jsonb not null default '[]'::jsonb,
   updated_at timestamptz not null default now()
@@ -489,51 +494,63 @@ create trigger whiteboards_touch before update on public.whiteboards
   for each row execute function public.touch_updated_at();
 
 -- ---------------------------------------------------------------
--- guest_logs: 게스트 체크인 기록
+-- guest_logs: guest check-in logs
 -- ---------------------------------------------------------------
 create table if not exists public.guest_logs (
   id          uuid primary key default gen_random_uuid(),
   space_id    uuid not null references public.spaces(id) on delete cascade,
   guest_key   text not null,
-  guest_name  text not null default '게스트',
+  guest_name  text not null default 'guest',
   approved_by text,
   entered_at  timestamptz not null default now()
 );
-create index if not exists guest_logs_space_idx on public.guest_logs(space_id, entered_at);
+
+create index if not exists guest_logs_space_idx
+  on public.guest_logs(space_id, entered_at);
+
 alter table public.guest_logs enable row level security;
 
 drop policy if exists "anyone logs entry" on public.guest_logs;
-create policy "anyone logs entry" on public.guest_logs for insert with check (true);
+create policy "anyone logs entry"
+  on public.guest_logs for insert
+  with check (true);
 
 drop policy if exists "admins read guest log" on public.guest_logs;
-create policy "admins read guest log" on public.guest_logs for select
+create policy "admins read guest log"
+  on public.guest_logs for select
   using (public.is_space_admin(space_id, auth.uid()));
 
 -- ---------------------------------------------------------------
--- analytics_events: 인사이트용 이벤트 로그
+-- analytics_events: analytics event logs
 -- ---------------------------------------------------------------
 create table if not exists public.analytics_events (
   id         bigint generated always as identity primary key,
   space_id   uuid not null references public.spaces(id) on delete cascade,
   room_id    uuid,
-  user_key   text not null,           -- uid 또는 guest key
+  user_key   text not null,
   user_name  text,
-  kind       text not null,           -- join | leave | chat | conv_seconds | online_peak
+  kind       text not null,
   value      numeric,
   created_at timestamptz not null default now()
 );
-create index if not exists analytics_space_idx on public.analytics_events(space_id, created_at);
+
+create index if not exists analytics_space_idx
+  on public.analytics_events(space_id, created_at);
+
 alter table public.analytics_events enable row level security;
 
 drop policy if exists "anyone writes analytics" on public.analytics_events;
-create policy "anyone writes analytics" on public.analytics_events for insert with check (true);
+create policy "anyone writes analytics"
+  on public.analytics_events for insert
+  with check (true);
 
 drop policy if exists "admins read analytics" on public.analytics_events;
-create policy "admins read analytics" on public.analytics_events for select
+create policy "admins read analytics"
+  on public.analytics_events for select
   using (public.is_space_admin(space_id, auth.uid()));
 
 -- ---------------------------------------------------------------
--- blocks: 유저 차단 (연결/채팅 차단, 클라이언트에서 적용)
+-- blocks: user block list
 -- ---------------------------------------------------------------
 create table if not exists public.blocks (
   user_id     uuid not null references auth.users(id) on delete cascade,
@@ -541,13 +558,30 @@ create table if not exists public.blocks (
   created_at  timestamptz not null default now(),
   primary key (user_id, blocked_key)
 );
+
 alter table public.blocks enable row level security;
 
 drop policy if exists "own blocks" on public.blocks;
-create policy "own blocks" on public.blocks for select using (user_id = auth.uid());
+create policy "own blocks"
+  on public.blocks for select
+  using (user_id = auth.uid());
 
 drop policy if exists "add block" on public.blocks;
-create policy "add block" on public.blocks for insert with check (user_id = auth.uid());
+create policy "add block"
+  on public.blocks for insert
+  with check (user_id = auth.uid());
 
 drop policy if exists "remove block" on public.blocks;
-create policy "remove block" on public.blocks for delete using (user_id = auth.uid());
+create policy "remove block"
+  on public.blocks for delete
+  using (user_id = auth.uid());
+
+-- ---------------------------------------------------------------
+-- backfill: add Grand Prix Circuit room to spaces created before this update
+-- ---------------------------------------------------------------
+insert into public.rooms (space_id, name, template_key, sort_order)
+select s.id, 'Grand Prix Circuit', 'circuit', 3
+from public.spaces s
+where not exists (
+  select 1 from public.rooms r where r.space_id = s.id and r.template_key = 'circuit'
+);

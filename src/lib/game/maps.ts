@@ -15,6 +15,7 @@ export interface TileInfo {
   color: string;
   solid: boolean;
   bike?: boolean;
+  boost?: boolean; // 스피드 부스트 패드
   accent?: string;
   outdoor?: boolean;
 }
@@ -36,6 +37,11 @@ export const TILE_INFO: Record<string, TileInfo> = {
   "#": { color: "#5b6273", solid: true, accent: "#787f92" },
   x: { color: "#12161f", solid: true },
   B: { color: "#4a5058", solid: false, bike: true, accent: "#fbbf24" },
+  a: { color: "#3f444c", solid: false, accent: "#4a5058" }, // 서킷 아스팔트(차선 없음)
+  r: { color: "#d64545", solid: false, accent: "#f3f4f6" }, // 레이싱 연석(빨강/흰색)
+  b: { color: "#3f444c", solid: false, bike: true, accent: "#fbbf24" }, // 카트 패드
+  "^": { color: "#3f444c", solid: false, boost: true, accent: "#fbbf24" }, // 스피드 부스트
+  F: { color: "#3f444c", solid: false, accent: "#e5e7eb" }, // 체커(결승선)
 };
 
 // ---------- 맵 데이터 구조 ----------
@@ -108,6 +114,19 @@ export interface MapLabel {
   text: string;
 }
 
+// 레이스(그랑프리) 설정 — 타일 좌표 사각형.
+export interface RaceRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+export interface RaceConfig {
+  laps: number;
+  start: RaceRect; // 출발/결승선
+  checkpoints: RaceRect[]; // 순서대로 통과해야 랩 인정
+}
+
 export interface MapData {
   key: string;
   name: string;
@@ -119,6 +138,8 @@ export interface MapData {
   spawns: TilePoint[];
   spotlights: TilePoint[];
   labels: MapLabel[];
+  vehicle?: "bike" | "kart"; // B 타일 탑승 시 탈것 종류 (기본 bike)
+  race?: RaceConfig;
 }
 
 // ---------- 조회 헬퍼 ----------
@@ -171,6 +192,23 @@ export function isSolidPx(grid: boolean[][], px: number, py: number): boolean {
 export function bikeZoneAt(map: MapData, px: number, py: number): boolean {
   const ch = tileAt(map, Math.floor(px / TILE), Math.floor(py / TILE));
   return !!TILE_INFO[ch]?.bike;
+}
+
+export function boostAt(map: MapData, px: number, py: number): boolean {
+  const ch = tileAt(map, Math.floor(px / TILE), Math.floor(py / TILE));
+  return !!TILE_INFO[ch]?.boost;
+}
+
+// 탈것 주행 시 노면 감속 여부 (잔디/모래/흙 = 오프로드)
+export function offroadAt(map: MapData, px: number, py: number): boolean {
+  const ch = tileAt(map, Math.floor(px / TILE), Math.floor(py / TILE));
+  return [",", ";", "s", "d"].includes(ch);
+}
+
+export function inRaceRect(r: RaceRect, px: number, py: number): boolean {
+  const c = px / TILE;
+  const row = py / TILE;
+  return c >= r.x && c < r.x + r.w && row >= r.y && row < r.y + r.h;
 }
 
 export function areaAtPx(map: MapData, px: number, py: number): PrivateArea | null {

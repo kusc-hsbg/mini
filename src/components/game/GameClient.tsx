@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { GameEngine } from "@/lib/game/engine";
+import { GameEngine, type RaceState } from "@/lib/game/engine";
 import {
   MapData,
   MapObject,
@@ -50,6 +50,7 @@ import WhiteboardModal from "./WhiteboardModal";
 import BulletinModal from "./BulletinModal";
 import TetrisModal from "./TetrisModal";
 import DeskModal from "./DeskModal";
+import RaceHud, { fmtMs, type LeaderEntry } from "./RaceHud";
 import { Modal, ToastStack, type ToastItem } from "./ui";
 
 const GUEST_KEY = "pixeltown:guest-appearance";
@@ -77,11 +78,16 @@ function resolveGuestIdentity(): Identity {
   let appearance: CharacterAppearance = {
     skin: "#f1c27d",
     color: "#6c8cff",
+    topStyle: "tshirt",
     pants: "#1f2937",
+    shoes: "#292524",
     hair: "short",
     hairColor: "#4b3621",
+    facialHair: "none",
     hat: "none",
+    glasses: "none",
     face: "smile",
+    special: "none",
   };
   let name = "게스트-" + id.slice(-4);
   try {
@@ -89,13 +95,19 @@ function resolveGuestIdentity(): Identity {
     if (raw) {
       const g = JSON.parse(raw);
       appearance = {
+        ...appearance,
         skin: g.skin ?? appearance.skin,
         color: g.color ?? appearance.color,
+        topStyle: g.topStyle ?? "tshirt",
         pants: g.pants ?? appearance.pants,
+        shoes: g.shoes ?? appearance.shoes,
         hair: (g.hair as HairType) ?? "short",
         hairColor: g.hairColor ?? g.hair_color ?? appearance.hairColor,
+        facialHair: g.facialHair ?? "none",
         hat: (g.hat as HatType) ?? "none",
+        glasses: g.glasses ?? "none",
         face: (g.face as FaceType) ?? "smile",
+        special: g.special ?? "none",
       };
       if (g.name) name = g.name;
     }
@@ -158,11 +170,16 @@ export default function GameClient({
         appearance: {
           skin: profile.skin,
           color: profile.color,
+          topStyle: (profile.top_style as CharacterAppearance["topStyle"]) ?? "tshirt",
           pants: profile.pants ?? "#1f2937",
+          shoes: profile.shoes ?? "#292524",
           hair: (profile.hair as HairType) ?? "short",
           hairColor: profile.hair_color ?? "#4b3621",
+          facialHair: (profile.facial_hair as CharacterAppearance["facialHair"]) ?? "none",
           hat: profile.hat as HatType,
+          glasses: (profile.glasses as CharacterAppearance["glasses"]) ?? "none",
           face: profile.face as FaceType,
+          special: (profile.special as CharacterAppearance["special"]) ?? "none",
         },
       });
     } else {
@@ -193,6 +210,8 @@ export default function GameClient({
   const [hintObj, setHintObj] = useState<MapObject | null>(null);
   const [liveMap, setLiveMap] = useState<MapData>(() => resolveMap(room.template_key, room.map_data));
   const [mapEditorKey, setMapEditorKey] = useState(0);
+  const [raceState, setRaceState] = useState<RaceState | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderEntry[]>([]);
 
   const autoBusyRef = useRef(false);
   const myLocksRef = useRef<Set<string>>(new Set());
@@ -396,8 +415,34 @@ export default function GameClient({
         refetchDesks();
         break;
       }
+      case "race": {
+        const r = payload as RtEvents["race"];
+        if (blockedRef.current.has(r.from)) break;
+        if (r.kind === "finish" && r.totalMs != null) {
+          applyRaceRecord(r.from, r.name, r.totalMs);
+          addToast(`🏁 ${r.name}님이 ${r.laps}랩 완주! ${fmtMs(r.totalMs)}`);
+        } else if (r.kind === "start") {
+          addToast(`🚦 ${r.name}님이 레이스를 시작했어요!`);
+        }
+        break;
+      }
     }
   }
+
+  const applyRaceRecord = useCallback((id: string, name: string, totalMs: number) => {
+    setLeaderboard((prev) => {
+      const next = [...prev];
+      const existing = next.find((e) => e.id === id);
+      if (existing) {
+        existing.finishes++;
+        existing.name = name;
+        if (totalMs < existing.bestTotalMs) existing.bestTotalMs = totalMs;
+      } else {
+        next.push({ id, name, bestTotalMs: totalMs, finishes: 1 });
+      }
+      return next;
+    });
+  }, []);
 
   const refetchMap = useCallback(async () => {
     const supabase = getSupabaseBrowser();
@@ -460,6 +505,35 @@ export default function GameClient({
         onPortal: (portal) => handlePortal(portal),
         onInteractHint: (obj) => setHintObj(obj),
         onPlayerClick: () => setPanel("participants"),
+        onRace: (ev) => {
+          if (ev.kind === "start") {
+            addToast(`🚦 레이스 시작! ${ev.laps}랩 완주하세요`);
+            if (multiplayer)
+              channelRef.current.send("race", {
+                from: identity.id,
+                name: identity.name,
+                kind: "start",
+                lap: ev.lap,
+                laps: ev.laps,
+              });
+          } else if (ev.kind === "lap" && ev.lapMs != null) {
+            addToast(`⏱️ LAP ${ev.lap - 1} 완료 — ${fmtMs(ev.lapMs)}`);
+          } else if (ev.kind === "finish" && ev.totalMs != null) {
+            addToast(`🏆 완주! 총 기록 ${fmtMs(ev.totalMs)} — 포디움에 올라가보세요!`);
+            applyRaceRecord(identity.id, identity.name, ev.totalMs);
+            if (multiplayer)
+              channelRef.current.send("race", {
+                from: identity.id,
+                name: identity.name,
+                kind: "finish",
+                lap: ev.lap,
+                laps: ev.laps,
+                lapMs: ev.lapMs,
+                totalMs: ev.totalMs,
+                bestLapMs: ev.bestLapMs,
+              });
+          }
+        },
         onAreaBlocked: (area, reason) => {
           if (reason === "locked") {
             addToast(`🔒 "${area.name}" 영역이 잠겨 있어요`, "노크", () => {
@@ -560,6 +634,18 @@ export default function GameClient({
     }, 2000);
     return () => clearInterval(t);
   }, []);
+
+  // ----- 레이스 HUD 폴링 (서킷 맵에서만) -----
+  useEffect(() => {
+    if (!liveMap.race) {
+      setRaceState(null);
+      return;
+    }
+    const t = setInterval(() => {
+      setRaceState(engineRef.current?.getRaceState() ?? null);
+    }, 100);
+    return () => clearInterval(t);
+  }, [liveMap, engineReady]);
 
   // ----- WebRTC 연결 대상 계산 (근접/영역/스포트라이트/상태) -----
   useEffect(() => {
@@ -1155,8 +1241,11 @@ export default function GameClient({
       {/* ---------- 조작 안내 ---------- */}
       <div className="pointer-events-none absolute bottom-20 left-3 z-10 rounded-lg bg-panel/70 px-3 py-2 text-[11px] leading-relaxed text-slate-400 backdrop-blur">
         <div>WASD/방향키 이동 · 더블클릭 자동 이동 · X 상호작용{hintObj ? ` (${hintObj.name ?? "오브젝트"})` : ""}</div>
-        <div>1~0 이모지 · F 오토바이 · M 미니맵</div>
+        <div>1~0 이모지 · Z 춤 · F {liveMap.vehicle === "kart" ? "카트" : "오토바이"} · M 미니맵</div>
       </div>
+
+      {/* ---------- 레이스 HUD (그랑프리) ---------- */}
+      {identity && <RaceHud state={raceState} leaderboard={leaderboard} selfId={identity.id} />}
 
       {rtc.mediaError && (
         <div className="pointer-events-none absolute bottom-32 left-1/2 z-20 -translate-x-1/2 rounded-lg bg-red-500/90 px-3 py-1.5 text-sm text-white">

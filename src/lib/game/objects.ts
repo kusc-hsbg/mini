@@ -27,6 +27,11 @@ export type ObjectKind =
   | "door"
   | "counter"
   | "campfire"
+  | "cone"
+  | "tires"
+  | "podium"
+  | "flag"
+  | "grandstand"
   | "custom";
 
 export interface ObjectDef {
@@ -36,7 +41,7 @@ export interface ObjectDef {
   solid: boolean;
   tall?: boolean; // 캐릭터 뒤로 지나갈 수 있는 상단부(전경 레이어)
   interaction?: InteractionKind;
-  category: "가구" | "자연" | "미디어" | "놀이" | "장식" | "기타";
+  category: "가구" | "자연" | "미디어" | "놀이" | "장식" | "레이싱" | "기타";
 }
 
 export const OBJECT_DEFS: Record<ObjectKind, ObjectDef> = {
@@ -65,6 +70,11 @@ export const OBJECT_DEFS: Record<ObjectKind, ObjectDef> = {
   bench: { label: "벤치", w: 2, h: 1, solid: true, category: "장식" },
   lamp: { label: "가로등/램프", w: 1, h: 1, solid: true, tall: true, category: "장식" },
   door: { label: "문(포털 표시)", w: 1, h: 1, solid: false, category: "기타" },
+  cone: { label: "라바콘(장애물)", w: 1, h: 1, solid: true, category: "레이싱" },
+  tires: { label: "타이어 방벽", w: 1, h: 1, solid: true, category: "레이싱" },
+  podium: { label: "포디움(시상대)", w: 3, h: 2, solid: true, category: "레이싱" },
+  flag: { label: "체커 깃발", w: 1, h: 1, solid: true, tall: true, category: "레이싱" },
+  grandstand: { label: "관중석", w: 3, h: 2, solid: true, category: "레이싱" },
   custom: { label: "커스텀(이미지 URL)", w: 1, h: 1, solid: false, interaction: "none", category: "기타" },
 };
 

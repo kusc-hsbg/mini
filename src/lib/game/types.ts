@@ -3,18 +3,28 @@
 export type HatType = "none" | "cap" | "crown" | "band" | "cat" | "beanie" | "flower";
 export type FaceType = "smile" | "cool" | "wink" | "star" | "sleepy" | "surprised";
 export type HairType = "none" | "short" | "long" | "ponytail" | "spiky" | "bob" | "curly";
+export type FacialHairType = "none" | "mustache" | "beard" | "goatee";
+export type GlassesType = "none" | "round" | "square" | "sunglasses";
+export type TopStyleType = "tshirt" | "hoodie" | "suit" | "stripe";
+export type SpecialType = "none" | "cape" | "ghost";
 export type Direction = "down" | "up" | "left" | "right";
 export type UserStatus = "available" | "busy" | "dnd";
 
 // 캐릭터 외형 (프로필에 저장되는 값과 동일).
+// 게더타운 구조: Base(피부/헤어/수염) · Clothing(상의/하의/신발) · Accessories(모자/안경) · Special
 export interface CharacterAppearance {
   skin: string;
   color: string; // 상의 색
+  topStyle: TopStyleType;
   pants: string; // 하의 색
+  shoes: string; // 신발 색
   hair: HairType;
   hairColor: string;
+  facialHair: FacialHairType;
   hat: HatType;
+  glasses: GlassesType;
   face: FaceType;
+  special: SpecialType;
 }
 
 // DB(profiles 테이블) 행 형태 — snake_case.
@@ -24,11 +34,16 @@ export interface Profile {
   display_name: string;
   skin: string;
   color: string;
+  top_style: string | null;
   pants: string;
+  shoes: string | null;
   hair: string;
   hair_color: string;
+  facial_hair: string | null;
   hat: string;
+  glasses: string | null;
   face: string;
+  special: string | null;
   status: UserStatus;
   status_message: string | null;
 }
@@ -41,7 +56,8 @@ export interface PlayerState {
   y: number;
   dir: Direction;
   moving: boolean;
-  onBike: boolean; // 오토바이 탑승 여부
+  onBike: boolean; // 탈것(오토바이/카트) 탑승 여부
+  dancing: boolean; // Z 키 춤
   appearance: CharacterAppearance;
   status: UserStatus;
   statusMsg?: string;

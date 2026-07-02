@@ -43,6 +43,11 @@ const TILE_PALETTE: { ch: string; label: string }[] = [
   { ch: "#", label: "벽" },
   { ch: "x", label: "공백" },
   { ch: "B", label: "오토바이존" },
+  { ch: "b", label: "카트존" },
+  { ch: "a", label: "서킷 아스팔트" },
+  { ch: "r", label: "레이싱 연석" },
+  { ch: "^", label: "부스트 패드" },
+  { ch: "F", label: "체커(결승선)" },
 ];
 
 export default function MapEditor({

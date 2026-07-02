@@ -22,6 +22,16 @@ export interface RtEvents {
   wb: { board: string; op: WbOp };
   "map-update": { by: string };
   "desk-update": { by: string };
+  race: {
+    from: string;
+    name: string;
+    kind: "start" | "lap" | "finish";
+    lap: number;
+    laps: number;
+    lapMs?: number;
+    totalMs?: number;
+    bestLapMs?: number;
+  };
 }
 
 export type RtEventName = keyof RtEvents;

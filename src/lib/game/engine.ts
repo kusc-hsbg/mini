@@ -6,17 +6,29 @@ import {
   PrivateArea,
   areaAtPx,
   bikeZoneAt,
+  boostAt,
   buildSolidGrid,
+  inRaceRect,
   isSolidPx,
   mapPixelSize,
   nearestInteractive,
+  offroadAt,
   portalAtPx,
   spawnPoint,
   spotlightAtPx,
 } from "./maps";
 import { OBJECT_DEFS } from "./objects";
 import { drawCharacter, drawObject, drawObjectTop, drawTile } from "./sprites";
-import { BIKE_SPEED, PLAYER_RADIUS, PROXIMITY_TILES, TILE, WALK_SPEED } from "./constants";
+import {
+  BIKE_SPEED,
+  BOOST_MS,
+  BOOST_MULT,
+  OFFROAD_MULT,
+  PLAYER_RADIUS,
+  PROXIMITY_TILES,
+  TILE,
+  WALK_SPEED,
+} from "./constants";
 import { findPath, type PathNode } from "./pathfinding";
 import type {
   CharacterAppearance,
@@ -30,6 +42,27 @@ interface ActiveEmote extends EmoteMessage {
   expires: number;
 }
 
+// 레이스 이벤트 (그랑프리)
+export interface RaceEvent {
+  kind: "start" | "lap" | "finish" | "reset";
+  lap: number;
+  laps: number;
+  lapMs?: number;
+  totalMs?: number;
+  bestLapMs?: number;
+}
+
+export interface RaceState {
+  active: boolean;
+  lap: number;
+  laps: number;
+  cpIndex: number;
+  cpTotal: number;
+  elapsedMs: number;
+  lapElapsedMs: number;
+  bestLapMs: number | null;
+}
+
 export interface EngineCallbacks {
   onState: (s: PlayerState) => void; // 주기적 위치 전송
   onAreaChange?: (area: PrivateArea | null) => void;
@@ -37,6 +70,7 @@ export interface EngineCallbacks {
   onInteractHint?: (obj: MapObject | null) => void;
   onPlayerClick?: (id: string, screenX: number, screenY: number) => void;
   onAreaBlocked?: (area: PrivateArea, reason: "locked" | "full") => void;
+  onRace?: (ev: RaceEvent) => void;
 }
 
 export class GameEngine {
@@ -68,6 +102,15 @@ export class GameEngine {
   private hintObj: MapObject | null = null;
 
   private bikeCooldown = 0;
+  // 레이스 상태
+  private boostUntil = 0;
+  private raceActive = false;
+  private raceLap = 0;
+  private raceCpIndex = 0;
+  private raceStart = 0;
+  private lapStart = 0;
+  private bestLapMs: number | null = null;
+  private wasInStartRect = false;
   private cam = { x: 0, y: 0 };
   zoom = 1;
   showMinimap = true;
@@ -99,6 +142,7 @@ export class GameEngine {
       dir: "down",
       moving: false,
       onBike: false,
+      dancing: false,
       appearance,
       status: opts?.status ?? "available",
       areaId: null,
@@ -310,6 +354,7 @@ export class GameEngine {
     }
     this.keys.add(k);
     if (k === "f") this.tryToggleBike();
+    if (k === "z") this.toggleDance();
   };
 
   private onKeyUp = (e: KeyboardEvent) => {
@@ -343,10 +388,110 @@ export class GameEngine {
     if (this.self.onBike) {
       this.self.onBike = false;
       this.bikeCooldown = 350;
+      this.resetRace();
     } else if (bikeZoneAt(this.map, this.self.x, this.self.y)) {
       this.self.onBike = true;
+      this.self.dancing = false;
       this.bikeCooldown = 350;
     }
+  }
+
+  private toggleDance() {
+    if (this.self.onBike) return;
+    this.self.dancing = !this.self.dancing;
+    this.pushState();
+  }
+
+  // ---------- 레이스 (그랑프리) ----------
+
+  private resetRace() {
+    if (this.raceActive) {
+      this.raceActive = false;
+      this.cb.onRace?.({
+        kind: "reset",
+        lap: this.raceLap,
+        laps: this.map.race?.laps ?? 3,
+      });
+    }
+    this.raceLap = 0;
+    this.raceCpIndex = 0;
+    this.wasInStartRect = false;
+  }
+
+  getRaceState(): RaceState | null {
+    const race = this.map.race;
+    if (!race) return null;
+    const now = performance.now();
+    return {
+      active: this.raceActive,
+      lap: this.raceLap,
+      laps: race.laps,
+      cpIndex: this.raceCpIndex,
+      cpTotal: race.checkpoints.length,
+      elapsedMs: this.raceActive ? now - this.raceStart : 0,
+      lapElapsedMs: this.raceActive ? now - this.lapStart : 0,
+      bestLapMs: this.bestLapMs,
+    };
+  }
+
+  private updateRace(now: number) {
+    const race = this.map.race;
+    if (!race) return;
+    if (!this.self.onBike) {
+      this.wasInStartRect = false;
+      return;
+    }
+
+    // 체크포인트 순서대로 통과
+    if (this.raceActive && this.raceCpIndex < race.checkpoints.length) {
+      if (inRaceRect(race.checkpoints[this.raceCpIndex], this.self.x, this.self.y)) {
+        this.raceCpIndex++;
+      }
+    }
+
+    // 출발/결승선 진입 에지 감지
+    const inStart = inRaceRect(race.start, this.self.x, this.self.y);
+    if (inStart && !this.wasInStartRect) {
+      if (!this.raceActive) {
+        // 레이스 시작
+        this.raceActive = true;
+        this.raceLap = 1;
+        this.raceCpIndex = 0;
+        this.raceStart = now;
+        this.lapStart = now;
+        this.cb.onRace?.({ kind: "start", lap: 1, laps: race.laps });
+      } else if (this.raceCpIndex >= race.checkpoints.length) {
+        // 랩 완료 (모든 CP 통과 후 결승선)
+        const lapMs = now - this.lapStart;
+        if (this.bestLapMs === null || lapMs < this.bestLapMs) this.bestLapMs = lapMs;
+        if (this.raceLap >= race.laps) {
+          const totalMs = now - this.raceStart;
+          this.raceActive = false;
+          this.cb.onRace?.({
+            kind: "finish",
+            lap: this.raceLap,
+            laps: race.laps,
+            lapMs,
+            totalMs,
+            bestLapMs: this.bestLapMs,
+          });
+          this.raceLap = 0;
+          this.raceCpIndex = 0;
+        } else {
+          this.raceLap++;
+          this.raceCpIndex = 0;
+          this.lapStart = now;
+          this.cb.onRace?.({
+            kind: "lap",
+            lap: this.raceLap,
+            laps: race.laps,
+            lapMs,
+            bestLapMs: this.bestLapMs,
+          });
+        }
+      }
+    }
+    this.wasInStartRect = inStart;
   }
 
   // ---------- 루프 ----------
@@ -418,16 +563,31 @@ export class GameEngine {
 
     const moving = dx !== 0 || dy !== 0;
     this.self.moving = moving;
+    if (moving && this.self.dancing) this.self.dancing = false;
 
     if (moving) {
       if (Math.abs(dy) >= Math.abs(dx)) this.self.dir = dy < 0 ? "up" : "down";
       else this.self.dir = dx < 0 ? "left" : "right";
 
       const len = Math.hypot(dx, dy) || 1;
-      const speed = this.self.onBike ? BIKE_SPEED : WALK_SPEED;
+      let speed = this.self.onBike ? BIKE_SPEED : WALK_SPEED;
+      if (this.self.onBike) {
+        // 부스트 패드 밟기
+        if (boostAt(this.map, this.self.x, this.self.y)) {
+          this.boostUntil = now + BOOST_MS;
+        }
+        if (now < this.boostUntil) speed *= BOOST_MULT;
+        // 잔디/모래 오프로드 감속 (서킷 숏컷 방지)
+        else if (this.map.race && offroadAt(this.map, this.self.x, this.self.y)) {
+          speed *= OFFROAD_MULT;
+        }
+      }
       this.moveAxis((dx / len) * speed * dt, 0);
       this.moveAxis(0, (dy / len) * speed * dt);
     }
+
+    // 레이스 진행 체크
+    this.updateRace(now);
 
     // ----- 영역/타일 상태 감지 -----
     const area = areaAtPx(this.map, this.self.x, this.self.y);
@@ -627,6 +787,8 @@ export class GameEngine {
               status: p.status,
               hand: p.hand,
               speaking: this.speakingIds.has(p.id),
+              dancing: p.dancing,
+              vehicle: this.map.vehicle ?? "bike",
             }
           ),
       });

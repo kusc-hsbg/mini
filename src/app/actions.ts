@@ -24,11 +24,16 @@ export async function saveProfile(form: {
   display_name: string;
   skin: string;
   color: string;
+  top_style: string;
   pants: string;
+  shoes: string;
   hair: string;
   hair_color: string;
+  facial_hair: string;
   hat: string;
+  glasses: string;
   face: string;
+  special: string;
 }): Promise<Result> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
@@ -38,11 +43,16 @@ export async function saveProfile(form: {
     display_name: form.display_name.slice(0, 24) || "Player",
     skin: form.skin,
     color: form.color,
+    top_style: form.top_style,
     pants: form.pants,
+    shoes: form.shoes,
     hair: form.hair,
     hair_color: form.hair_color,
+    facial_hair: form.facial_hair,
     hat: form.hat,
+    glasses: form.glasses,
     face: form.face,
+    special: form.special,
     updated_at: new Date().toISOString(),
   });
   if (err) return { error: err.message };

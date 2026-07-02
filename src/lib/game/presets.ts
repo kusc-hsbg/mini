@@ -259,6 +259,9 @@ function buildPlaza(): MapData {
   c.portals.push({ id: "pz-po-office", x: 44, y: 14, kind: "room", roomTemplate: "office", label: "🏢 오피스로" });
   add(c, "door", 46, 14, { name: "파크 입구" });
   c.portals.push({ id: "pz-po-garden", x: 46, y: 14, kind: "room", roomTemplate: "garden", label: "🌳 파크로" });
+  add(c, "door", 48, 14, { name: "서킷 입구" });
+  c.portals.push({ id: "pz-po-circuit", x: 48, y: 14, kind: "room", roomTemplate: "circuit", label: "🏁 그랑프리 서킷으로" });
+  add(c, "flag", 49, 13);
   add(c, "door", 74, 41, { name: "지름길" });
   c.portals.push({ id: "pz-tp-1", x: 74, y: 41, kind: "same", tx: 5, ty: 41, label: "↔ 반대편 도로" });
   add(c, "door", 5, 44, { name: "지름길" });
@@ -563,8 +566,149 @@ function buildGarden(): MapData {
   };
 }
 
+// ==================== 4. 그랑프리 서킷 (88 x 54) ====================
+// 게더타운 Grand Prix 구성: 카트(F로 탑승) · 부스트 패드 · 라바콘 장애물 ·
+// 체커 결승선 · 3랩 레이스 · 리더보드 · 관중석 · 중계석(스포트라이트) · 포디움
+
+function buildCircuit(): MapData {
+  const W = 88;
+  const H = 54;
+  const g = new Grid(W, H, ",");
+  const c = ctx("cc");
+
+  g.scatter(";", 460, 1, 1, W - 2, H - 2, 42, ",");
+
+  // ---- 트랙 (아스팔트 링, 폭 7타일) + 연석 ----
+  g.rect(7, 7, 74, 42, "r"); // 외곽 연석
+  g.rect(8, 8, 72, 40, "a"); // 아스팔트
+  g.rect(14, 14, 60, 28, "r"); // 안쪽 연석
+  g.rect(15, 15, 58, 26, ","); // 잔디 아일랜드
+  g.scatter(";", 120, 16, 16, 56, 24, 43, ",");
+
+  // 결승선 (체커, 상단 직선)
+  for (let r = 8; r < 15; r++) {
+    g.set(44, r, "F");
+    g.set(45, r, "F");
+  }
+
+  // ---- 부스트 패드 ----
+  const boosts: [number, number][] = [
+    [30, 44], [31, 44], [50, 44], [51, 44], [65, 43], [66, 43], // 백스트레이트
+    [10, 22], [11, 22], // 좌측 직선
+    [76, 30], [77, 30], // 우측 직선
+    [55, 10], [56, 10], // 홈스트레이트 후반
+  ];
+  for (const [bx, by] of boosts) g.set(bx, by, "^");
+
+  // ---- 피트레인 (아일랜드 상단) ----
+  g.rect(28, 16, 32, 7, "-");
+  for (let i = 0; i < 8; i++) g.set(31 + i * 3, 18, "b");
+  add(c, "counter", 29, 20);
+  add(c, "counter", 30, 20);
+  add(c, "coffee", 31, 20);
+  add(c, "vending", 57, 17);
+  add(c, "sign", 28, 17, {
+    name: "피트레인 안내",
+    props: {
+      text: "🏁 그랑프리 서킷에 오신 걸 환영합니다!\n\n1) 노란 칸에서 F 키로 카트 탑승\n2) 체커 라인을 지나면 랩 타이머 시작\n3) 시계 방향으로 3랩 완주!\n\n⚡ 노란 화살표 = 스피드 부스트\n🚧 라바콘은 완전히 막혀요 — 피하세요\n🌿 잔디/모래에선 카트가 느려집니다",
+    },
+  });
+  c.spawns.push({ x: 34, y: 21 }, { x: 37, y: 21 }, { x: 40, y: 21 }, { x: 43, y: 21 });
+  c.labels.push({ x: 29, y: 16, text: "🔧 피트레인 (F로 카트 탑승)" });
+
+  // ---- 포디움 + 깃발 (아일랜드 중앙) ----
+  add(c, "podium", 42, 28);
+  add(c, "flag", 40, 28);
+  add(c, "flag", 46, 28);
+  c.labels.push({ x: 41, y: 27, text: "🏆 포디움" });
+
+  // ---- 아일랜드 꾸미기 ----
+  g.blob(62, 33, 6, 3.5, "s");
+  g.blob(62, 33, 4.6, 2.5, "~");
+  add(c, "tree", 20, 26);
+  add(c, "tree", 25, 32);
+  add(c, "tree", 55, 26);
+  add(c, "bench", 30, 33);
+  add(c, "bench", 34, 33);
+  for (let i = 0; i < 4; i++) add(c, "flowerbed", 28 + i * 2, 25);
+  c.areas.push({ id: "infield", name: "🌿 인필드 라운지", x: 28, y: 31, w: 10, h: 6 });
+
+  // ---- 관중석 + 중계석 (트랙 위쪽 외곽) ----
+  g.rect(14, 2, 60, 5, "-");
+  for (let i = 0; i < 7; i++) add(c, "grandstand", 15 + i * 5, 2);
+  c.labels.push({ x: 15, y: 2, text: "📣 관중석" });
+  g.rect(60, 2, 13, 5, "-");
+  add(c, "tv", 66, 2, { name: "중계 스크린", props: { url: "" } });
+  add(c, "speaker", 64, 3);
+  add(c, "speaker", 70, 3);
+  c.spotlights.push({ x: 66, y: 4 }, { x: 68, y: 4 });
+  c.labels.push({ x: 62, y: 6, text: "🎙️ 중계석 (스포트라이트)" });
+
+  // ---- 라바콘 장애물 (트랙 위) ----
+  const cones: [number, number][] = [
+    [58, 11], [62, 12], // 홈스트레이트 이후
+    [75, 20], [77, 26], [74, 35], // 우측
+    [60, 45], [52, 42], [38, 45], [30, 42], // 하단
+    [10, 36], [13, 30], [11, 19], // 좌측
+    [25, 9], [33, 12], // 상단 진입
+  ];
+  for (const [cx2, cy2] of cones) add(c, "cone", cx2, cy2);
+
+  // ---- 타이어 방벽 (코너 보호) ----
+  const tireSpots: [number, number][] = [
+    [15, 15], [16, 15], [15, 16], // 아일랜드 코너 4곳
+    [71, 15], [72, 15], [72, 16],
+    [15, 39], [15, 40], [16, 40],
+    [72, 39], [71, 40], [72, 40],
+    [8, 8], [9, 8], [8, 9], // 외곽 코너 4곳
+    [78, 8], [79, 8], [79, 9],
+    [8, 46], [8, 47], [9, 47],
+    [79, 46], [78, 47], [79, 47],
+  ];
+  for (const [tx, ty] of tireSpots) add(c, "tires", tx, ty);
+
+  // ---- 외곽 나무/램프 ----
+  for (let x = 0; x < W; x += 4) add(c, "tree", x, H - 2);
+  for (let y = 10; y < H - 3; y += 6) {
+    add(c, "tree", 0, y);
+    add(c, "tree", W - 2, y);
+  }
+  add(c, "lamp", 6, 8);
+  add(c, "lamp", 81, 8);
+  add(c, "lamp", 6, 46);
+  add(c, "lamp", 81, 46);
+
+  // ---- 포털: 광장으로 ----
+  add(c, "door", 4, 27, { name: "서킷 출구" });
+  c.portals.push({ id: "cc-po-plaza", x: 4, y: 27, kind: "room", roomTemplate: "plaza", label: "⛲ 광장으로" });
+
+  return {
+    key: "circuit",
+    name: "그랑프리 서킷",
+    description: "카트 레이싱 서킷 — 부스트 패드, 라바콘, 3랩 타임어택, 리더보드, 관중석과 포디움",
+    tiles: g.rows(),
+    objects: c.objects,
+    areas: c.areas,
+    portals: c.portals,
+    spawns: c.spawns,
+    spotlights: c.spotlights,
+    labels: c.labels,
+    vehicle: "kart",
+    race: {
+      laps: 3,
+      start: { x: 44, y: 8, w: 2, h: 7 },
+      checkpoints: [
+        { x: 73, y: 26, w: 7, h: 2 }, // CP1 우측 (시계 방향)
+        { x: 43, y: 41, w: 2, h: 7 }, // CP2 하단
+        { x: 8, y: 26, w: 7, h: 2 }, // CP3 좌측
+      ],
+    },
+  };
+}
+
 export const PRESET_MAPS: Record<string, MapData> = {
   plaza: buildPlaza(),
   office: buildOffice(),
   garden: buildGarden(),
+  circuit: buildCircuit(),
 };

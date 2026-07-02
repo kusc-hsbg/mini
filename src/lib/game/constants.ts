@@ -1,7 +1,10 @@
 export const TILE = 32; // 한 타일 픽셀 크기
 
 export const WALK_SPEED = 150; // px/sec (도보)
-export const BIKE_SPEED = 300; // px/sec (오토바이)
+export const BIKE_SPEED = 300; // px/sec (오토바이/카트)
+export const BOOST_MULT = 1.75; // 부스트 패드 배속
+export const BOOST_MS = 1300; // 부스트 지속 시간
+export const OFFROAD_MULT = 0.45; // 서킷에서 잔디/모래 주행 시 감속
 
 export const PLAYER_RADIUS = 10; // 충돌/렌더 반경
 
@@ -48,11 +51,38 @@ export const HATS: { key: string; label: string }[] = [
 ];
 export const FACES: { key: string; label: string }[] = [
   { key: "smile", label: "스마일" },
-  { key: "cool", label: "선글라스" },
+  { key: "cool", label: "무표정" },
   { key: "wink", label: "윙크" },
   { key: "star", label: "반짝" },
   { key: "sleepy", label: "졸림" },
   { key: "surprised", label: "놀람" },
+];
+export const FACIAL_HAIRS: { key: string; label: string }[] = [
+  { key: "none", label: "없음" },
+  { key: "mustache", label: "콧수염" },
+  { key: "beard", label: "턱수염" },
+  { key: "goatee", label: "염소수염" },
+];
+export const GLASSES: { key: string; label: string }[] = [
+  { key: "none", label: "없음" },
+  { key: "round", label: "동그란 안경" },
+  { key: "square", label: "사각 안경" },
+  { key: "sunglasses", label: "선글라스" },
+];
+export const TOP_STYLES: { key: string; label: string }[] = [
+  { key: "tshirt", label: "티셔츠" },
+  { key: "hoodie", label: "후디" },
+  { key: "suit", label: "정장" },
+  { key: "stripe", label: "줄무늬" },
+];
+export const SPECIALS: { key: string; label: string }[] = [
+  { key: "none", label: "없음" },
+  { key: "cape", label: "히어로 망토" },
+  { key: "ghost", label: "유령" },
+];
+export const SHOES_COLORS = [
+  "#292524", "#7c2d12", "#f8fafc", "#dc2626",
+  "#1d4ed8", "#15803d", "#facc15", "#a855f7",
 ];
 
 export const STATUS_META: Record<
