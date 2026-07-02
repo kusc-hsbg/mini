@@ -1,7 +1,19 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getSessionContext } from "@/lib/auth";
 
-export default async function Landing() {
+export const dynamic = "force-dynamic";
+
+export default async function Landing({
+  searchParams,
+}: {
+  searchParams: { code?: string };
+}) {
+  // OAuth 코드가 홈으로 떨어진 경우(리디렉션 허용목록 미설정 등) 콜백으로 전달
+  if (searchParams?.code) {
+    redirect(`/auth/callback?code=${encodeURIComponent(searchParams.code)}&next=/customize`);
+  }
+
   const { configured, userId } = await getSessionContext();
 
   return (
