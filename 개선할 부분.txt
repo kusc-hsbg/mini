@@ -1,0 +1,256 @@
+1. 공간 구조 시스템
+
+게더타운의 기본 구조는 Space → Room/Map → Tile → Object로 보면 됩니다. Space는 하나의 가상 세계이고, Room/Map은 그 안의 개별 맵이며, Background와 Foreground 레이어를 깔고 그 위에 타일 효과와 오브젝트를 배치하는 방식입니다.
+
+핵심 구성은 다음과 같습니다.
+
+시스템	기능
+Space	하나의 가상공간, 고유 URL 보유
+Room / Map	Space 안에 들어가는 개별 맵
+Background	맵의 바닥 배경 이미지
+Foreground	캐릭터가 뒤로 지나갈 수 있는 전경 레이어
+Tile	32×32px 기준의 이동/상호작용 단위
+Object	책상, 의자, 문, 게시판, 게임, 화이트보드 등 배치 요소
+Portal	같은 방, 다른 방, 다른 Space로 이동
+Spawn	입장 위치 지정
+Private Area	회의실/소그룹 대화 영역
+Spotlight	발표자 방송 영역
+2. 아바타·이동 시스템
+
+사용자는 아바타를 꾸밀 수 있고, 방향키/WASD/더블클릭으로 이동하며, 특정 오브젝트 앞에서 X 키를 눌러 상호작용합니다. 가까이 다가가면 자동으로 오디오·비디오가 연결되는 공간 기반 대화 시스템이 핵심입니다.
+
+기능은 다음과 같습니다.
+
+시스템	기능
+아바타 커스터마이징	색상, 스타일, 액세서리 설정
+이동	방향키, WASD, 더블클릭 이동
+상호작용	X 키로 오브젝트 실행
+근접 대화	가까이 가면 음성/영상 연결
+상태 표시	Available, Busy, Do Not Disturb 등
+이모트 반응	감정 표현
+참가자 패널	현재 접속자 확인
+Follow / Lead	다른 사람을 따라가거나 안내
+Spotlight	발표자처럼 전체 방에 음성/영상 송출
+3. 음성·영상·회의 시스템
+
+Gather의 회의 기능에는 화면 공유, 다중 화면 공유, 화면 주석, 채팅, 이모지 반응, 손들기, 회의 녹화 등이 포함됩니다. 일부 기능은 1.0과 2.0에서 다르며, 2.0에는 AI 회의 노트와 AI 회의 전사 기능이 포함됩니다.
+
+시스템	기능
+오디오/비디오	근접 기반 자동 연결
+화면 공유	탭, 창, 전체 화면 공유
+다중 화면 공유	여러 명이 동시에 화면 공유
+화면 주석	공유 화면 위에 표시/주석
+회의 채팅	회의 중 메시지
+DM	개인 메시지
+그룹 채팅	그룹 단위 대화
+이모지 반응	회의 중 반응
+손들기	발언 요청
+회의 녹화	유료/권한 조건에 따라 사용
+AI 회의 노트	Gather 2.0 기능
+AI 전사	Gather 2.0 기능
+4. 회의실·프라이빗 영역 시스템
+
+Private Area는 회의실처럼 작동하는 영역입니다. 같은 Private Area 안에 있는 사람끼리만 대화가 연결되며, 이름과 최대 인원을 설정하면 회의 예약 위치로 사용할 수 있습니다. Remote Office에서는 회의 영역을 잠글 수 있어 외부인이 갑자기 들어오는 것을 막을 수 있습니다.
+
+시스템	기능
+Private Area	소회의실/팀별 대화 공간
+Max Occupancy	최대 입장 인원 설정
+회의실 예약	캘린더 회의 위치로 사용
+회의실 잠금	외부 인원 입장 차단
+입장 승인/거절	잠긴 회의실 접근 제어
+회의실 링크	특정 영역으로 초대 가능
+데스크 회의	개인 책상에서 회의 가능
+특정 위치 회의	지정된 Spawn/Private Area로 회의 설정
+5. 캘린더·일정 연동 시스템
+
+Gather에서는 Google Calendar 또는 Outlook Calendar와 연결해 회의를 예약할 수 있습니다. 회의 위치는 사용 가능한 Private Area, 내 책상, 특정 위치 중에서 선택할 수 있습니다. 다만 2.0 기준으로는 Google Calendar 쪽이 중심이고, Outlook·Slack·SSO 등 일부 기능은 버전에 따라 차이가 있습니다.
+
+시스템	기능
+Google Calendar 연동	회의 예약
+Outlook Calendar 연동	Gather 1.0 중심
+Chrome Extension	Google Calendar에서 Gather 회의 생성
+Outlook Add-in	Outlook에서 Gather 회의 생성
+반복 회의 마이그레이션	기존 회의에 Gather 위치 추가
+자동 상태 변경	일정에 따라 Busy 등 상태 반영
+6. 맵 제작·공간 커스터마이징 시스템
+
+Gather 1.0에서는 Build Tool과 Mapmaker를 사용해 공간을 꾸미고 수정합니다. Build Tool은 오브젝트를 빠르게 추가·삭제하는 도구이고, Mapmaker는 배경, 전경, 타일 효과, 포털, 프라이빗 영역 등을 다루는 고급 편집 도구입니다.
+
+시스템	기능
+Build Tool	오브젝트 추가/삭제
+Mapmaker	맵 전체 구조 편집
+Object Picker	기본 오브젝트 선택
+Custom Object	직접 만든 이미지 업로드
+Text Label	공간 내 텍스트 라벨
+Background Upload	배경 이미지 업로드
+Foreground Upload	전경 이미지 업로드
+Box Select	여러 오브젝트/타일 일괄 선택
+Undo	실수 복구
+Template	기본 공간 템플릿 사용
+Studio / Decorator	Gather 2.0의 개선된 편집 시스템
+7. 타일 효과 시스템
+
+Gather의 타일 효과는 공식 문서 기준으로 Impassable, Spawn, Portal, Private Area, Spotlight 5가지가 핵심입니다. 타일은 32×32px 단위이며, 캐릭터의 이동과 공간 반응을 결정합니다.
+
+타일 효과	기능
+Impassable Tile	벽, 책상 등 지나갈 수 없는 영역
+Spawn Tile	입장 위치 설정
+Portal Tile	다른 위치/방/공간으로 이동
+Private Area Tile	회의실, 조별 대화 영역
+Spotlight Tile	발표자 방송 위치
+8. 포털·이동 연결 시스템
+
+Portal은 세 가지 방식으로 사용할 수 있습니다. 같은 Room 안의 다른 위치로 이동하거나, 같은 Space 안의 다른 Room으로 이동하거나, 완전히 다른 Space로 이동할 수 있습니다.
+
+포털 유형	기능
+Same Room Portal	같은 맵 안에서 순간 이동
+Different Room Portal	같은 Space 안의 다른 방으로 이동
+Different Space Portal	다른 Gather Space로 이동
+Door / Elevator 오브젝트	포털 위치를 시각적으로 표시
+Password Door	비밀번호 입력 후 통과
+Member-only Door	멤버만 통과 가능
+9. 오브젝트 상호작용 시스템
+
+오브젝트에는 웹사이트, 이미지, 영상, 외부 화상회의, 노트 등을 연결할 수 있습니다. 기본 오브젝트 대부분은 상호작용이 없지만, 게임·사운드·화이트보드 같은 일부 오브젝트는 기본 상호작용을 가집니다.
+
+오브젝트 기능	설명
+Embedded Website	웹사이트 임베드
+Embedded Image	이미지 표시
+Embedded Video	YouTube, Twitch, Vimeo 등 영상 연결
+External Call	Zoom, Teams, Webex 등 외부 회의 연결
+Note Object	텍스트/링크 안내문
+Whiteboard	협업 화이트보드
+Bulletin Board	공지사항/이미지/웹페이지 게시
+Game Object	게임 실행
+Sound Object	사운드 재생
+Custom Object	직접 만든 오브젝트 업로드
+10. 화이트보드·협업 도구 시스템
+
+화이트보드는 오브젝트로 배치한 뒤 X 키로 실행하며, 여러 사람이 동시에 메모하거나 그림을 그릴 수 있습니다. 공유 URL을 복사하거나 PDF, PNG, SVG로 내보낼 수 있습니다.
+
+시스템	기능
+Whiteboard Object	회의 중 브레인스토밍
+실시간 공동 편집	여러 명이 동시에 작성
+메모	텍스트 노트
+드로잉	그림/스케치
+URL 공유	외부 브라우저에서 보기
+PDF/PNG/SVG 내보내기	결과물 저장
+11. 게임·소셜 활동 시스템
+
+Gather에는 Tetris, Codenames, Draw Battle 같은 내장 게임 오브젝트를 배치할 수 있고, Rec Room이나 Grand Prix 같은 팀 소셜 활동도 사용할 수 있습니다. 원하는 외부 온라인 게임 URL을 오브젝트에 임베드하는 방식도 가능합니다.
+
+시스템	기능
+내장 게임	Tetris, Codenames, Draw Battle 등
+Rec Room	게임 공간
+Grand Prix	고카트 레이싱
+Board Game Night	보드게임 공간
+외부 게임 임베드	URL 연결
+팀 소셜	아이스브레이킹, 네트워킹
+Breakout 활동	그룹별 이동/대화
+12. 권한·역할 시스템
+
+Gather에는 사용자 역할별 권한이 있으며, Admin은 멤버를 관리하고 역할을 설정할 수 있습니다. 권한에 따라 Mapmaker, Build Tool, 초대, 설정 변경 등의 사용 가능 여부가 달라집니다.
+
+역할/권한	기능
+Admin	전체 설정/멤버/권한 관리
+Mapmaker	맵 제작 및 수정
+Member	일반 팀원
+Guest	외부 방문자
+Moderator	강퇴/차단 등 운영 권한
+Role Configuration	역할별 기능 허용/제한
+Manage Members	멤버 초대/역할 변경
+Manage Guests	게스트 로그/접근 관리
+13. 보안·접근 제한 시스템
+
+공간 접근은 비밀번호, 로그인 요구, 이메일 도메인 제한, 게스트 체크인 등으로 관리할 수 있습니다. Guest Check-In을 켜면 비회원/외부 방문자가 온라인 멤버에게 입장 요청을 보내고, 멤버가 승인하거나 거절할 수 있습니다.
+
+시스템	기능
+Space Password	공간 비밀번호
+Require Login	로그인 사용자만 입장
+Email Domain Access	특정 이메일 도메인 제한
+Guest Check-In	방문자 입장 요청
+Guest Log	게스트 입장 기록
+Guest Access Duration	게스트 접근 기간 설정
+Revoke Access	접근 권한 회수
+Allow Staff Access	문제 해결용 Gather 직원 접근 허용
+14. 모더레이션·관리 시스템
+
+운영자는 사용자 음성/영상을 음소거하거나, 특정 사용자를 차단, 강퇴, 밴할 수 있습니다. Kick은 공간에서 내보내지만 재입장이 가능하고, Ban은 공간 접근 자체를 막습니다.
+
+시스템	기능
+Mute	오디오/비디오 음소거
+Block	특정 사용자와 연결 차단
+Kick	공간에서 내보내기
+Ban	공간 접근 금지
+Unban	차단 해제
+Participant Controls	참가자 패널에서 관리
+15. 상태·프레즌스 시스템
+
+Gather 2.0에서는 실시간 존재감 기능이 강화되어, 누가 사용 가능한지 보고 바로 말을 걸거나, 근처 대화를 듣고, 클릭 한 번으로 대화에 합류할 수 있습니다. 2.0에는 Smart Status, Live App Status, 주변 대화 감지 같은 기능도 포함됩니다.
+
+시스템	기능
+Available / Busy / DND	현재 상태 표시
+Custom Status	사용자 상태 메시지
+Smart Status	캘린더 기반 자동 상태
+Live App Status	사용 중인 앱 표시
+Nearby Conversation	주변 대화 감지
+Wave Over	상대를 불러오기
+Join in Click	클릭으로 대화 합류
+Desk Presence	책상 기준 근무 상태 표시
+16. 데스크·개인 공간 시스템
+
+사용자는 자신의 책상을 지정하고 꾸밀 수 있습니다. 책상은 개인 자리, 빠른 대화 위치, 회의 위치, 집중 근무 상태 표시, 비동기 노트/선물 남기기 등에 활용됩니다.
+
+시스템	기능
+Desk Claim	내 자리 지정
+Desk Customize	책상, 의자, 러그, 컴퓨터 등 꾸미기
+Desk Meeting	내 책상에서 회의
+Focus Work	Busy/DND 상태로 집중 근무
+Leave Note / Gift	비동기 메시지/선물
+Desk Manager	2.0에서 멤버 책상 배정 관리
+17. 분석·인사이트 시스템
+
+프리미엄 오피스 기능인 Insights는 팀 활동, 대화량, 활성 사용자, 피크 동시 접속자, 멤버별 활동일, 대화 시간 등을 확인하는 분석 기능입니다. 단, 공식 문서상 직원 감시용 시간 추적이 아니라 온보딩과 협업 패턴 파악용으로 안내됩니다.
+
+시스템	기능
+Office Insights	공간 전체 활동 분석
+Member Insights	멤버별 활동 분석
+Active Users	활성 사용자 수
+Peak Concurrent Users	최대 동시 접속자 수
+Conversation Count	대화 수
+Median Conversation Length	중간 대화 길이
+Hours of Conversation	총 대화 시간
+Active Days	활동일
+Onboarding Milestones	온보딩 단계 달성률
+Export Data	차트 데이터 다운로드
+18. 외부 연동 시스템
+
+Gather 1.0과 2.0은 연동 지원 범위가 다릅니다. 공식 비교표 기준으로 Google Calendar와 Chrome Extension은 양쪽에서 지원되고, Outlook과 Slack은 1.0 중심, GitHub와 Spotify는 2.0에서 지원됩니다.
+
+연동	비고
+Google Calendar	회의 예약
+Google Chrome Extension	캘린더에서 Gather 회의 생성
+Outlook Calendar	1.0 중심
+Outlook Add-in	1.0 중심
+Slack	1.0 중심
+GitHub	2.0 지원
+Spotify	2.0 지원
+External Call	Zoom, Teams, Webex 등 외부 회의 연결
+19. 1.0과 2.0 차이 핵심
+
+Gather 2.0은 새 플랫폼으로, 실시간 존재감, GitHub·Spotify 같은 신규 연동, AI 회의 노트, 비동기 채팅, 새로운 오피스 편집 경험 등이 추가되었습니다. 다만 공식 문서 기준으로 팀 규모가 100명 이상이거나 Outlook 연동, SSO가 꼭 필요하면 아직 1.0을 권장하는 경우가 있습니다.
+
+구분	Gather 1.0 Classic	Gather 2.0 Beta
+추천 규모	더 큰 오피스 가능	100명 이하 팀 권장
+맵 편집	Mapmaker 중심	Studio/Decorator 개선
+커스텀 맵 업로드	가능	제한 있음
+AI 회의 노트	없음	있음
+AI 전사	없음	있음
+GitHub 연동	없음	있음
+Spotify 연동	없음	있음
+Outlook 연동	있음	제한/미지원
+SSO	1.0 쪽 권장	아직 제한
+한 줄로 정리하면
+
+게더타운의 시스템은 크게 가상공간 제작 시스템, 아바타 이동 시스템, 근접 음성/영상 시스템, 회의실 시스템, 오브젝트 상호작용 시스템, 포털 이동 시스템, 권한·보안 시스템, 캘린더 연동 시스템, 소셜 게임 시스템, 분석 시스템으로 나눌 수 있습니다.
+즉, 단순 화상회의 툴이 아니라 “맵 기반 온라인 오피스/이벤트 플랫폼”에 가깝습니다.
