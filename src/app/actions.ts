@@ -34,6 +34,7 @@ export async function saveProfile(form: {
   glasses: string;
   face: string;
   special: string;
+  head_img: string;
 }): Promise<Result> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
@@ -53,6 +54,7 @@ export async function saveProfile(form: {
     glasses: form.glasses,
     face: form.face,
     special: form.special,
+    head_img: form.head_img,
     updated_at: new Date().toISOString(),
   });
   if (err) return { error: err.message };

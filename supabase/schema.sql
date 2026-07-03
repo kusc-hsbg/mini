@@ -37,6 +37,8 @@ alter table public.profiles add column if not exists shoes text not null default
 alter table public.profiles add column if not exists facial_hair text not null default 'none';
 alter table public.profiles add column if not exists glasses text not null default 'none';
 alter table public.profiles add column if not exists special text not null default 'none';
+-- 특별 헤어 스타일 (이미지 머리, 'none' = 픽셀 머리)
+alter table public.profiles add column if not exists head_img text not null default 'none';
 
 alter table public.profiles enable row level security;
 

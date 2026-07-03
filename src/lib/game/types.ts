@@ -25,6 +25,7 @@ export interface CharacterAppearance {
   glasses: GlassesType;
   face: FaceType;
   special: SpecialType;
+  headImg?: string; // 특별 헤어 스타일 키 ("none"/undefined = 픽셀 머리)
 }
 
 // DB(profiles 테이블) 행 형태 — snake_case.
@@ -44,6 +45,7 @@ export interface Profile {
   glasses: string | null;
   face: string;
   special: string | null;
+  head_img: string | null;
   status: UserStatus;
   status_message: string | null;
 }

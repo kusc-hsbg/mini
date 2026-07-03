@@ -2,7 +2,7 @@
 import type { CharacterAppearance, Direction, UserStatus } from "./types";
 import { TILE_INFO, type MapObject } from "./maps";
 import { OBJECT_DEFS } from "./objects";
-import { STATUS_META, TILE } from "./constants";
+import { STATUS_META, TILE, headImgUrl } from "./constants";
 
 // ---------- 유틸 ----------
 
@@ -1270,6 +1270,22 @@ export function drawCharacter(
 
   // ----- 머리 -----
   const headTop = bodyTop - 9.5 * u;
+
+  // 특별 헤어 스타일: 얼굴+헤어 일체형 이미지가 픽셀 머리를 통째로 대체.
+  // (이미지 로딩 전에는 기존 픽셀 머리로 폴백)
+  const headImg =
+    !robot && app.headImg && app.headImg !== "none"
+      ? getImage(headImgUrl(app.headImg))
+      : null;
+
+  if (headImg) {
+    // 이미지 얼굴 중심(약 540,640/1080)이 픽셀 머리 중심에 오도록 앵커링
+    const S = 72;
+    ctx.save();
+    if (dir === "left") ctx.scale(-1, 1);
+    ctx.drawImage(headImg, -S / 2, headTop - 33, S, S);
+    ctx.restore();
+  } else {
   ctx.fillStyle = skin;
   roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, robot ? 3 : 6);
   ctx.fill();
@@ -1324,6 +1340,7 @@ export function drawCharacter(
     // ----- 모자 -----
     drawHatPixel(ctx, u, headTop, app.hat, top);
   }
+  } // end: 픽셀 머리 (headImg 없을 때)
 
   // 춤 음표
   if (dancing) {

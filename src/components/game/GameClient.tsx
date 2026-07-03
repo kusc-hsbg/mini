@@ -109,6 +109,7 @@ function resolveGuestIdentity(): Identity {
         glasses: g.glasses ?? "none",
         face: (g.face as FaceType) ?? "smile",
         special: normalizeSpecial(g.special),
+        headImg: typeof g.headImg === "string" ? g.headImg : "none",
       };
       if (g.name) name = g.name;
     }
@@ -182,6 +183,7 @@ export default function GameClient({
           glasses: (profile.glasses as CharacterAppearance["glasses"]) ?? "none",
           face: profile.face as FaceType,
           special: normalizeSpecial(profile.special),
+          headImg: profile.head_img ?? "none",
         },
       });
     } else {

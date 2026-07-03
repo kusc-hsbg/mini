@@ -14,11 +14,13 @@ import {
   HAIRS,
   HAIR_COLORS,
   HATS,
+  HEAD_STYLES,
   PANTS_COLORS,
   SHOES_COLORS,
   SKIN_TONES,
   SPECIALS,
   TOP_STYLES,
+  headImgUrl,
   normalizeSpecial,
 } from "@/lib/game/constants";
 import type {
@@ -74,6 +76,7 @@ export default function CustomizeForm({
       glasses: "none",
       face: "smile",
       special: "none",
+      headImg: "none",
     };
     if (profile) {
       return {
@@ -91,6 +94,7 @@ export default function CustomizeForm({
         glasses: (profile.glasses as GlassesType) ?? "none",
         face: profile.face as FaceType,
         special: normalizeSpecial(profile.special),
+        headImg: profile.head_img ?? "none",
       };
     }
     if (typeof window !== "undefined") {
@@ -130,6 +134,7 @@ export default function CustomizeForm({
           glasses: app.glasses,
           face: app.face,
           special: app.special,
+          head_img: app.headImg ?? "none",
         });
         if ("error" in res) {
           // 실패를 조용히 삼키면 "입장 버튼이 안 눌리는" 것처럼 보인다 — 반드시 표시.
@@ -164,6 +169,7 @@ export default function CustomizeForm({
       glasses: Math.random() < 0.35 ? (pick(GLASSES).key as GlassesType) : "none",
       face: pick(FACES).key as FaceType,
       special: "none",
+      headImg: "none",
     });
   }
 
@@ -217,6 +223,43 @@ export default function CustomizeForm({
         <div className="min-h-[280px] space-y-5 rounded-xl bg-panel2/40 p-4">
           {tab === "base" && (
             <>
+              <Section label="✨ 특별 헤어 스타일 (이미지)">
+                <button
+                  onClick={() => patch({ headImg: "none" })}
+                  className={`grid h-14 w-14 place-items-center rounded-xl text-[11px] transition ${
+                    (app.headImg ?? "none") === "none"
+                      ? "bg-accent text-white ring-2 ring-accent"
+                      : "bg-panel2 text-slate-300 hover:bg-panel2/70"
+                  }`}
+                >
+                  기본
+                </button>
+                {HEAD_STYLES.map((h) => (
+                  <button
+                    key={h.key}
+                    onClick={() => patch({ headImg: h.key })}
+                    title={h.label}
+                    className={`relative h-14 w-14 overflow-hidden rounded-xl bg-panel2 transition hover:brightness-110 ${
+                      app.headImg === h.key ? "ring-2 ring-accent" : ""
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={headImgUrl(h.key)}
+                      alt={h.label}
+                      className="h-full w-full scale-[1.7] object-contain"
+                    />
+                    <span className="absolute inset-x-0 bottom-0 bg-black/55 text-center text-[9px] text-white">
+                      {h.label}
+                    </span>
+                  </button>
+                ))}
+              </Section>
+              {app.headImg && app.headImg !== "none" && (
+                <p className="text-xs text-amber-300/80">
+                  💡 특별 스타일 사용 중에는 헤어/표정/모자/안경/수염 옵션이 적용되지 않아요.
+                </p>
+              )}
               <Section label="피부톤">
                 {SKIN_TONES.map((c) => (
                   <Swatch key={c} color={c} active={app.skin === c} onClick={() => patch({ skin: c })} />

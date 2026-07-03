@@ -87,6 +87,26 @@ export function normalizeSpecial(v: string | null | undefined): "none" | "cape" 
   if (v === "ghost") return "robot";
   return "none";
 }
+// 특별 헤어 스타일 — 이미지 머리(얼굴+헤어 일체형). 픽셀 머리를 대체한다.
+export const HEAD_STYLES: { key: string; label: string }[] = [
+  { key: "b-lucian", label: "루시안" },
+  { key: "b-moses", label: "모세" },
+  { key: "b-asher", label: "아셔" },
+  { key: "b-eden", label: "에덴" },
+  { key: "b-uriel", label: "우리엘" },
+  { key: "b-cross", label: "크로스" },
+  { key: "g-deborah", label: "데보라" },
+  { key: "g-lucia", label: "루시아" },
+  { key: "g-sarah", label: "사라" },
+  { key: "g-ariel", label: "아리엘" },
+  { key: "g-eve", label: "이브" },
+  { key: "g-hana", label: "하나" },
+];
+
+export function headImgUrl(key: string): string {
+  return `/avatars/heads/${key}.png`;
+}
+
 export const SHOES_COLORS = [
   "#292524", "#7c2d12", "#f8fafc", "#dc2626",
   "#1d4ed8", "#15803d", "#facc15", "#a855f7",
