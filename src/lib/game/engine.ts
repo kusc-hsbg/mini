@@ -72,7 +72,10 @@ export interface EngineCallbacks {
   onPlayerClick?: (id: string, screenX: number, screenY: number) => void;
   onAreaBlocked?: (area: PrivateArea, reason: "locked" | "full") => void;
   onRace?: (ev: RaceEvent) => void;
+  onItem?: (kind: RaceItemKind) => void; // 레이스 아이템 획득/기름 밟음
 }
+
+export type RaceItemKind = "turbo" | "boost" | "slow" | "oil";
 
 export class GameEngine {
   private canvas: HTMLCanvasElement;
@@ -89,7 +92,8 @@ export class GameEngine {
   private lastSentSig = ""; // 마지막으로 전송한 상태 시그니처 (변경 시에만 전송)
 
   private self: PlayerState;
-  private others = new Map<string, PlayerState & { tx: number; ty: number }>();
+  // lastMoveAt: 마지막 move 브로드캐스트 수신 시각 — presence 보정/제거 판단에 사용
+  private others = new Map<string, PlayerState & { tx: number; ty: number; lastMoveAt: number }>();
   private emotes = new Map<string, ActiveEmote[]>();
   private deskOwners = new Map<string, string>(); // object id -> 이름
 
@@ -104,6 +108,11 @@ export class GameEngine {
   private hintObj: MapObject | null = null;
 
   private bikeCooldown = 0;
+  // 레이스 아이템 (아이템 박스/기름 웅덩이)
+  private raceItems: MapObject[] = [];
+  private itemCooldowns = new Map<string, number>(); // object id -> 다시 활성화되는 시각
+  private effectMult = 1; // 아이템 효과 배속
+  private effectUntil = 0;
   // 레이스 상태
   private boostUntil = 0;
   private raceActive = false;
@@ -151,9 +160,9 @@ export class GameEngine {
       areaId: null,
       spotlight: false,
       hand: false,
-      camOn: false,
       guest: opts?.guest ?? false,
     };
+    this.raceItems = map.objects.filter((o) => o.type === "itembox" || o.type === "oil");
   }
 
   // ---------- 라이프사이클 ----------
@@ -184,6 +193,8 @@ export class GameEngine {
     this.map = map;
     this.solid = buildSolidGrid(map);
     this.renderGround();
+    this.raceItems = map.objects.filter((o) => o.type === "itembox" || o.type === "oil");
+    this.itemCooldowns.clear();
     if (this.seat) this.standUp(); // 좌석 오브젝트가 사라졌을 수 있음
     if (!keepPosition) {
       const sp = spawnPoint(map);
@@ -312,6 +323,7 @@ export class GameEngine {
 
   upsertOther(p: PlayerState) {
     if (p.id === this.self.id) return;
+    const now = performance.now();
     const existing = this.others.get(p.id);
     if (existing) {
       // 순간이동/대량 유실 등으로 목표가 멀면 스냅 (맵을 가로질러 미끄러지는 현상 방지)
@@ -322,9 +334,10 @@ export class GameEngine {
         y: far ? p.y : existing.y,
         tx: p.x,
         ty: p.y,
+        lastMoveAt: now,
       });
     } else {
-      this.others.set(p.id, { ...p, tx: p.x, ty: p.y });
+      this.others.set(p.id, { ...p, tx: p.x, ty: p.y, lastMoveAt: now });
     }
   }
 
@@ -333,9 +346,12 @@ export class GameEngine {
   }
 
   reconcileRoster(list: PlayerState[]) {
+    const now = performance.now();
     const ids = new Set(list.map((p) => p.id));
-    for (const id of Array.from(this.others.keys())) {
-      if (!ids.has(id)) this.others.delete(id);
+    for (const [id, o] of Array.from(this.others.entries())) {
+      // presence 가 잠깐 끊겨도(플랩) 최근에 move 를 보낸 플레이어는 유지 —
+      // 즉시 지우면 캐릭터가 깜빡이며 사라진다.
+      if (!ids.has(id) && now - o.lastMoveAt > 8000) this.others.delete(id);
     }
     for (const p of list) {
       if (p.id === this.self.id) continue;
@@ -347,14 +363,18 @@ export class GameEngine {
         existing.status = p.status;
         existing.statusMsg = p.statusMsg;
         existing.hand = p.hand;
-        existing.camOn = p.camOn;
-        // 단, broadcast 유실로 presence 위치와 크게 어긋나면 presence 쪽으로 수렴.
-        if (Math.hypot(p.x - existing.tx, p.y - existing.ty) > TILE * 3) {
+        // presence 위치는 최대 3초 묵은 값이므로, 이동 중(최근 move 수신)인
+        // 플레이어에게 덮어쓰면 뒤로 순간이동(고무줄)한다.
+        // move 가 한동안 없을 때만 presence 위치로 수렴.
+        if (
+          now - existing.lastMoveAt > 4000 &&
+          Math.hypot(p.x - existing.tx, p.y - existing.ty) > TILE
+        ) {
           existing.tx = p.x;
           existing.ty = p.y;
         }
       } else {
-        this.others.set(p.id, { ...p, tx: p.x, ty: p.y });
+        this.others.set(p.id, { ...p, tx: p.x, ty: p.y, lastMoveAt: 0 });
       }
     }
   }
@@ -634,9 +654,42 @@ export class GameEngine {
         else if (this.map.race && offroadAt(this.map, this.self.x, this.self.y)) {
           speed *= OFFROAD_MULT;
         }
+        // 아이템 효과 (터보/부스트/슬로우/기름)
+        if (now < this.effectUntil) speed *= this.effectMult;
       }
       this.moveAxis((dx / len) * speed * dt, 0);
       this.moveAxis(0, (dy / len) * speed * dt);
+    }
+
+    // 레이스 아이템 픽업 (탑승 중 해당 타일 위)
+    if (this.self.onBike && this.raceItems.length) {
+      const col = Math.floor(this.self.x / TILE);
+      const row = Math.floor(this.self.y / TILE);
+      for (const o of this.raceItems) {
+        if (o.x !== col || o.y !== row) continue;
+        if (now < (this.itemCooldowns.get(o.id) ?? 0)) continue;
+        if (o.type === "oil") {
+          this.itemCooldowns.set(o.id, now + 1500);
+          this.effectMult = 0.35;
+          this.effectUntil = now + 1000;
+          this.cb.onItem?.("oil");
+        } else {
+          this.itemCooldowns.set(o.id, now + 6000);
+          const roll = Math.random();
+          const kind: RaceItemKind = roll < 0.4 ? "boost" : roll < 0.75 ? "turbo" : "slow";
+          if (kind === "turbo") {
+            this.effectMult = 1.9;
+            this.effectUntil = now + 2000;
+          } else if (kind === "boost") {
+            this.effectMult = 1.5;
+            this.effectUntil = now + 1500;
+          } else {
+            this.effectMult = 0.55;
+            this.effectUntil = now + 1800;
+          }
+          this.cb.onItem?.(kind);
+        }
+      }
     }
 
     // 레이스 진행 체크
@@ -677,7 +730,7 @@ export class GameEngine {
     // Supabase Realtime rate limit 에 걸려 이모트/채팅까지 드랍된다).
     if (now - this.lastSent > NET_TICK) {
       const s = this.self;
-      const sig = `${Math.round(s.x)},${Math.round(s.y)},${s.dir},${s.moving},${s.onBike},${s.dancing},${s.sitting},${s.hand},${s.status},${s.areaId},${s.spotlight},${s.camOn}`;
+      const sig = `${Math.round(s.x)},${Math.round(s.y)},${s.dir},${s.moving},${s.onBike},${s.dancing},${s.sitting},${s.hand},${s.status},${s.areaId},${s.spotlight}`;
       if (sig !== this.lastSentSig) {
         this.lastSentSig = sig;
         this.lastSent = now;
@@ -823,7 +876,10 @@ export class GameEngine {
       const def = OBJECT_DEFS[o.type];
       if (!def) continue;
       const baseY = (o.y + def.h) * TILE;
-      items.push({ y: baseY - 6, draw: () => drawObject(ctx, o, now) });
+      // 아이템 박스는 획득 후 리스폰 전까지 흐리게 표시
+      const collected =
+        o.type === "itembox" && now < (this.itemCooldowns.get(o.id) ?? 0);
+      items.push({ y: baseY - 6, draw: () => drawObject(ctx, o, now, collected) });
     }
 
     const allPlayers: PlayerState[] = [...this.others.values(), this.self];

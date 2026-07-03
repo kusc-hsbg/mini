@@ -75,7 +75,8 @@ export default function ParticipantsPanel({
                 </span>
                 <span className="flex shrink-0 gap-1 text-xs">
                   {p.hand && "✋"}
-                  {p.camOn ? "📷" : ""}
+                  {p.sitting && "🪑"}
+                  {p.onBike && "🏎️"}
                 </span>
               </button>
 

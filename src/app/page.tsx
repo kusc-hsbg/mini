@@ -26,7 +26,7 @@ export default async function Landing({
           PixelTown
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-lg text-slate-300">
-          아바타로 돌아다니고, 가까이 가면 영상이 연결되고, 회의실을 잠그고,
+          아바타로 돌아다니고, 카트 레이스를 하고, 회의실을 잠그고,
           화이트보드에 함께 그리는 맵 기반 온라인 오피스. 게더타운처럼.
         </p>
 
@@ -74,9 +74,9 @@ export default async function Landing({
 
 const FEATURES = [
   {
-    icon: "📷",
-    title: "근접 영상 대화",
-    desc: "가까이 가면 자동으로 연결되는 WebRTC 카메라 대화. 프라이빗 영역·스포트라이트 지원.",
+    icon: "🏁",
+    title: "그랑프리 레이싱",
+    desc: "카트 탑승, 부스트 패드, ? 아이템 박스와 기름 웅덩이. 3랩 타임어택과 리더보드.",
   },
   {
     icon: "🚪",

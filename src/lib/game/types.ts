@@ -65,7 +65,6 @@ export interface PlayerState {
   areaId: string | null; // 현재 프라이빗 영역
   spotlight: boolean; // 스포트라이트 타일 위
   hand: boolean; // 손들기
-  camOn: boolean;
   guest: boolean;
 }
 

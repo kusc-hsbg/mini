@@ -1,11 +1,11 @@
 "use client";
 
-// 방(Room) 화면 오케스트레이터 — 엔진 + 실시간 + WebRTC + HUD/패널/모달.
+// 방(Room) 화면 오케스트레이터 — 엔진 + 실시간 + HUD/패널/모달.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { GameEngine, type RaceState } from "@/lib/game/engine";
+import { GameEngine, type RaceItemKind, type RaceState } from "@/lib/game/engine";
 import {
   MapData,
   MapObject,
@@ -19,7 +19,6 @@ import { OBJECT_DEFS } from "@/lib/game/objects";
 import { playPianoNote } from "@/lib/game/audio";
 import { useRoomChannel } from "@/hooks/useRoomChannel";
 import { useControlChannel, type ControlChannel } from "@/hooks/useControlChannel";
-import { useWebRTC } from "@/hooks/useWebRTC";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { logEvent } from "@/lib/analytics";
 import { banTarget, blockTarget, sendDm, setStatus as setStatusAction, unblockTarget } from "@/app/actions";
@@ -43,7 +42,6 @@ import type {
 } from "@/lib/game/types";
 
 import Toolbar from "./Toolbar";
-import VideoDock from "./VideoDock";
 import ParticipantsPanel from "./ParticipantsPanel";
 import ChatPanel, { type ChatTab } from "./ChatPanel";
 import MeetingsPanel from "./MeetingsPanel";
@@ -276,20 +274,6 @@ export default function GameClient({
   );
   controlRef.current = control;
 
-  // ----- WebRTC (카메라 전용) -----
-  const rtc = useWebRTC({
-    selfId: identity?.id ?? "pending",
-    enabled: multiplayer && !!identity,
-    send: (to, data) =>
-      channelRef.current.send("signal", { from: identity?.id ?? "", to, data }),
-    onMediaChange: (cam) => {
-      engineRef.current?.patchSelf({ camOn: cam });
-      pushPresence();
-    },
-  });
-  const rtcRef = useRef(rtc);
-  rtcRef.current = rtc;
-
   const pushPresence = useCallback(() => {
     const self = engineRef.current?.getSelf();
     if (self && multiplayer) channelRef.current.track(self);
@@ -393,7 +377,6 @@ export default function GameClient({
       case "mod": {
         const m = payload as RtEvents["mod"];
         if (m.target !== myId) break;
-        rtcRef.current.shutdown();
         alert(m.kind === "kick" ? "방에서 내보내졌습니다." : "이 스페이스에서 차단되었습니다.");
         router.replace("/spaces");
         break;
@@ -410,12 +393,6 @@ export default function GameClient({
           playPianoNote(p.note, vol);
           engine?.addEmote(p.from, { id: `pn-${p.note}-${Date.now()}`, kind: "emoji", value: "🎵", at: Date.now() });
         }
-        break;
-      }
-      case "signal": {
-        const s = payload as RtEvents["signal"];
-        if (s.to !== myId || blockedRef.current.has(s.from)) break;
-        rtcRef.current.handleSignal(s.from, s.data);
         break;
       }
       case "wb": {
@@ -551,6 +528,17 @@ export default function GameClient({
               });
           }
         },
+        onItem: (kind: RaceItemKind) => {
+          const meta: Record<RaceItemKind, [string, string]> = {
+            turbo: ["🚀 터보! 2초간 초가속", "🚀"],
+            boost: ["⚡ 부스트!", "⚡"],
+            slow: ["🐢 꽝... 슬로우에 걸렸어요", "🐢"],
+            oil: ["🛢️ 기름에 미끄러졌다!", "💫"],
+          };
+          const [text, emoji] = meta[kind];
+          addToast(text);
+          sendEmote("emoji", emoji);
+        },
         onAreaBlocked: (area, reason) => {
           if (reason === "locked") {
             addToast(`🔒 "${area.name}" 영역이 잠겨 있어요`, "노크", () => {
@@ -664,34 +652,32 @@ export default function GameClient({
     return () => clearInterval(t);
   }, [liveMap, engineReady]);
 
-  // ----- WebRTC 연결 대상 계산 (근접/영역/스포트라이트/상태) -----
+  // ----- 근접 대화 시간 측정 (인사이트 conv_seconds) -----
   useEffect(() => {
     if (!multiplayer) return;
     const t = setInterval(() => {
       const e = engineRef.current;
       if (!e) return;
       const self = e.getSelf();
-      const ids: string[] = [];
+      let near = 0;
       for (const p of e.getOthers()) {
         if (blockedRef.current.has(p.id)) continue;
-        if (p.status === "dnd" || statusRef.current === "dnd") continue;
-        if (p.spotlight || self.spotlight) {
-          ids.push(p.id);
-          continue;
-        }
-        if (self.areaId) {
-          if (p.areaId === self.areaId) ids.push(p.id);
-          continue;
-        }
-        if (!p.areaId && Math.hypot(p.x - self.x, p.y - self.y) <= PROXIMITY_TILES * TILE) {
-          ids.push(p.id);
-        }
+        if (self.areaId && p.areaId === self.areaId) near++;
+        else if (!self.areaId && !p.areaId && Math.hypot(p.x - self.x, p.y - self.y) <= PROXIMITY_TILES * TILE) near++;
       }
-      rtcRef.current.setDesired(ids);
-      if (ids.length > 0) convSecondsRef.current += 0.8;
+      if (near > 0) convSecondsRef.current += 0.8;
     }, 800);
     return () => clearInterval(t);
   }, [multiplayer]);
+
+  // ----- 탭 복귀 시 presence 즉시 갱신 -----
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") pushPresence();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [pushPresence]);
 
   // ----- 데스크/쪽지 로드 -----
   useEffect(() => {
@@ -1153,11 +1139,6 @@ export default function GameClient({
     (id: string) => players.find((p) => p.id === id)?.name ?? "익명",
     [players]
   );
-  const spotlightIds = useMemo(() => {
-    const s = new Set<string>();
-    for (const p of players) if (p.spotlight) s.add(p.id === identity?.id ? "self" : p.id);
-    return s;
-  }, [players, identity]);
   const myDesk = desks.find((d) => d.owner_id === identity?.id) ?? null;
   const selfInSpotlight = players.find((p) => p.id === identity?.id)?.spotlight ?? false;
 
@@ -1227,17 +1208,6 @@ export default function GameClient({
         </div>
       </div>
 
-      {/* ---------- 비디오 독 ---------- */}
-      <div className="pointer-events-none absolute inset-x-0 top-14 z-20 flex justify-center">
-        <VideoDock
-          localStream={rtc.localStream}
-          peers={rtc.peers}
-          nameOf={nameOf}
-          spotlightIds={spotlightIds}
-          selfName={identity?.name ?? ""}
-        />
-      </div>
-
       {/* ---------- 프라이빗 영역 배너 ---------- */}
       {currentArea && (
         <div className="pointer-events-auto absolute left-1/2 top-3 z-20 hidden -translate-x-1/2 items-center gap-2 rounded-xl border border-accent/30 bg-panel/90 px-3 py-1.5 text-sm backdrop-blur sm:flex">
@@ -1286,24 +1256,16 @@ export default function GameClient({
       {/* ---------- 레이스 HUD (그랑프리) ---------- */}
       {identity && <RaceHud state={raceState} leaderboard={leaderboard} selfId={identity.id} />}
 
-      {rtc.mediaError && (
-        <div className="pointer-events-none absolute bottom-32 left-1/2 z-20 -translate-x-1/2 rounded-lg bg-red-500/90 px-3 py-1.5 text-sm text-white">
-          {rtc.mediaError}
-        </div>
-      )}
-
       {/* ---------- 하단 툴바 ---------- */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center p-3">
         <Toolbar
           multiplayer={multiplayer}
-          camOn={rtc.camOn}
           hand={hand}
           status={status}
           statusMsg={statusMsg}
           soundOn={soundOn}
           canEdit={canEdit && multiplayer}
           editorOpen={editorOpen}
-          onCam={rtc.toggleCam}
           onHand={() => {
             const next = !hand;
             setHand(next);

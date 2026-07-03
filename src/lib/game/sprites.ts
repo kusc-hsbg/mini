@@ -282,7 +282,8 @@ const BOOK_COLORS = ["#ef4444", "#3b82f6", "#22c55e", "#eab308", "#a855f7", "#f9
 export function drawObject(
   ctx: CanvasRenderingContext2D,
   o: MapObject,
-  t: number
+  t: number,
+  collected = false // itembox: 획득 후 리스폰 대기 중
 ) {
   const def = OBJECT_DEFS[o.type];
   if (!def) return;
@@ -292,6 +293,61 @@ export function drawObject(
   const h = def.h * TILE;
 
   switch (o.type) {
+    case "itembox": {
+      // 회전하는 ? 박스 (마리오카트 스타일) — 획득 시 흐린 외곽선만
+      const bobY = Math.sin(t / 260 + o.x) * 2.5;
+      const cx = x + TILE / 2;
+      const cy = y + TILE / 2 + bobY;
+      if (collected) {
+        ctx.globalAlpha = 0.22;
+      }
+      // 그림자
+      ctx.fillStyle = "rgba(0,0,0,0.2)";
+      ctx.beginPath();
+      ctx.ellipse(x + TILE / 2, y + TILE - 4, 9, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 무지개 그라데이션 박스
+      const hue = Math.floor((t / 12 + o.x * 40) % 360);
+      ctx.fillStyle = `hsl(${hue}, 80%, 55%)`;
+      roundRect(ctx, cx - 10, cy - 10, 20, 20, 4);
+      ctx.fill();
+      ctx.fillStyle = `hsl(${(hue + 60) % 360}, 80%, 68%)`;
+      roundRect(ctx, cx - 10, cy - 10, 20, 8, 4);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.85)";
+      ctx.lineWidth = 1.5;
+      roundRect(ctx, cx - 10, cy - 10, 20, 20, 4);
+      ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 13px ui-sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("?", cx, cy + 1);
+      ctx.textBaseline = "alphabetic";
+      ctx.globalAlpha = 1;
+      return;
+    }
+    case "oil": {
+      // 검은 기름 웅덩이 + 무지개빛 광택
+      ctx.fillStyle = "rgba(12,14,18,0.85)";
+      ctx.beginPath();
+      ctx.ellipse(x + 16, y + 17, 13, 9, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(x + 8, y + 11, 5, 3.5, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + 25, y + 22, 4, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      const sh = Math.sin(t / 400 + o.y) * 2;
+      ctx.fillStyle = "rgba(120,180,255,0.28)";
+      ctx.beginPath();
+      ctx.ellipse(x + 13 + sh, y + 15, 5, 2, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(200,140,255,0.22)";
+      ctx.beginPath();
+      ctx.ellipse(x + 20 - sh, y + 19, 4, 1.8, 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
     case "desk": {
       ctx.fillStyle = "rgba(0,0,0,0.2)";
       ctx.fillRect(x + 2, y + h - 4, w - 4, 4);

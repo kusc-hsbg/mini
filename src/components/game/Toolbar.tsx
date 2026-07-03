@@ -1,20 +1,18 @@
 "use client";
 
-// 하단 툴바 — 카메라 / 상태 / 이모지 / 손들기 / 줌 / 패널 토글.
+// 하단 툴바 — 상태 / 이모지 / 손들기 / 줌 / 패널 토글.
 import { useState } from "react";
 import { EMOJIS, STATUS_META } from "@/lib/game/constants";
 import type { UserStatus } from "@/lib/game/types";
 
 export default function Toolbar(props: {
   multiplayer: boolean;
-  camOn: boolean;
   hand: boolean;
   status: UserStatus;
   statusMsg: string;
   soundOn: boolean;
   canEdit: boolean;
   editorOpen: boolean;
-  onCam: () => void;
   onHand: () => void;
   onStatus: (s: UserStatus, msg: string) => void;
   onEmoji: (emoji: string) => void;
@@ -35,12 +33,9 @@ export default function Toolbar(props: {
 
   return (
     <div className="pointer-events-auto relative flex items-center gap-1.5 rounded-2xl bg-panel/85 p-2 backdrop-blur">
-      {/* 미디어 */}
+      {/* 손들기 */}
       {props.multiplayer && (
         <>
-          <IconBtn on={props.camOn} onClick={props.onCam} title="카메라 (근접 영상 대화)">
-            {props.camOn ? "📷" : "📵"}
-          </IconBtn>
           <IconBtn on={props.hand} onClick={props.onHand} title="손들기">
             ✋
           </IconBtn>
@@ -76,7 +71,7 @@ export default function Toolbar(props: {
                   style={{ backgroundColor: STATUS_META[s].color }}
                 />
                 {STATUS_META[s].label}
-                {s === "dnd" && <span className="text-[10px] text-slate-500">(대화 연결 안 됨)</span>}
+                {s === "dnd" && <span className="text-[10px] text-slate-500">(웨이브 알림 차단)</span>}
               </button>
             ))}
             <input

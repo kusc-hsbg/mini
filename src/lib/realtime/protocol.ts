@@ -1,12 +1,6 @@
 // Supabase Realtime 브로드캐스트 이벤트 정의.
 import type { ChatMessage, EmoteMessage, PlayerState } from "@/lib/game/types";
 
-export interface SignalData {
-  sdp?: RTCSessionDescriptionInit;
-  candidate?: RTCIceCandidateInit;
-  bye?: boolean;
-}
-
 export interface RtEvents {
   move: PlayerState;
   emote: { id: string; emote: EmoteMessage };
@@ -16,7 +10,6 @@ export interface RtEvents {
   "knock-result": { to: string; areaId: string; allow: boolean; byName: string };
   lock: { areaId: string; locked: boolean; byName: string };
   mod: { kind: "kick" | "ban"; target: string; byName: string };
-  signal: { from: string; to: string; data: SignalData };
   piano: { from: string; x: number; y: number; note: number };
   wb: { board: string; op: WbOp };
   "map-update": { by: string };

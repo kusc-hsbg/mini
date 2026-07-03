@@ -32,6 +32,8 @@ export type ObjectKind =
   | "podium"
   | "flag"
   | "grandstand"
+  | "itembox"
+  | "oil"
   | "custom";
 
 export interface ObjectDef {
@@ -75,6 +77,8 @@ export const OBJECT_DEFS: Record<ObjectKind, ObjectDef> = {
   podium: { label: "포디움(시상대)", w: 3, h: 2, solid: true, category: "레이싱" },
   flag: { label: "체커 깃발", w: 1, h: 1, solid: true, tall: true, category: "레이싱" },
   grandstand: { label: "관중석", w: 3, h: 2, solid: true, category: "레이싱" },
+  itembox: { label: "아이템 박스(랜덤 효과)", w: 1, h: 1, solid: false, category: "레이싱" },
+  oil: { label: "기름 웅덩이(미끄러짐)", w: 1, h: 1, solid: false, category: "레이싱" },
   custom: { label: "커스텀(이미지 URL)", w: 1, h: 1, solid: false, interaction: "none", category: "기타" },
 };
 
