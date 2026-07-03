@@ -1,24 +1,20 @@
 "use client";
 
-// 하단 툴바 — 미디어 컨트롤 / 상태 / 이모지 / 손들기 / 녹화 / 줌 / 패널 토글.
-import { useRef, useState } from "react";
+// 하단 툴바 — 카메라 / 상태 / 이모지 / 손들기 / 줌 / 패널 토글.
+import { useState } from "react";
 import { EMOJIS, STATUS_META } from "@/lib/game/constants";
 import type { UserStatus } from "@/lib/game/types";
 
 export default function Toolbar(props: {
   multiplayer: boolean;
-  micOn: boolean;
   camOn: boolean;
-  sharing: boolean;
   hand: boolean;
   status: UserStatus;
   statusMsg: string;
   soundOn: boolean;
   canEdit: boolean;
   editorOpen: boolean;
-  onMic: () => void;
   onCam: () => void;
-  onShare: () => void;
   onHand: () => void;
   onStatus: (s: UserStatus, msg: string) => void;
   onEmoji: (emoji: string) => void;
@@ -34,46 +30,6 @@ export default function Toolbar(props: {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [msg, setMsg] = useState(props.statusMsg);
-  const [recording, setRecording] = useState(false);
-  const recRef = useRef<MediaRecorder | null>(null);
-  const recStreamRef = useRef<MediaStream | null>(null);
-
-  async function toggleRecord() {
-    if (recording) {
-      recRef.current?.stop();
-      recStreamRef.current?.getTracks().forEach((t) => t.stop());
-      setRecording(false);
-      return;
-    }
-    try {
-      const screen = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: true,
-      });
-      let mixed = screen;
-      try {
-        const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mixed = new MediaStream([...screen.getTracks(), ...mic.getAudioTracks()]);
-      } catch {}
-      recStreamRef.current = mixed;
-      const rec = new MediaRecorder(mixed, { mimeType: pickMime() });
-      const chunks: Blob[] = [];
-      rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-      rec.onstop = () => {
-        const blob = new Blob(chunks, { type: rec.mimeType });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `pixeltown-recording-${Date.now()}.webm`;
-        a.click();
-        URL.revokeObjectURL(a.href);
-        setRecording(false);
-      };
-      screen.getVideoTracks()[0].onended = () => rec.state !== "inactive" && rec.stop();
-      rec.start(1000);
-      recRef.current = rec;
-      setRecording(true);
-    } catch {}
-  }
 
   const meta = STATUS_META[props.status];
 
@@ -82,22 +38,13 @@ export default function Toolbar(props: {
       {/* 미디어 */}
       {props.multiplayer && (
         <>
-          <IconBtn on={props.micOn} onClick={props.onMic} title="마이크 (근접 대화)">
-            {props.micOn ? "🎙️" : "🔇"}
-          </IconBtn>
-          <IconBtn on={props.camOn} onClick={props.onCam} title="카메라">
+          <IconBtn on={props.camOn} onClick={props.onCam} title="카메라 (근접 영상 대화)">
             {props.camOn ? "📷" : "📵"}
           </IconBtn>
-          <IconBtn on={props.sharing} onClick={props.onShare} title="화면 공유">
-            🖥️
-          </IconBtn>
-          <IconBtn on={recording} onClick={toggleRecord} title="녹화 (내 화면을 webm으로 저장)">
-            {recording ? "⏺️" : "🎬"}
-          </IconBtn>
-          <Divider />
           <IconBtn on={props.hand} onClick={props.onHand} title="손들기">
             ✋
           </IconBtn>
+          <Divider />
         </>
       )}
 
@@ -238,16 +185,4 @@ function IconBtn({
 
 function Divider() {
   return <div className="mx-0.5 h-6 w-px bg-white/10" />;
-}
-
-function pickMime(): string {
-  const candidates = [
-    "video/webm;codecs=vp9,opus",
-    "video/webm;codecs=vp8,opus",
-    "video/webm",
-  ];
-  for (const c of candidates) {
-    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(c)) return c;
-  }
-  return "";
 }

@@ -78,8 +78,15 @@ export const TOP_STYLES: { key: string; label: string }[] = [
 export const SPECIALS: { key: string; label: string }[] = [
   { key: "none", label: "없음" },
   { key: "cape", label: "히어로 망토" },
-  { key: "ghost", label: "유령" },
+  { key: "robot", label: "로봇" },
 ];
+
+// 과거에 저장된 "ghost" 등 더 이상 없는 코스튬 값 정규화.
+export function normalizeSpecial(v: string | null | undefined): "none" | "cape" | "robot" {
+  if (v === "cape" || v === "robot") return v;
+  if (v === "ghost") return "robot";
+  return "none";
+}
 export const SHOES_COLORS = [
   "#292524", "#7c2d12", "#f8fafc", "#dc2626",
   "#1d4ed8", "#15803d", "#facc15", "#a855f7",

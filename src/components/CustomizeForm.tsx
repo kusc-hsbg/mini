@@ -19,6 +19,7 @@ import {
   SKIN_TONES,
   SPECIALS,
   TOP_STYLES,
+  normalizeSpecial,
 } from "@/lib/game/constants";
 import type {
   CharacterAppearance,
@@ -54,6 +55,7 @@ export default function CustomizeForm({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [dir, setDir] = useState<Direction>("down");
   const [tab, setTab] = useState<TabKey>("base");
 
@@ -88,13 +90,17 @@ export default function CustomizeForm({
         hat: profile.hat as HatType,
         glasses: (profile.glasses as GlassesType) ?? "none",
         face: profile.face as FaceType,
-        special: (profile.special as SpecialType) ?? "none",
+        special: normalizeSpecial(profile.special),
       };
     }
     if (typeof window !== "undefined") {
       try {
         const raw = localStorage.getItem(GUEST_KEY);
-        if (raw) return { ...def, ...JSON.parse(raw) };
+        if (raw) {
+          const g = { ...def, ...JSON.parse(raw) };
+          g.special = normalizeSpecial(g.special);
+          return g;
+        }
       } catch {}
     }
     return def;
@@ -107,6 +113,7 @@ export default function CustomizeForm({
 
   function handleSave() {
     setSaved(false);
+    setSaveError(null);
     if (configured && profile) {
       startTransition(async () => {
         const res = await saveProfile({
@@ -124,10 +131,14 @@ export default function CustomizeForm({
           face: app.face,
           special: app.special,
         });
-        if (!("error" in res)) {
-          setSaved(true);
-          router.push("/spaces");
+        if ("error" in res) {
+          // 실패를 조용히 삼키면 "입장 버튼이 안 눌리는" 것처럼 보인다 — 반드시 표시.
+          setSaveError(res.error);
+          return;
         }
+        setSaved(true);
+        router.push("/spaces");
+        router.refresh();
       });
     } else {
       try {
@@ -328,6 +339,11 @@ export default function CustomizeForm({
           {saved && <span className="text-sm text-accent2">저장됨!</span>}
           {!profile && <span className="text-xs text-slate-500">(게스트: 이 브라우저에만 저장)</span>}
         </div>
+        {saveError && (
+          <p className="rounded-lg bg-red-500/10 p-3 text-sm text-red-300">
+            저장에 실패했습니다: {saveError}
+          </p>
+        )}
       </div>
     </div>
   );

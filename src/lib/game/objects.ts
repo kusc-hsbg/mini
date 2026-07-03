@@ -63,7 +63,7 @@ export const OBJECT_DEFS: Record<ObjectKind, ObjectDef> = {
   sign: { label: "안내판", w: 1, h: 1, solid: true, interaction: "note", category: "미디어" },
   speaker: { label: "스피커", w: 1, h: 1, solid: true, interaction: "sound", category: "미디어" },
   arcade: { label: "아케이드(테트리스)", w: 1, h: 1, solid: true, tall: true, interaction: "tetris", category: "놀이" },
-  piano: { label: "피아노", w: 2, h: 1, solid: true, interaction: "sound", category: "놀이" },
+  piano: { label: "피아노", w: 2, h: 1, solid: true, interaction: "piano", category: "놀이" },
   coffee: { label: "커피머신", w: 1, h: 1, solid: true, category: "가구" },
   vending: { label: "자판기", w: 1, h: 1, solid: true, tall: true, category: "가구" },
   rug: { label: "러그", w: 3, h: 2, solid: false, category: "장식" },
@@ -92,5 +92,6 @@ export const INTERACTION_LABELS: Record<InteractionKind, string> = {
   sound: "사운드 재생",
   spotify: "Spotify 임베드",
   tetris: "테트리스",
+  piano: "피아노 연주",
   none: "상호작용 없음",
 };

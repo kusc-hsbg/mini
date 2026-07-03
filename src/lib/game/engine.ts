@@ -23,6 +23,7 @@ import {
   BIKE_SPEED,
   BOOST_MS,
   BOOST_MULT,
+  NET_TICK,
   OFFROAD_MULT,
   PLAYER_RADIUS,
   PROXIMITY_TILES,
@@ -85,16 +86,17 @@ export class GameEngine {
   private raf = 0;
   private last = 0;
   private lastSent = 0;
+  private lastSentSig = ""; // 마지막으로 전송한 상태 시그니처 (변경 시에만 전송)
 
   private self: PlayerState;
   private others = new Map<string, PlayerState & { tx: number; ty: number }>();
   private emotes = new Map<string, ActiveEmote[]>();
-  private speakingIds = new Set<string>();
   private deskOwners = new Map<string, string>(); // object id -> 이름
 
   private path: PathNode[] = [];
   private pathTarget: PathNode | null = null;
   private followId: string | null = null;
+  private seat: { objId: string; prevX: number; prevY: number } | null = null; // 앉기 전 위치 복원용
 
   private currentArea: PrivateArea | null = null;
   private lockedAreas = new Set<string>();
@@ -143,14 +145,13 @@ export class GameEngine {
       moving: false,
       onBike: false,
       dancing: false,
+      sitting: false,
       appearance,
       status: opts?.status ?? "available",
       areaId: null,
       spotlight: false,
       hand: false,
-      micOn: false,
       camOn: false,
-      sharing: false,
       guest: opts?.guest ?? false,
     };
   }
@@ -183,6 +184,7 @@ export class GameEngine {
     this.map = map;
     this.solid = buildSolidGrid(map);
     this.renderGround();
+    if (this.seat) this.standUp(); // 좌석 오브젝트가 사라졌을 수 있음
     if (!keepPosition) {
       const sp = spawnPoint(map);
       this.self.x = sp.x * TILE + TILE / 2;
@@ -221,6 +223,8 @@ export class GameEngine {
   }
 
   teleport(tileX: number, tileY: number) {
+    this.seat = null;
+    this.self.sitting = false;
     this.self.x = tileX * TILE + TILE / 2;
     this.self.y = tileY * TILE + TILE / 2;
     this.path = [];
@@ -230,6 +234,7 @@ export class GameEngine {
   }
 
   walkToTile(tx: number, ty: number) {
+    if (this.seat) this.standUp();
     const sx = Math.floor(this.self.x / TILE);
     const sy = Math.floor(this.self.y / TILE);
     const p = findPath(this.solid, sx, sy, tx, ty);
@@ -243,6 +248,48 @@ export class GameEngine {
     const p = this.others.get(id);
     if (!p) return;
     this.walkToTile(Math.floor(p.tx / TILE), Math.floor(p.ty / TILE));
+  }
+
+  // ---------- 앉기 ----------
+
+  isSitting() {
+    return !!this.seat;
+  }
+
+  // 의자/소파/벤치에 앉기. 잠긴 영역 안의 좌석이면 실패(false).
+  sitOn(obj: MapObject): boolean {
+    if (this.self.onBike) return false;
+    const def = OBJECT_DEFS[obj.type];
+    if (!def) return false;
+    const cx = (obj.x + def.w / 2) * TILE;
+    const cy = (obj.y + def.h / 2) * TILE + 4;
+    const area = areaAtPx(this.map, cx, cy);
+    if (area && this.currentArea?.id !== area.id && this.lockedAreas.has(area.id)) {
+      this.notifyBlocked(area, "locked");
+      return false;
+    }
+    this.seat = { objId: obj.id, prevX: this.self.x, prevY: this.self.y };
+    this.self.x = cx;
+    this.self.y = cy;
+    this.self.sitting = true;
+    this.self.moving = false;
+    this.self.dancing = false;
+    this.self.dir = obj.dir === "up" ? "up" : "down";
+    this.path = [];
+    this.pathTarget = null;
+    this.followId = null;
+    this.pushState();
+    return true;
+  }
+
+  standUp() {
+    if (!this.seat) return;
+    // 좌석이 벽/가구(솔리드) 위일 수 있으므로 앉기 전 위치로 복원
+    this.self.x = this.seat.prevX;
+    this.self.y = this.seat.prevY;
+    this.seat = null;
+    this.self.sitting = false;
+    this.pushState();
   }
 
   setFollow(id: string | null) {
@@ -259,11 +306,6 @@ export class GameEngine {
     return this.lockedAreas.has(id);
   }
 
-  setSpeaking(id: string, on: boolean) {
-    if (on) this.speakingIds.add(id);
-    else this.speakingIds.delete(id);
-  }
-
   setDeskOwners(m: Map<string, string>) {
     this.deskOwners = m;
   }
@@ -272,9 +314,15 @@ export class GameEngine {
     if (p.id === this.self.id) return;
     const existing = this.others.get(p.id);
     if (existing) {
-      existing.tx = p.x;
-      existing.ty = p.y;
-      Object.assign(existing, { ...p, x: existing.x, y: existing.y, tx: p.x, ty: p.y });
+      // 순간이동/대량 유실 등으로 목표가 멀면 스냅 (맵을 가로질러 미끄러지는 현상 방지)
+      const far = Math.hypot(p.x - existing.x, p.y - existing.y) > TILE * 6;
+      Object.assign(existing, {
+        ...p,
+        x: far ? p.x : existing.x,
+        y: far ? p.y : existing.y,
+        tx: p.x,
+        ty: p.y,
+      });
     } else {
       this.others.set(p.id, { ...p, tx: p.x, ty: p.y });
     }
@@ -293,14 +341,18 @@ export class GameEngine {
       if (p.id === this.self.id) continue;
       const existing = this.others.get(p.id);
       if (existing) {
-        // 위치 목표는 broadcast 가 담당 — 메타만 갱신
+        // 위치 목표는 broadcast 가 담당 — 메타만 갱신.
         existing.name = p.name;
         existing.appearance = p.appearance;
         existing.status = p.status;
+        existing.statusMsg = p.statusMsg;
         existing.hand = p.hand;
-        existing.micOn = p.micOn;
         existing.camOn = p.camOn;
-        existing.sharing = p.sharing;
+        // 단, broadcast 유실로 presence 위치와 크게 어긋나면 presence 쪽으로 수렴.
+        if (Math.hypot(p.x - existing.tx, p.y - existing.ty) > TILE * 3) {
+          existing.tx = p.x;
+          existing.ty = p.y;
+        }
       } else {
         this.others.set(p.id, { ...p, tx: p.x, ty: p.y });
       }
@@ -384,7 +436,7 @@ export class GameEngine {
   };
 
   private tryToggleBike() {
-    if (this.bikeCooldown > 0) return;
+    if (this.bikeCooldown > 0 || this.seat) return;
     if (this.self.onBike) {
       this.self.onBike = false;
       this.bikeCooldown = 350;
@@ -397,7 +449,7 @@ export class GameEngine {
   }
 
   private toggleDance() {
-    if (this.self.onBike) return;
+    if (this.self.onBike || this.seat) return;
     this.self.dancing = !this.self.dancing;
     this.pushState();
   }
@@ -522,8 +574,9 @@ export class GameEngine {
       if (k.has("arrowright") || k.has("d")) dx += 1;
     }
 
-    // 키 입력이 있으면 자동 이동 취소
+    // 키 입력이 있으면 자동 이동 취소 + 앉아 있으면 일어남
     if (dx !== 0 || dy !== 0) {
+      if (this.seat) this.standUp();
       this.path = [];
       this.pathTarget = null;
       this.followId = null;
@@ -620,10 +673,16 @@ export class GameEngine {
       this.cb.onInteractHint?.(hint);
     }
 
-    // 위치 전송
-    if (now - this.lastSent > 80) {
-      this.lastSent = now;
-      this.pushState();
+    // 위치 전송 — 상태가 실제로 바뀌었을 때만 (가만히 있을 때 스팸 전송하면
+    // Supabase Realtime rate limit 에 걸려 이모트/채팅까지 드랍된다).
+    if (now - this.lastSent > NET_TICK) {
+      const s = this.self;
+      const sig = `${Math.round(s.x)},${Math.round(s.y)},${s.dir},${s.moving},${s.onBike},${s.dancing},${s.sitting},${s.hand},${s.status},${s.areaId},${s.spotlight},${s.camOn}`;
+      if (sig !== this.lastSentSig) {
+        this.lastSentSig = sig;
+        this.lastSent = now;
+        this.pushState();
+      }
     }
 
     // 원격 플레이어 보간
@@ -770,7 +829,8 @@ export class GameEngine {
     const allPlayers: PlayerState[] = [...this.others.values(), this.self];
     for (const p of allPlayers) {
       items.push({
-        y: p.y,
+        // 앉은 캐릭터는 좌석 오브젝트보다 나중에(위에) 그려야 가려지지 않는다
+        y: p.sitting ? p.y + 12 : p.y,
         draw: () =>
           drawCharacter(
             ctx,
@@ -786,8 +846,8 @@ export class GameEngine {
             {
               status: p.status,
               hand: p.hand,
-              speaking: this.speakingIds.has(p.id),
               dancing: p.dancing,
+              sitting: p.sitting,
               vehicle: this.map.vehicle ?? "bike",
             }
           ),

@@ -63,6 +63,7 @@ export type InteractionKind =
   | "sound"
   | "spotify"
   | "tetris"
+  | "piano"
   | "none";
 
 export interface ObjectProps {
@@ -232,6 +233,9 @@ export function portalAtPx(map: MapData, px: number, py: number): Portal | null 
   return map.portals.find((p) => p.x === c && p.y === r) ?? null;
 }
 
+// interaction 필드 없이도 타입 자체로 상호작용되는 오브젝트.
+export const TYPE_INTERACTIVE = new Set(["desk", "chair", "sofa", "bench", "coffee", "vending"]);
+
 // 상호작용 가능한 가장 가까운 오브젝트 (중심 기준 거리, 픽셀).
 export function nearestInteractive(
   map: MapData,
@@ -246,8 +250,8 @@ export function nearestInteractive(
     if (!def) continue;
     const kind = o.props?.interaction ?? def.interaction;
     if (!kind || kind === "none") {
-      // 데스크는 상호작용(자리 지정/쪽지) 대상
-      if (o.type !== "desk") continue;
+      // 데스크(자리 지정/쪽지) · 좌석(앉기) · 커피/자판기(아이템)는 타입 자체가 상호작용 대상
+      if (!TYPE_INTERACTIVE.has(o.type)) continue;
     }
     const cx = (o.x + def.w / 2) * TILE;
     const cy = (o.y + def.h / 2) * TILE;

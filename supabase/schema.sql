@@ -201,7 +201,8 @@ begin
     (new.id, 'Main Plaza', 'plaza', 0),
     (new.id, 'Office', 'office', 1),
     (new.id, 'Garden', 'garden', 2),
-    (new.id, 'Grand Prix Circuit', 'circuit', 3);
+    (new.id, 'Grand Prix Circuit', 'circuit', 3),
+    (new.id, 'Beach Resort', 'beach', 4);
   return new;
 end;
 $$;
@@ -584,4 +585,14 @@ select s.id, 'Grand Prix Circuit', 'circuit', 3
 from public.spaces s
 where not exists (
   select 1 from public.rooms r where r.space_id = s.id and r.template_key = 'circuit'
+);
+
+-- ---------------------------------------------------------------
+-- backfill: add Beach Resort room to spaces created before this update
+-- ---------------------------------------------------------------
+insert into public.rooms (space_id, name, template_key, sort_order)
+select s.id, 'Beach Resort', 'beach', 4
+from public.spaces s
+where not exists (
+  select 1 from public.rooms r where r.space_id = s.id and r.template_key = 'beach'
 );

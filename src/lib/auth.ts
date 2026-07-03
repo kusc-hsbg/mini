@@ -21,11 +21,26 @@ export async function getSessionContext(): Promise<{
     return { configured: true, userId: null, email: null, profile: null };
   }
 
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
+
+  // 프로필 행이 없으면(트리거 누락 등) 즉시 생성 —
+  // 이게 없으면 로그인했는데도 게스트로 취급되는 버그가 생긴다.
+  if (!profile) {
+    const displayName =
+      (user.user_metadata?.full_name as string | undefined) ||
+      user.email?.split("@")[0] ||
+      "Player";
+    const { data: created } = await supabase
+      .from("profiles")
+      .upsert({ id: user.id, display_name: displayName.slice(0, 24) })
+      .select("*")
+      .maybeSingle();
+    profile = created;
+  }
 
   return {
     configured: true,

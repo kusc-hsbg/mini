@@ -6,7 +6,7 @@ export type HairType = "none" | "short" | "long" | "ponytail" | "spiky" | "bob" 
 export type FacialHairType = "none" | "mustache" | "beard" | "goatee";
 export type GlassesType = "none" | "round" | "square" | "sunglasses";
 export type TopStyleType = "tshirt" | "hoodie" | "suit" | "stripe";
-export type SpecialType = "none" | "cape" | "ghost";
+export type SpecialType = "none" | "cape" | "robot";
 export type Direction = "down" | "up" | "left" | "right";
 export type UserStatus = "available" | "busy" | "dnd";
 
@@ -58,15 +58,14 @@ export interface PlayerState {
   moving: boolean;
   onBike: boolean; // 탈것(오토바이/카트) 탑승 여부
   dancing: boolean; // Z 키 춤
+  sitting: boolean; // 의자/소파/벤치에 앉음
   appearance: CharacterAppearance;
   status: UserStatus;
   statusMsg?: string;
   areaId: string | null; // 현재 프라이빗 영역
   spotlight: boolean; // 스포트라이트 타일 위
   hand: boolean; // 손들기
-  micOn: boolean;
   camOn: boolean;
-  sharing: boolean; // 화면 공유 중
   guest: boolean;
 }
 

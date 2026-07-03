@@ -5,20 +5,19 @@ export interface SignalData {
   sdp?: RTCSessionDescriptionInit;
   candidate?: RTCIceCandidateInit;
   bye?: boolean;
-  meta?: { screenId?: string | null };
 }
 
 export interface RtEvents {
   move: PlayerState;
   emote: { id: string; emote: EmoteMessage };
   chat: ChatMessage;
-  reaction: { from: string; fromName: string; emoji: string };
   wave: { from: string; fromName: string; to: string };
   knock: { from: string; fromName: string; areaId: string };
   "knock-result": { to: string; areaId: string; allow: boolean; byName: string };
   lock: { areaId: string; locked: boolean; byName: string };
-  mod: { kind: "kick" | "ban" | "mute"; target: string; byName: string };
+  mod: { kind: "kick" | "ban"; target: string; byName: string };
   signal: { from: string; to: string; data: SignalData };
+  piano: { from: string; x: number; y: number; note: number };
   wb: { board: string; op: WbOp };
   "map-update": { by: string };
   "desk-update": { by: string };

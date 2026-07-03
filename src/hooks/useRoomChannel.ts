@@ -22,7 +22,6 @@ const EVENTS: RtEventName[] = [
   "move",
   "emote",
   "chat",
-  "reaction",
   "wave",
   "knock",
   "knock-result",
@@ -33,6 +32,7 @@ const EVENTS: RtEventName[] = [
   "map-update",
   "desk-update",
   "race",
+  "piano",
 ];
 
 // 한 방의 실시간 채널 (Supabase Realtime presence + broadcast).
@@ -46,6 +46,7 @@ export function useRoomChannel(
   handlersRef.current = handlers;
 
   const chanRef = useRef<RealtimeChannel | null>(null);
+  const lastStateRef = useRef<PlayerState | null>(null);
   const [ready, setReady] = useState(false);
   const [online, setOnline] = useState(1);
 
@@ -76,7 +77,15 @@ export function useRoomChannel(
     }
 
     channel.subscribe((status) => {
-      if (status === "SUBSCRIBED") setReady(true);
+      if (status === "SUBSCRIBED") {
+        setReady(true);
+        // 구독(재구독 포함) 즉시 내 presence 를 등록해야
+        // 다른 클라이언트의 접속 인원/명단이 바로 갱신된다.
+        const last = lastStateRef.current;
+        if (last) channel.track(last);
+      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        setReady(false);
+      }
     });
     chanRef.current = channel;
 
@@ -91,6 +100,7 @@ export function useRoomChannel(
     ready,
     online,
     track: (state) => {
+      lastStateRef.current = state;
       chanRef.current?.track(state);
     },
     send: (event, payload) => {

@@ -1,5 +1,5 @@
-// 대형 프리셋 맵 3종. 코드로 조립해 실수 없이 큰 맵을 만든다.
-// (기존 24x18 → 80x50급, 면적 약 9배)
+// 대형 프리셋 맵 5종 (광장/오피스/파크/그랑프리 서킷/비치 리조트).
+// 코드로 조립해 실수 없이 큰 맵을 만든다. (기존 24x18 → 80x50급, 면적 약 9배)
 import type {
   MapData,
   MapLabel,
@@ -262,6 +262,8 @@ function buildPlaza(): MapData {
   add(c, "door", 48, 14, { name: "서킷 입구" });
   c.portals.push({ id: "pz-po-circuit", x: 48, y: 14, kind: "room", roomTemplate: "circuit", label: "🏁 그랑프리 서킷으로" });
   add(c, "flag", 49, 13);
+  add(c, "door", 50, 14, { name: "비치 입구" });
+  c.portals.push({ id: "pz-po-beach", x: 50, y: 14, kind: "room", roomTemplate: "beach", label: "🏖️ 비치 리조트로" });
   add(c, "door", 74, 41, { name: "지름길" });
   c.portals.push({ id: "pz-tp-1", x: 74, y: 41, kind: "same", tx: 5, ty: 41, label: "↔ 반대편 도로" });
   add(c, "door", 5, 44, { name: "지름길" });
@@ -706,9 +708,174 @@ function buildCircuit(): MapData {
   };
 }
 
+// ==================== 5. 비치 리조트 (76 x 48) ====================
+// 바다 · 보드워크(부두) · 티키 바 · 비치 발리볼 · 카바나 · 캠프파이어 · 선셋 스테이지
+
+function buildBeach(): MapData {
+  const W = 76;
+  const H = 48;
+  const g = new Grid(W, H, ",");
+  const c = ctx("bc");
+
+  g.scatter(";", 320, 1, 1, 44, H - 2, 77, ",");
+
+  // ---- 바다 (우측) + 백사장 ----
+  g.rect(56, 0, W - 56, H, "~");
+  g.rect(44, 0, 12, H, "s");
+  // 물결치는 해안선
+  const shore = mulberry32(88);
+  for (let r = 0; r < H; r++) {
+    const wob = Math.floor(shore() * 3);
+    for (let i = 0; i < wob; i++) g.set(56 + i, r, "s");
+  }
+
+  // ---- 보드워크 (부두) — 바다로 뻗은 원목 데크 ----
+  g.rect(50, 20, 22, 5, "w");
+  add(c, "lamp", 52, 19);
+  add(c, "lamp", 62, 19);
+  add(c, "lamp", 70, 19);
+  add(c, "bench", 58, 23);
+  add(c, "bench", 64, 23);
+  add(c, "sign", 68, 21, {
+    name: "부두 끝",
+    props: { text: "🌅 선셋 포인트\n\n여기서 보는 노을이 제일 예뻐요.\n벤치에 앉아서(X) 잠시 쉬어가세요." },
+  });
+  c.areas.push({ id: "pier", name: "🌅 선셋 부두", x: 60, y: 20, w: 12, h: 5, maxOccupancy: 6 });
+  c.labels.push({ x: 51, y: 20, text: "🌉 보드워크" });
+
+  // ---- 티키 바 (백사장 위 오두막) ----
+  g.rect(30, 6, 12, 8, "w");
+  g.border(30, 6, 12, 8, "#");
+  g.set(35, 13, "w");
+  g.set(36, 13, "w");
+  add(c, "counter", 31, 8);
+  add(c, "counter", 32, 8);
+  add(c, "counter", 33, 8);
+  add(c, "coffee", 31, 7);
+  add(c, "vending", 40, 7);
+  add(c, "piano", 37, 8, { name: "비치 피아노" });
+  add(c, "speaker", 34, 7, {
+    name: "티키 라디오",
+    props: { url: "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3" },
+  });
+  add(c, "roundtable", 32, 10);
+  add(c, "chair", 31, 11);
+  add(c, "chair", 34, 11);
+  add(c, "roundtable", 37, 10);
+  add(c, "chair", 36, 11);
+  add(c, "chair", 39, 11);
+  c.areas.push({ id: "tiki-bar", name: "🍹 티키 바", x: 31, y: 7, w: 10, h: 6 });
+  c.labels.push({ x: 31, y: 6, text: "🍹 티키 바" });
+
+  // ---- 비치 발리볼 코트 ----
+  g.rect(45, 30, 10, 8, "s");
+  add(c, "cone", 45, 33);
+  add(c, "cone", 54, 33);
+  add(c, "flag", 45, 30);
+  add(c, "flag", 54, 30);
+  c.areas.push({ id: "volleyball", name: "🏐 비치 발리볼", x: 45, y: 30, w: 10, h: 8, maxOccupancy: 8 });
+  c.labels.push({ x: 45, y: 29, text: "🏐 비치 발리볼" });
+
+  // ---- 카바나 3동 (프라이빗, 잠금 가능) ----
+  for (let i = 0; i < 3; i++) {
+    const bx = 45;
+    const by = 4 + i * 6;
+    g.rect(bx, by, 6, 5, "w");
+    g.border(bx, by, 6, 5, "#");
+    g.set(bx, by + 2, "w"); // 서쪽 출입구
+    add(c, "sofa", bx + 2, by + 1);
+    add(c, "rug", bx + 1, by + 2, { props: { color: "#0d9488" } });
+    c.areas.push({
+      id: `cabana-${i + 1}`,
+      name: `⛱️ 카바나 ${i + 1}`,
+      x: bx + 1,
+      y: by + 1,
+      w: 4,
+      h: 3,
+      maxOccupancy: 4,
+      lockable: true,
+    });
+  }
+  c.labels.push({ x: 45, y: 3, text: "⛱️ 카바나 (잠금 가능)" });
+
+  // ---- 캠프파이어 (백사장) ----
+  add(c, "campfire", 48, 42);
+  add(c, "bench", 45, 40);
+  add(c, "bench", 51, 40);
+  add(c, "bench", 45, 44);
+  add(c, "bench", 51, 44);
+  c.areas.push({ id: "beach-fire", name: "🔥 비치 파이어", x: 44, y: 39, w: 11, h: 7 });
+  c.labels.push({ x: 44, y: 39, text: "🔥 비치 파이어" });
+
+  // ---- 선셋 스테이지 (스포트라이트) ----
+  g.rect(8, 8, 16, 9, "-");
+  g.rect(10, 9, 12, 3, "m");
+  for (let i = 0; i < 3; i++) c.spotlights.push({ x: 12 + i * 3, y: 10 });
+  add(c, "speaker", 9, 9);
+  add(c, "speaker", 21, 9);
+  add(c, "tv", 14, 9, { name: "스테이지 스크린", props: { url: "" } });
+  add(c, "bench", 10, 14);
+  add(c, "bench", 14, 14);
+  add(c, "bench", 18, 14);
+  c.labels.push({ x: 9, y: 8, text: "🎶 선셋 스테이지 (스포트라이트)" });
+
+  // ---- 라이딩 트랙 (잔디 쪽 루프) ----
+  g.rect(4, 44, 48, 2, "=");
+  g.rect(4, 22, 2, 24, "=");
+  g.rect(4, 22, 24, 2, "=");
+  g.rect(6, 44, 2, 1, "B");
+  g.rect(46, 44, 2, 1, "B");
+  c.labels.push({ x: 7, y: 43, text: "🏍️ 비치 트랙" });
+
+  // ---- 피크닉 & 야자수 ----
+  g.rect(12, 28, 6, 4, "d");
+  add(c, "roundtable", 14, 29);
+  add(c, "chair", 13, 30);
+  add(c, "chair", 16, 30);
+  c.areas.push({ id: "beach-picnic", name: "🧺 야자수 피크닉", x: 12, y: 28, w: 6, h: 4, maxOccupancy: 5 });
+  const rng = mulberry32(55);
+  for (let i = 0; i < 12; i++) {
+    const tx = 4 + Math.floor(rng() * 36);
+    const ty = 4 + Math.floor(rng() * 38);
+    const ch = g.g[ty]?.[tx];
+    const ch2 = g.g[ty + 1]?.[tx + 1];
+    if ((ch === "," || ch === ";") && (ch2 === "," || ch2 === ";")) add(c, "tree", tx, ty);
+  }
+  for (let i = 0; i < 5; i++) add(c, "flowerbed", 26 + i * 2, 40);
+
+  // ---- 게시판/안내판 + 아케이드 ----
+  add(c, "bulletin", 34, 17, { name: "리조트 게시판" });
+  add(c, "sign", 37, 17, {
+    name: "리조트 안내",
+    props: {
+      text: "🏖️ 비치 리조트에 오신 걸 환영합니다!\n\n· 티키 바: 피아노 연주 & 커피\n· 카바나: 프라이빗 대화 (잠금 가능)\n· 부두 벤치에 앉아 노을 감상 (X 키)\n· 비치 트랙: F 키로 오토바이 라이딩",
+    },
+  });
+  add(c, "arcade", 40, 17, { name: "비치 테트리스" });
+
+  // ---- 스폰 + 포털 ----
+  c.spawns.push({ x: 36, y: 20 }, { x: 38, y: 20 }, { x: 36, y: 22 }, { x: 38, y: 22 });
+  add(c, "door", 30, 21, { name: "리조트 출구" });
+  c.portals.push({ id: "bc-po-plaza", x: 30, y: 21, kind: "room", roomTemplate: "plaza", label: "⛲ 광장으로" });
+
+  return {
+    key: "beach",
+    name: "비치 리조트",
+    description: "바다, 부두, 티키 바, 비치 발리볼, 카바나, 캠프파이어가 있는 휴양지 맵",
+    tiles: g.rows(),
+    objects: c.objects,
+    areas: c.areas,
+    portals: c.portals,
+    spawns: c.spawns,
+    spotlights: c.spotlights,
+    labels: c.labels,
+  };
+}
+
 export const PRESET_MAPS: Record<string, MapData> = {
   plaza: buildPlaza(),
   office: buildOffice(),
   garden: buildGarden(),
   circuit: buildCircuit(),
+  beach: buildBeach(),
 };

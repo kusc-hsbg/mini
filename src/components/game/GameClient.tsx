@@ -14,7 +14,9 @@ import {
   objectInteraction,
   resolveMap,
 } from "@/lib/game/maps";
-import { EMOJIS, PROXIMITY_TILES, TILE } from "@/lib/game/constants";
+import { EMOJIS, PROXIMITY_TILES, TILE, normalizeSpecial } from "@/lib/game/constants";
+import { OBJECT_DEFS } from "@/lib/game/objects";
+import { playPianoNote } from "@/lib/game/audio";
 import { useRoomChannel } from "@/hooks/useRoomChannel";
 import { useControlChannel, type ControlChannel } from "@/hooks/useControlChannel";
 import { useWebRTC } from "@/hooks/useWebRTC";
@@ -49,6 +51,7 @@ import ObjectModal from "./ObjectModal";
 import WhiteboardModal from "./WhiteboardModal";
 import BulletinModal from "./BulletinModal";
 import TetrisModal from "./TetrisModal";
+import PianoModal from "./PianoModal";
 import DeskModal from "./DeskModal";
 import RaceHud, { fmtMs, type LeaderEntry } from "./RaceHud";
 import { Modal, ToastStack, type ToastItem } from "./ui";
@@ -107,7 +110,7 @@ function resolveGuestIdentity(): Identity {
         hat: (g.hat as HatType) ?? "none",
         glasses: g.glasses ?? "none",
         face: (g.face as FaceType) ?? "smile",
-        special: g.special ?? "none",
+        special: normalizeSpecial(g.special),
       };
       if (g.name) name = g.name;
     }
@@ -120,6 +123,7 @@ type ModalState =
   | { kind: "whiteboard"; obj: MapObject }
   | { kind: "bulletin"; obj: MapObject }
   | { kind: "tetris" }
+  | { kind: "piano"; obj: MapObject }
   | { kind: "desk"; obj: MapObject }
   | { kind: "portal-pw"; portal: Portal }
   | { kind: "notes" }
@@ -179,7 +183,7 @@ export default function GameClient({
           hat: profile.hat as HatType,
           glasses: (profile.glasses as CharacterAppearance["glasses"]) ?? "none",
           face: profile.face as FaceType,
-          special: (profile.special as CharacterAppearance["special"]) ?? "none",
+          special: normalizeSpecial(profile.special),
         },
       });
     } else {
@@ -215,6 +219,8 @@ export default function GameClient({
 
   const autoBusyRef = useRef(false);
   const myLocksRef = useRef<Set<string>>(new Set());
+  // 노크 승인을 받은 영역: 만료 시각까지 lock 재브로드캐스트를 무시 (승인 직후 재잠김 방지)
+  const knockGraceRef = useRef<Map<string, number>>(new Map());
   const blockedRef = useRef(blocked);
   blockedRef.current = blocked;
   const statusRef = useRef(status);
@@ -270,16 +276,14 @@ export default function GameClient({
   );
   controlRef.current = control;
 
-  // ----- WebRTC -----
+  // ----- WebRTC (카메라 전용) -----
   const rtc = useWebRTC({
     selfId: identity?.id ?? "pending",
     enabled: multiplayer && !!identity,
     send: (to, data) =>
       channelRef.current.send("signal", { from: identity?.id ?? "", to, data }),
-    onSpeaking: (id, on) =>
-      engineRef.current?.setSpeaking(id === identity?.id ? identity.id : id, on),
-    onMediaChange: (mic, cam, sharing) => {
-      engineRef.current?.patchSelf({ micOn: mic, camOn: cam, sharing });
+    onMediaChange: (cam) => {
+      engineRef.current?.patchSelf({ camOn: cam });
       pushPresence();
     },
   });
@@ -358,15 +362,14 @@ export default function GameClient({
         const r = payload as RtEvents["knock-result"];
         if (r.to !== myId) break;
         if (r.allow) {
+          // 30초 동안은 잠금 재브로드캐스트가 와도 다시 잠그지 않는다.
+          knockGraceRef.current.set(r.areaId, Date.now() + 30_000);
           setLockedAreas((prev) => {
             const next = new Set(prev);
             next.delete(r.areaId);
             return next;
           });
-          addToast(`✅ ${r.byName}님이 입장을 승인했어요 (잠시 동안 입장 가능)`);
-          setTimeout(() => {
-            // 25초 후 다시 잠금 반영 (여전히 잠겨 있다면 lock 재브로드캐스트로 복원됨)
-          }, 25000);
+          addToast(`✅ ${r.byName}님이 입장을 승인했어요 (30초 동안 입장 가능)`);
         } else {
           addToast("❌ 입장이 거절되었습니다");
         }
@@ -374,6 +377,11 @@ export default function GameClient({
       }
       case "lock": {
         const l = payload as RtEvents["lock"];
+        if (l.locked) {
+          const grace = knockGraceRef.current.get(l.areaId);
+          if (grace && Date.now() < grace) break; // 승인 유예 중 — 재잠김 무시
+          if (grace) knockGraceRef.current.delete(l.areaId);
+        }
         setLockedAreas((prev) => {
           const next = new Set(prev);
           if (l.locked) next.add(l.areaId);
@@ -385,13 +393,22 @@ export default function GameClient({
       case "mod": {
         const m = payload as RtEvents["mod"];
         if (m.target !== myId) break;
-        if (m.kind === "mute") {
-          rtcRef.current.forceMute();
-          addToast(`🔇 ${m.byName}님이 내 마이크를 음소거했습니다`);
-        } else {
-          rtcRef.current.shutdown();
-          alert(m.kind === "kick" ? "방에서 내보내졌습니다." : "이 스페이스에서 차단되었습니다.");
-          router.replace("/spaces");
+        rtcRef.current.shutdown();
+        alert(m.kind === "kick" ? "방에서 내보내졌습니다." : "이 스페이스에서 차단되었습니다.");
+        router.replace("/spaces");
+        break;
+      }
+      case "piano": {
+        const p = payload as RtEvents["piano"];
+        if (p.from === myId || blockedRef.current.has(p.from)) break;
+        const self = engine?.getSelf();
+        if (!self) break;
+        // 거리 감쇠 — 가까울수록 크게 (12타일 밖은 안 들림)
+        const d = Math.hypot(p.x - self.x, p.y - self.y);
+        const vol = Math.max(0, 1 - d / (TILE * 12));
+        if (vol > 0.02) {
+          playPianoNote(p.note, vol);
+          engine?.addEmote(p.from, { id: `pn-${p.note}-${Date.now()}`, kind: "emoji", value: "🎵", at: Date.now() });
         }
         break;
       }
@@ -872,6 +889,29 @@ export default function GameClient({
       setModal({ kind: "desk", obj });
       return;
     }
+    // 좌석: 앉기/일어나기 토글
+    if (obj.type === "chair" || obj.type === "sofa" || obj.type === "bench") {
+      const e = engineRef.current;
+      if (!e) return;
+      if (e.isSitting()) {
+        e.standUp();
+      } else if (e.sitOn(obj)) {
+        addToast("🪑 앉았어요 — 이동 키나 X 키로 일어나요");
+      }
+      return;
+    }
+    // 커피/자판기: 아이템 이모트
+    if (obj.type === "coffee") {
+      sendEmote("emoji", "☕");
+      addToast("☕ 커피를 내렸어요");
+      return;
+    }
+    if (obj.type === "vending") {
+      const snacks = ["🥤", "🍫", "🍩", "🍬", "🧃"];
+      sendEmote("emoji", snacks[Math.floor(Math.random() * snacks.length)]);
+      addToast("🎰 자판기에서 간식이 나왔어요!");
+      return;
+    }
     const kind = objectInteraction(obj);
     switch (kind) {
       case "whiteboard":
@@ -882,6 +922,9 @@ export default function GameClient({
         break;
       case "tetris":
         setModal({ kind: "tetris" });
+        break;
+      case "piano":
+        setModal({ kind: "piano", obj });
         break;
       case "sound":
         if (!soundOn) {
@@ -1024,10 +1067,6 @@ export default function GameClient({
     addToast(isBlocked ? `${name}님 차단을 해제했어요` : `🚫 ${name}님을 차단했어요 (대화/연결 차단)`);
   }
 
-  function doMute(id: string) {
-    if (!identity) return;
-    channelRef.current.send("mod", { kind: "mute", target: id, byName: identity.name });
-  }
   function doKick(id: string) {
     if (!identity) return;
     if (!confirm("이 참가자를 내보낼까요? (재입장 가능)")) return;
@@ -1179,7 +1218,7 @@ export default function GameClient({
           <div className="rounded-xl bg-panel/80 px-3 py-2 text-sm backdrop-blur">
             {multiplayer ? (
               <span className="text-accent2">
-                ● {channel.ready ? `${channel.online}명 접속` : "연결 중..."}
+                ● {channel.ready ? `${Math.max(channel.online, players.length)}명 접속` : "연결 중..."}
               </span>
             ) : (
               <span className="text-amber-300">싱글플레이 (Supabase 미설정)</span>
@@ -1192,13 +1231,10 @@ export default function GameClient({
       <div className="pointer-events-none absolute inset-x-0 top-14 z-20 flex justify-center">
         <VideoDock
           localStream={rtc.localStream}
-          localScreen={rtc.localScreen}
           peers={rtc.peers}
           nameOf={nameOf}
           spotlightIds={spotlightIds}
           selfName={identity?.name ?? ""}
-          sendAnnot={sendWbOp}
-          subscribeAnnot={subscribeWb}
         />
       </div>
 
@@ -1240,8 +1276,11 @@ export default function GameClient({
 
       {/* ---------- 조작 안내 ---------- */}
       <div className="pointer-events-none absolute bottom-20 left-3 z-10 rounded-lg bg-panel/70 px-3 py-2 text-[11px] leading-relaxed text-slate-400 backdrop-blur">
-        <div>WASD/방향키 이동 · 더블클릭 자동 이동 · X 상호작용{hintObj ? ` (${hintObj.name ?? "오브젝트"})` : ""}</div>
-        <div>1~0 이모지 · Z 춤 · F {liveMap.vehicle === "kart" ? "카트" : "오토바이"} · M 미니맵</div>
+        <div>
+          WASD/방향키 이동 · 더블클릭 자동 이동 · X 상호작용
+          {hintObj ? ` (${hintObj.name ?? OBJECT_DEFS[hintObj.type]?.label ?? "오브젝트"})` : ""}
+        </div>
+        <div>1~0 이모지 · Z 춤 · X 의자 앉기 · F {liveMap.vehicle === "kart" ? "카트" : "오토바이"} · M 미니맵</div>
       </div>
 
       {/* ---------- 레이스 HUD (그랑프리) ---------- */}
@@ -1257,18 +1296,14 @@ export default function GameClient({
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center p-3">
         <Toolbar
           multiplayer={multiplayer}
-          micOn={rtc.micOn}
           camOn={rtc.camOn}
-          sharing={rtc.sharing}
           hand={hand}
           status={status}
           statusMsg={statusMsg}
           soundOn={soundOn}
           canEdit={canEdit && multiplayer}
           editorOpen={editorOpen}
-          onMic={rtc.toggleMic}
           onCam={rtc.toggleCam}
-          onShare={rtc.toggleShare}
           onHand={() => {
             const next = !hand;
             setHand(next);
@@ -1329,7 +1364,6 @@ export default function GameClient({
                 });
               }}
               onBlockToggle={doBlockToggle}
-              onMute={doMute}
               onKick={doKick}
               onBan={doBan}
               onClose={() => setPanel(null)}
@@ -1409,6 +1443,23 @@ export default function GameClient({
       {/* ---------- 모달 ---------- */}
       {modal?.kind === "object" && <ObjectModal obj={modal.obj} onClose={() => setModal(null)} />}
       {modal?.kind === "tetris" && <TetrisModal onClose={() => setModal(null)} />}
+      {modal?.kind === "piano" && identity && (
+        <PianoModal
+          title={modal.obj.name ?? "피아노"}
+          onNote={(note) => {
+            const self = engineRef.current?.getSelf();
+            if (multiplayer && self) {
+              channelRef.current.send("piano", {
+                from: identity.id,
+                x: self.x,
+                y: self.y,
+                note,
+              });
+            }
+          }}
+          onClose={() => setModal(null)}
+        />
+      )}
       {modal?.kind === "whiteboard" && (
         <WhiteboardModal
           boardKey={`${space.id}:${modal.obj.id}`}

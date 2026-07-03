@@ -16,7 +16,6 @@ export default function ParticipantsPanel({
   onFollow,
   onDm,
   onBlockToggle,
-  onMute,
   onKick,
   onBan,
   onClose,
@@ -31,7 +30,6 @@ export default function ParticipantsPanel({
   onFollow: (id: string | null) => void;
   onDm: (id: string) => void;
   onBlockToggle: (id: string, name: string) => void;
-  onMute: (id: string) => void;
   onKick: (id: string) => void;
   onBan: (id: string, name: string) => void;
   onClose: () => void;
@@ -77,8 +75,6 @@ export default function ParticipantsPanel({
                 </span>
                 <span className="flex shrink-0 gap-1 text-xs">
                   {p.hand && "✋"}
-                  {p.sharing && "🖥️"}
-                  {p.micOn ? "🎙️" : ""}
                   {p.camOn ? "📷" : ""}
                 </span>
               </button>
@@ -99,7 +95,6 @@ export default function ParticipantsPanel({
                   </Btn>
                   {isMod && (
                     <>
-                      <Btn onClick={() => onMute(p.id)} danger>🔇 뮤트</Btn>
                       <Btn onClick={() => onKick(p.id)} danger>👢 킥</Btn>
                       <Btn onClick={() => onBan(p.id, p.name)} danger>⛔ 밴</Btn>
                     </>

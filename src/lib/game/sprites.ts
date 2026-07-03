@@ -1009,8 +1009,8 @@ function drawBike(
 export interface CharacterExtras {
   status?: UserStatus;
   hand?: boolean;
-  speaking?: boolean;
   dancing?: boolean;
+  sitting?: boolean;
   vehicle?: "bike" | "kart";
 }
 
@@ -1031,21 +1031,26 @@ export function drawCharacter(
   extras?: CharacterExtras
 ) {
   const u = 2; // 픽셀 유닛
-  const dancing = !!extras?.dancing && !moving && !onBike;
-  const step = moving ? Math.floor(t / 130) % 4 : 0; // 걷기 프레임 0..3
+  const sitting = !!extras?.sitting && !onBike;
+  const dancing = !!extras?.dancing && !moving && !onBike && !sitting;
+  const step = moving && !sitting ? Math.floor(t / 130) % 4 : 0; // 걷기 프레임 0..3
   const danceBeat = Math.floor(t / 200) % 2; // 춤 비트
-  const bob = moving
-    ? step % 2 === 1
-      ? -1
-      : 0
-    : dancing
-      ? danceBeat === 0
-        ? -1.5
+  const bob = sitting
+    ? 0
+    : moving
+      ? step % 2 === 1
+        ? -1
         : 0
-      : Math.sin(t / 500) > 0.6
-        ? -0.5
-        : 0;
-  const ghost = app.special === "ghost";
+      : dancing
+        ? danceBeat === 0
+          ? -1.5
+          : 0
+        : Math.sin(t / 500) > 0.6
+          ? -0.5
+          : 0;
+  // "ghost" 는 삭제된 레거시 코스튬 값 — 로봇으로 정규화.
+  const special = (app.special as string) === "ghost" ? "robot" : app.special;
+  const robot = special === "robot";
 
   // 그림자
   ctx.fillStyle = "rgba(0,0,0,0.28)";
@@ -1060,65 +1065,69 @@ export function drawCharacter(
 
   ctx.save();
   ctx.translate(Math.round(cx), Math.round(cy + bob * u - (onBike ? 8 : 0)));
-  if (ghost) {
-    ctx.globalAlpha = 0.72;
-  }
   if (dancing && danceBeat === 1) {
     ctx.rotate(0.06); // 좌우 리듬
   } else if (dancing) {
     ctx.rotate(-0.06);
   }
 
-  const skin = ghost ? "#e8ecf7" : app.skin;
-  const top = ghost ? "#dfe5f2" : app.color;
-  const pants = ghost ? "#cfd6e8" : app.pants ?? "#1f2937";
-  const shoesC = ghost ? "#cfd6e8" : app.shoes ?? "#292524";
-  const hairC = ghost ? "#f3f5fb" : app.hairColor ?? "#4b3621";
+  const skin = robot ? "#c2cad8" : app.skin;
+  const top = robot ? "#8e99ac" : app.color;
+  const pants = robot ? "#5b6472" : app.pants ?? "#1f2937";
+  const shoesC = robot ? "#3f4753" : app.shoes ?? "#292524";
+  const hairC = app.hairColor ?? "#4b3621";
   const side = dir === "left" ? -1 : dir === "right" ? 1 : 0;
-  const bodyTop = -14 * u;
+  // 앉으면 다리가 접히므로 몸 전체가 3유닛 내려온다
+  const bodyTop = (sitting ? -11 : -14) * u;
+  const flap = moving || dancing ? Math.sin(t / 120) * 2 : Math.sin(t / 600) * 1;
 
-  // ----- 망토 (몸 뒤) -----
-  if (app.special === "cape" && !ghost) {
-    const flap = moving || dancing ? Math.sin(t / 120) * 2 : Math.sin(t / 600) * 1;
+  // ----- 망토 (몸 뒤) — 방향별로 올바른 자세 -----
+  if (special === "cape" && !robot) {
     ctx.fillStyle = "#dc2626";
-    ctx.beginPath();
-    ctx.moveTo(-5 * u, bodyTop + u);
-    ctx.lineTo(5 * u, bodyTop + u);
-    ctx.lineTo(6.5 * u + flap, 0.5 * u);
-    ctx.lineTo(-6.5 * u - flap, 0.5 * u);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "#991b1b";
-    ctx.fillRect(-5 * u, bodyTop + u, 10 * u, 1.2 * u);
+    if (dir === "left" || dir === "right") {
+      // 옆모습: 등 뒤(진행 반대 방향)로 흘러내리는 망토
+      const back = -side; // 등 쪽 방향
+      ctx.beginPath();
+      ctx.moveTo(back * 1.5 * u, bodyTop + 0.5 * u); // 목 뒤
+      ctx.lineTo(back * 5 * u, bodyTop + u); // 어깨 끝
+      ctx.lineTo(back * (7 * u + Math.abs(flap)), 0.5 * u); // 밑단 바깥(펄럭)
+      ctx.lineTo(back * 2 * u, 0.5 * u); // 밑단 안쪽
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#991b1b";
+      ctx.fillRect(back * 1.5 * u - (back < 0 ? 3.5 * u : 0), bodyTop + 0.5 * u, 3.5 * u, 1.2 * u);
+    } else if (dir === "down") {
+      // 정면: 어깨 뒤로 살짝 보이는 자락
+      ctx.beginPath();
+      ctx.moveTo(-5 * u, bodyTop + u);
+      ctx.lineTo(5 * u, bodyTop + u);
+      ctx.lineTo(6.5 * u + flap, 0.5 * u);
+      ctx.lineTo(-6.5 * u - flap, 0.5 * u);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#991b1b";
+      ctx.fillRect(-5 * u, bodyTop + u, 10 * u, 1.2 * u);
+    }
+    // dir === "up"(뒷모습)은 몸을 그린 뒤에 등 전체를 덮도록 아래에서 그린다.
   }
 
-  // ----- 다리 + 신발 -----
-  if (ghost) {
-    // 유령: 다리 대신 물결 꼬리
-    ctx.fillStyle = top;
-    ctx.beginPath();
-    ctx.moveTo(-5 * u, bodyTop + 8 * u);
-    ctx.lineTo(5 * u, bodyTop + 8 * u);
-    ctx.lineTo(5 * u, -2 * u);
-    for (let i = 0; i < 4; i++) {
-      const wx = 5 * u - (i + 0.5) * 2.5 * u;
-      const wy = i % 2 === 0 ? 0.5 * u + Math.sin(t / 300) * 1.5 : -2 * u;
-      ctx.lineTo(wx, wy);
-    }
-    ctx.lineTo(-5 * u, -2 * u);
-    ctx.closePath();
-    ctx.fill();
-  } else {
+  // ----- 다리 + 신발 (앉으면 접힌 짧은 다리) -----
+  {
     const legLift = [0, 2, 0, 2];
-    const lA = moving ? legLift[step] : dancing ? danceBeat * 2 : 0;
-    const lB = moving ? legLift[(step + 2) % 4] : dancing ? (1 - danceBeat) * 2 : 0;
+    const lA = sitting ? 0 : moving ? legLift[step] : dancing ? danceBeat * 2 : 0;
+    const lB = sitting ? 0 : moving ? legLift[(step + 2) % 4] : dancing ? (1 - danceBeat) * 2 : 0;
+    const legH = sitting ? 3 * u : 6 * u;
     ctx.fillStyle = pants;
     if (dir === "left" || dir === "right") {
-      ctx.fillRect(-3 * u + side * u, -6 * u - lA, 3 * u, 6 * u);
-      ctx.fillRect(0 * u + side * u, -6 * u - lB, 3 * u, 6 * u);
+      ctx.fillRect(-3 * u + side * u, -legH - lA, 3 * u, legH);
+      ctx.fillRect(0 * u + side * u, -legH - lB, 3 * u, legH);
+      if (sitting) {
+        // 옆모습: 허벅지가 앞으로 나온다
+        ctx.fillRect(side * 2 * u, -legH, 3 * u, 1.6 * u);
+      }
     } else {
-      ctx.fillRect(-4 * u, -6 * u - lA, 3.5 * u, 6 * u + lA);
-      ctx.fillRect(0.5 * u, -6 * u - lB, 3.5 * u, 6 * u + lB);
+      ctx.fillRect(-4 * u, -legH - lA, 3.5 * u, legH + lA);
+      ctx.fillRect(0.5 * u, -legH - lB, 3.5 * u, legH + lB);
     }
     ctx.fillStyle = shoesC;
     if (dir === "left" || dir === "right") {
@@ -1130,12 +1139,23 @@ export function drawCharacter(
     }
   }
 
-  // ----- 몸통(상의) — 스타일별 -----
-  drawTop(ctx, u, bodyTop, top, app.topStyle ?? "tshirt", dir, ghost);
+  // ----- 몸통(상의) — 스타일별 (로봇은 금속 몸통) -----
+  drawTop(ctx, u, bodyTop, top, robot ? "tshirt" : app.topStyle ?? "tshirt", dir, robot);
+  if (robot && dir !== "up") {
+    // 가슴 패널 + 상태등
+    ctx.fillStyle = "#4b5563";
+    roundRect(ctx, -2.5 * u, bodyTop + 2 * u, 5 * u, 3.5 * u, 2);
+    ctx.fill();
+    const blink = Math.floor(t / 600) % 2 === 0;
+    ctx.fillStyle = blink ? "#34d399" : "#166e51";
+    ctx.fillRect(-1.5 * u, bodyTop + 2.8 * u, 1.2 * u, 1.2 * u);
+    ctx.fillStyle = "#fbbf24";
+    ctx.fillRect(0.5 * u, bodyTop + 2.8 * u, 1.2 * u, 1.2 * u);
+  }
 
   // ----- 팔 (스윙/춤/손들기) -----
   const armSwing = moving ? (step === 1 ? 2 : step === 3 ? -2 : 0) : 0;
-  const armC = app.topStyle === "suit" && !ghost ? darken("#2b3040", 0.05) : darken(top, 0.1);
+  const armC = app.topStyle === "suit" && !robot ? darken("#2b3040", 0.05) : darken(top, 0.1);
   ctx.fillStyle = armC;
   const handRaised = extras?.hand;
   if (dancing && dir !== "left" && dir !== "right") {
@@ -1170,29 +1190,84 @@ export function drawCharacter(
     }
   }
 
+  // ----- 뒷모습 망토: 등 전체를 덮는다 (몸/팔 위, 머리 아래) -----
+  if (special === "cape" && !robot && dir === "up") {
+    ctx.fillStyle = "#dc2626";
+    ctx.beginPath();
+    ctx.moveTo(-5 * u, bodyTop - 0.5 * u);
+    ctx.lineTo(5 * u, bodyTop - 0.5 * u);
+    ctx.lineTo(6.5 * u + flap, 1 * u);
+    ctx.lineTo(-6.5 * u - flap, 1 * u);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#b91c1c";
+    ctx.fillRect(-5 * u, bodyTop - 0.5 * u, 10 * u, 1.4 * u); // 목깃
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-5 * u, bodyTop - 0.5 * u);
+    ctx.lineTo(-6.5 * u - flap, 1 * u);
+    ctx.moveTo(5 * u, bodyTop - 0.5 * u);
+    ctx.lineTo(6.5 * u + flap, 1 * u);
+    ctx.stroke();
+  }
+
   // ----- 머리 -----
   const headTop = bodyTop - 9.5 * u;
   ctx.fillStyle = skin;
-  roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
+  roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, robot ? 3 : 6);
   ctx.fill();
   // 외곽선 (게더 스타일의 또렷한 실루엣)
   ctx.strokeStyle = OUTLINE;
   ctx.lineWidth = 1.2;
-  roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
+  roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, robot ? 3 : 6);
   ctx.stroke();
 
-  // ----- 머리카락 -----
-  drawHair(ctx, u, headTop, app.hair ?? "short", hairC, dir);
+  if (robot) {
+    // 안테나
+    ctx.strokeStyle = "#6b7280";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, headTop);
+    ctx.lineTo(0, headTop - 3 * u);
+    ctx.stroke();
+    const pulse = Math.floor(t / 400) % 2 === 0;
+    ctx.fillStyle = pulse ? "#f87171" : "#7f1d1d";
+    ctx.beginPath();
+    ctx.arc(0, headTop - 3.5 * u, 1.2 * u, 0, Math.PI * 2);
+    ctx.fill();
+    // 측면 볼트
+    ctx.fillStyle = "#6b7280";
+    ctx.fillRect(-6.2 * u, headTop + 4 * u, 1.4 * u, 2 * u);
+    ctx.fillRect(4.8 * u, headTop + 4 * u, 1.4 * u, 2 * u);
+    if (dir !== "up") {
+      // 바이저 + 발광 눈
+      const off = dir === "left" ? -1.5 * u : dir === "right" ? 1.5 * u : 0;
+      ctx.fillStyle = "#1f2430";
+      roundRect(ctx, -4.5 * u + off * 0.4, headTop + 3 * u, 9 * u, 3.2 * u, 2);
+      ctx.fill();
+      ctx.fillStyle = "#22d3ee";
+      ctx.fillRect(off - 2.8 * u, headTop + 4 * u, 1.6 * u, 1.4 * u);
+      ctx.fillRect(off + 1.2 * u, headTop + 4 * u, 1.6 * u, 1.4 * u);
+      // 입(스피커 그릴)
+      ctx.fillStyle = "#4b5563";
+      ctx.fillRect(off - 1.5 * u, headTop + 7.6 * u, 3 * u, 0.6 * u);
+      ctx.fillRect(off - 1.5 * u, headTop + 8.6 * u, 3 * u, 0.6 * u);
+    }
+  } else {
+    // ----- 머리카락 -----
+    drawHair(ctx, u, headTop, app.hair ?? "short", hairC, dir);
 
-  // ----- 얼굴/수염/안경 -----
-  if (dir !== "up") {
-    drawFacePixel(ctx, u, headTop, dir, app.face, skin);
-    drawFacialHair(ctx, u, headTop, dir, app.facialHair ?? "none", hairC);
-    drawGlasses(ctx, u, headTop, dir, app.glasses ?? "none");
+    // ----- 얼굴/수염/안경 -----
+    if (dir !== "up") {
+      drawFacePixel(ctx, u, headTop, dir, app.face, skin);
+      drawFacialHair(ctx, u, headTop, dir, app.facialHair ?? "none", hairC);
+      drawGlasses(ctx, u, headTop, dir, app.glasses ?? "none");
+    }
+
+    // ----- 모자 -----
+    drawHatPixel(ctx, u, headTop, app.hat, top);
   }
-
-  // ----- 모자 -----
-  drawHatPixel(ctx, u, headTop, app.hat, top);
 
   // 춤 음표
   if (dancing) {
@@ -1201,7 +1276,7 @@ export function drawCharacter(
     ctx.textAlign = "center";
     ctx.fillStyle = "#a5b4fc";
     ctx.fillText(danceBeat === 0 ? "♪" : "♫", 8 * u, headTop - 4 * u);
-    ctx.globalAlpha = ghost ? 0.72 : 1;
+    ctx.globalAlpha = 1;
   }
 
   ctx.restore();
@@ -1231,14 +1306,6 @@ export function drawCharacter(
   ctx.fillStyle = "#fff";
   ctx.fillText(label, cx + 5, labelY - 1);
 
-  // 말하는 중 표시(초록 링)
-  if (extras?.speaking) {
-    ctx.strokeStyle = "rgba(52,211,153,0.9)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, 13, 6, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  }
   // 손들기 아이콘
   if (extras?.hand) {
     ctx.font = "14px serif";
@@ -1246,7 +1313,7 @@ export function drawCharacter(
   }
 }
 
-// 상의 스타일별 몸통 렌더 (티셔츠/후디/정장/줄무늬)
+// 상의 스타일별 몸통 렌더 (티셔츠/후디/정장/줄무늬). robot 이면 금속 몸통 취급.
 function drawTop(
   ctx: CanvasRenderingContext2D,
   u: number,
@@ -1254,10 +1321,10 @@ function drawTop(
   color: string,
   style: string,
   dir: Direction,
-  ghost: boolean
+  robot: boolean
 ) {
   const H = 8.5 * u;
-  if (style === "suit" && !ghost) {
+  if (style === "suit" && !robot) {
     // 정장: 짙은 자켓 + 셔츠 + 넥타이
     ctx.fillStyle = "#2b3040";
     roundRect(ctx, -5 * u, bodyTop, 10 * u, H, 3);
@@ -1278,7 +1345,7 @@ function drawTop(
     roundRect(ctx, -5 * u, bodyTop, 10 * u, H, 3);
     ctx.fill();
     if (style === "stripe") {
-      ctx.fillStyle = ghost ? "rgba(255,255,255,0.5)" : lighten(color, 0.45);
+      ctx.fillStyle = robot ? "rgba(255,255,255,0.5)" : lighten(color, 0.45);
       ctx.fillRect(-5 * u, bodyTop + 1.5 * u, 10 * u, 1.2 * u);
       ctx.fillRect(-5 * u, bodyTop + 4.2 * u, 10 * u, 1.2 * u);
     } else if (style === "hoodie") {
