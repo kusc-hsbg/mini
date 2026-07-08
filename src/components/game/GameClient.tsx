@@ -24,13 +24,14 @@ import { useRoomChannel } from "@/hooks/useRoomChannel";
 import { useControlChannel, type ControlChannel } from "@/hooks/useControlChannel";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { logEvent } from "@/lib/analytics";
-import { addKill, banTarget, blockTarget, buyWeapon, claimAttendance, claimQuest, grantHearts, saveBio as saveBioAction, sendDm, sendFriendRequest, setStatus as setStatusAction, unblockTarget } from "@/app/actions";
+import { addKill, banTarget, blockTarget, buyWeapon, claimAttendance, claimQuest, grantHearts, incrementRaceWin, saveBio as saveBioAction, sendDm, sendFriendRequest, setStatus as setStatusAction, unblockTarget } from "@/app/actions";
 import StoreModal, { type WalletState } from "./StoreModal";
 import FriendsPanel from "./FriendsPanel";
 import MiniGamesModal from "./MiniGamesModal";
 import BankModal from "./BankModal";
 import PkHud from "./PkHud";
 import { SHOP_MAP } from "@/lib/game/shop";
+import { KILL_TITLES } from "@/lib/game/weapons";
 import type { PlayerCosmetics } from "@/lib/game/types";
 import type { RtEventName, RtEvents, WbOp } from "@/lib/realtime/protocol";
 import type {
@@ -158,6 +159,7 @@ type ModalState =
   | { kind: "quest" }
   | { kind: "minigame" }
   | { kind: "bank" }
+  | { kind: "collection" }
   | null;
 
 type PanelState = "participants" | "chat" | "meetings" | "friends" | null;
@@ -272,6 +274,7 @@ export default function GameClient({
     equipped: profile?.equipped ?? {},
   }));
   const [mounted, setMounted] = useState(false);
+  const [stats, setStats] = useState({ raceWins: profile?.race_wins ?? 0, kills: profile?.kills ?? 0 });
 
   const autoBusyRef = useRef(false);
   const myLocksRef = useRef<Set<string>>(new Set());
@@ -584,8 +587,24 @@ export default function GameClient({
           } else if (ev.kind === "lap" && ev.lapMs != null) {
             addToast(`⏱️ LAP ${ev.lap - 1} 완료 — ${fmtMs(ev.lapMs)}`);
           } else if (ev.kind === "finish" && ev.totalMs != null) {
-            addToast(`🏆 완주! 총 기록 ${fmtMs(ev.totalMs)} — 포디움에 올라가보세요!`);
+            addToast(`🏆 완주! 총 기록 ${fmtMs(ev.totalMs)} — 트로피장으로 이동합니다!`);
             applyRaceRecord(identity.id, identity.name, ev.totalMs);
+            // 트로피장(포디움)으로 이동 + 우승 기록
+            const eng = engineRef.current;
+            const podium = liveMap.objects.find((o) => o.type === "podium");
+            if (eng) {
+              eng.patchSelf({ onBike: false });
+              if (podium) eng.teleport(podium.x + 1, podium.y + 2);
+              else if (liveMap.spawns[0]) eng.teleport(liveMap.spawns[0].x, liveMap.spawns[0].y);
+            }
+            if (profile) {
+              incrementRaceWin().then((res) => {
+                if (!("error" in res)) {
+                  setStats((s) => ({ ...s, raceWins: res.raceWins }));
+                  addToast(`🥇 레이스 우승 기록! 누적 ${res.raceWins}회 (도감에서 확인)`);
+                }
+              });
+            }
             if (multiplayer)
               channelRef.current.send("race", {
                 from: identity.id,
@@ -614,7 +633,10 @@ export default function GameClient({
           addToast(`🎯 ${victimName}님을 처치했습니다!`);
           if (profile) {
             addKill().then((res) => {
-              if (!("error" in res) && res.newTitle) addToast(`🏅 새 칭호 획득: ${res.newTitle}!`);
+              if (!("error" in res)) {
+                setStats((s) => ({ ...s, kills: res.kills }));
+                if (res.newTitle) addToast(`🏅 새 칭호 획득: ${res.newTitle}!`);
+              }
             });
           }
         },
@@ -623,7 +645,10 @@ export default function GameClient({
           const meta: Record<RaceItemKind, [string, string]> = {
             turbo: ["🚀 터보! 2초간 초가속", "🚀"],
             boost: ["⚡ 부스트!", "⚡"],
+            rocket: ["🚀 로켓! 5초간 2배 속도", "🚀"],
             slow: ["🐢 꽝... 슬로우에 걸렸어요", "🐢"],
+            ink: ["🖤 먹물! 시야가 가려졌어요", "🖤"],
+            meteor: ["☄️ 운석/폭탄! 잠시 멈춰요", "💫"],
             oil: ["🛢️ 기름에 미끄러졌다!", "💫"],
           };
           const [text, emoji] = meta[kind];
@@ -1426,6 +1451,15 @@ export default function GameClient({
               🤝 친구
             </button>
           )}
+          {profile && (
+            <button
+              onClick={() => setModal({ kind: "collection" })}
+              className="rounded-xl bg-panel/80 px-3 py-2 text-sm text-slate-300 backdrop-blur hover:text-white"
+              title="도감 — 우승/킬/칭호"
+            >
+              📖 도감
+            </button>
+          )}
           {wallet.equipped.mount && (
             <button
               onClick={() => {
@@ -1855,6 +1889,15 @@ export default function GameClient({
           onClose={() => setModal(null)}
         />
       )}
+      {modal?.kind === "collection" && (
+        <CollectionModal
+          raceWins={stats.raceWins}
+          kills={stats.kills}
+          titles={profile?.titles ?? []}
+          inventoryCount={wallet.inventory.length}
+          onClose={() => setModal(null)}
+        />
+      )}
       {modal?.kind === "bank" && (
         <BankModal
           hearts={wallet.hearts}
@@ -2013,6 +2056,61 @@ function NotesModal({
           ))}
         </ul>
       )}
+    </Modal>
+  );
+}
+
+// ---------- 도감 (우승/킬/칭호) ----------
+const TITLE_LABELS: Record<string, string> = {
+  tutorial: "🌱 새싹 모험가",
+  ...Object.fromEntries(KILL_TITLES.map((t) => [t.title, "🎖️ " + t.label])),
+};
+function CollectionModal({
+  raceWins,
+  kills,
+  titles,
+  inventoryCount,
+  onClose,
+}: {
+  raceWins: number;
+  kills: number;
+  titles: string[];
+  inventoryCount: number;
+  onClose: () => void;
+}) {
+  return (
+    <Modal title="📖 도감" onClose={onClose}>
+      <div className="space-y-3">
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            ["🥇", "레이스 우승", raceWins],
+            ["🎯", "누적 킬", kills],
+            ["🎒", "보유 아이템", inventoryCount],
+          ].map(([icon, label, val]) => (
+            <div key={label as string} className="rounded-xl bg-panel2 p-3 text-center">
+              <div className="text-2xl">{icon as string}</div>
+              <div className="mt-1 text-lg font-bold text-white">{val as number}</div>
+              <div className="text-xs text-slate-400">{label as string}</div>
+            </div>
+          ))}
+        </div>
+        <div>
+          <div className="mb-1 text-sm text-slate-300">획득 칭호</div>
+          {titles.length === 0 ? (
+            <p className="rounded-xl bg-panel2/60 p-3 text-sm text-slate-500">
+              아직 칭호가 없어요. 레이스 우승, PK 킬, 튜토리얼로 칭호를 모아보세요!
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {titles.map((t) => (
+                <span key={t} className="rounded-full bg-accent/20 px-3 py-1 text-sm text-accent2">
+                  {TITLE_LABELS[t] ?? t}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </Modal>
   );
 }

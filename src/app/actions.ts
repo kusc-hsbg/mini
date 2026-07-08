@@ -359,6 +359,18 @@ export async function transferHearts(toId: string, amount: number): Promise<Resu
   return { ok: true, hearts: Number(data?.hearts ?? 0) };
 }
 
+// 레이스 완주(우승) 기록 — race_wins 증가 (도감)
+export async function incrementRaceWin(): Promise<Result<{ raceWins: number }>> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const { data } = await supabase.from("profiles").select("race_wins").eq("id", user.id).maybeSingle();
+  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  const raceWins = Number(data.race_wins ?? 0) + 1;
+  const { error: err } = await supabase.from("profiles").update({ race_wins: raceWins }).eq("id", user.id);
+  if (err) return { error: err.message };
+  return { ok: true, raceWins };
+}
+
 // 온보딩 퀘스트 완료 보상 (계정당 1회) — 100하트 + 'tutorial' 칭호
 export async function claimQuest(): Promise<Result<{ hearts: number; already?: boolean }>> {
   const { supabase, user, error } = await requireUser();

@@ -87,7 +87,7 @@ export interface EngineCallbacks {
   onRespawn?: () => void;
 }
 
-export type RaceItemKind = "turbo" | "boost" | "slow" | "oil";
+export type RaceItemKind = "turbo" | "boost" | "slow" | "oil" | "rocket" | "ink" | "meteor";
 
 // PK 투사체
 interface Projectile {
@@ -172,6 +172,8 @@ export class GameEngine {
   private itemCooldowns = new Map<string, number>(); // object id -> 다시 활성화되는 시각
   private effectMult = 1; // 아이템 효과 배속
   private effectUntil = 0;
+  private stunUntil = 0; // 운석/폭탄 스턴 (이동 불가)
+  private inkUntil = 0; // 먹물 (시야 가림)
   // 레이스 상태
   private boostUntil = 0;
   private raceActive = false;
@@ -914,8 +916,8 @@ export class GameEngine {
       if (k.has("arrowright") || k.has("d")) dx += 1;
     }
 
-    // PK: 사망 중에는 이동 불가
-    if (this.self.dead) {
+    // PK 사망 / 레이스 스턴(운석·폭탄) 중에는 이동 불가
+    if (this.self.dead || now < this.stunUntil) {
       dx = 0;
       dy = 0;
     }
@@ -1001,17 +1003,31 @@ export class GameEngine {
           this.cb.onItem?.("oil");
         } else {
           this.itemCooldowns.set(o.id, now + 6000);
+          // 카트라이더식 랜덤 아이템 (좋은 것/나쁜 것 도박)
           const roll = Math.random();
-          const kind: RaceItemKind = roll < 0.4 ? "boost" : roll < 0.75 ? "turbo" : "slow";
+          let kind: RaceItemKind;
+          if (roll < 0.24) kind = "boost";
+          else if (roll < 0.44) kind = "turbo";
+          else if (roll < 0.6) kind = "rocket";
+          else if (roll < 0.74) kind = "slow";
+          else if (roll < 0.88) kind = "ink";
+          else kind = "meteor";
           if (kind === "turbo") {
             this.effectMult = 1.9;
             this.effectUntil = now + 2000;
           } else if (kind === "boost") {
             this.effectMult = 1.5;
             this.effectUntil = now + 1500;
-          } else {
+          } else if (kind === "rocket") {
+            this.effectMult = 2.0;
+            this.effectUntil = now + 5000; // 로켓 5초간 2배
+          } else if (kind === "slow") {
             this.effectMult = 0.55;
             this.effectUntil = now + 1800;
+          } else if (kind === "ink") {
+            this.inkUntil = now + 2600; // 먹물 — 시야 가림
+          } else {
+            this.stunUntil = now + 2500; // 운석/폭탄 — 스턴
           }
           this.cb.onItem?.(kind);
         }
@@ -1378,6 +1394,27 @@ export class GameEngine {
 
     // 미니맵
     if (this.showMinimap && this.ground) this.renderMinimap(ctx, W);
+
+    // 먹물(ink) — 시야 가림 (화면 대부분을 검게, 중앙만 살짝 보임)
+    if (now < this.inkUntil) {
+      const g = ctx.createRadialGradient(W / 2, H / 2, 24, W / 2, H / 2, Math.max(W, H) * 0.55);
+      g.addColorStop(0, "rgba(0,0,0,0.25)");
+      g.addColorStop(0.45, "rgba(2,2,6,0.9)");
+      g.addColorStop(1, "rgba(0,0,0,0.99)");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.font = "bold 16px ui-sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("🖤 먹물!", W / 2, 40);
+    }
+    // 스턴 표시
+    if (now < this.stunUntil) {
+      ctx.fillStyle = "rgba(251,191,36,0.9)";
+      ctx.font = "bold 16px ui-sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("💫 스턴!", W / 2, 40);
+    }
   }
 
   private renderPk(ctx: CanvasRenderingContext2D, now: number) {

@@ -721,10 +721,16 @@ function buildCircuit(): MapData {
   add(c, "lamp", 6, 46);
   add(c, "lamp", 81, 46);
 
-  // ---- 포털: 광장으로 + 중앙 워프 포탈 ----
+  // ---- 포털: 광장/테마 서킷 + 중앙 워프 포탈 ----
   add(c, "door", 4, 27, { name: "서킷 출구" });
   c.portals.push({ id: "cc-po-plaza", x: 4, y: 27, kind: "room", roomTemplate: "plaza", label: "⛲ 광장으로" });
   add(c, "portalhub", 50, 19, { name: "워프 포탈" });
+  // 테마 전환 게이트 (요트/비행기)
+  add(c, "sign", 44, 18, { name: "테마 서킷", props: { text: "🏁 테마 서킷\n\n오른쪽 문으로 바다 요트/하늘 비행기 서킷으로 이동!" } });
+  add(c, "door", 46, 20, { name: "바다 요트 서킷" });
+  c.portals.push({ id: "cc-po-sea", x: 46, y: 20, kind: "room", roomTemplate: "circuit-sea", label: "🛥️ 바다 요트 서킷으로" });
+  add(c, "door", 48, 20, { name: "하늘 비행기 서킷" });
+  c.portals.push({ id: "cc-po-sky", x: 48, y: 20, kind: "room", roomTemplate: "circuit-sky", label: "✈️ 하늘 비행기 서킷으로" });
 
   return {
     key: "circuit",
@@ -1118,6 +1124,112 @@ function buildCafe(): MapData {
   };
 }
 
+// ==================== 7.5 테마 레이스 (바다 요트 / 하늘 비행기) ====================
+// 사각 링 트랙. 트랙 밖은 solid 방벽(바다=물, 하늘=허공)으로 이탈을 막는다.
+
+function buildRingRace(theme: "sea" | "sky"): MapData {
+  const W = 80;
+  const H = 50;
+  const barrier = theme === "sea" ? "~" : "x"; // 트랙 밖 방벽(통과불가)
+  const island = theme === "sea" ? "w" : "-"; // 안쪽 섬(데크/구름 플랫폼)
+  const g = new Grid(W, H, barrier);
+  const c = ctx(theme);
+
+  // ---- 사각 링 트랙 ----
+  g.rect(7, 7, W - 14, H - 14, "r"); // 외곽 연석
+  g.rect(8, 8, W - 16, H - 16, "a"); // 아스팔트(활주로/부두)
+  g.rect(14, 14, W - 28, H - 28, "r"); // 안쪽 연석
+  g.rect(15, 15, W - 30, H - 30, island); // 안쪽 섬
+
+  // 결승선(상단 직선 세로 체커)
+  for (let r = 8; r < 14; r++) {
+    g.set(39, r, "F");
+    g.set(40, r, "F");
+  }
+  // 카트 패드(출발, 6인 이상 탑승 가능) + 부스트
+  g.rect(33, 11, 12, 1, "b");
+  const boosts: [number, number][] = [
+    [W - 11, 24], [W - 11, 25], [24, H - 11], [25, H - 11], [10, 24], [10, 25], [55, 9], [56, 9],
+  ];
+  for (const [bx, by] of boosts) g.set(bx, by, "^");
+
+  // 스폰(출발선 뒤)
+  c.spawns.push({ x: 34, y: 11 }, { x: 37, y: 11 }, { x: 42, y: 11 }, { x: 45, y: 11 }, { x: 34, y: 9 }, { x: 45, y: 9 });
+
+  // ---- 아이템 박스 / 기름 ----
+  const items: [number, number][] = [
+    [20, 10], [26, 10], [W - 11, 20], [W - 11, 30], [30, H - 11], [50, H - 11], [10, 20], [10, 30], [60, 10],
+  ];
+  for (const [ix, iy] of items) add(c, "itembox", ix, iy);
+  for (const [ox, oy] of [[W - 11, 16], [16, H - 11], [10, 34]] as [number, number][]) add(c, "oil", ox, oy);
+
+  // ---- 안쪽 섬 꾸미기 + 포디움(트로피장) ----
+  add(c, "podium", 38, 30);
+  add(c, "flag", 36, 30);
+  add(c, "flag", 41, 30);
+  if (theme === "sea") {
+    // 요트 부두 테마 — 야자수/부표(라바콘)/모래
+    g.blob(24, 24, 4, 2.6, "s");
+    g.blob(55, 32, 4, 2.6, "s");
+    add(c, "tree", 22, 22);
+    add(c, "tree", 56, 33);
+    for (const [bx, by] of [[16, 8], [63, 8], [16, H - 9], [63, H - 9]] as [number, number][]) add(c, "cone", bx, by);
+    add(c, "sign", 30, 16, {
+      name: "요트 레이스 안내",
+      props: { text: "🛥️ 바다 요트 레이스\n\n부두(F로 카트 탑승)에서 출발해 3바퀴!\n트랙 밖은 바다라 빠지지 않게 조심하세요.\n⚡ 부스트 · 🎁 아이템 박스 활용!" },
+    });
+    c.labels.push({ x: 16, y: 6, text: "🛥️ 바다 요트 서킷" });
+  } else {
+    // 하늘 비행기 테마 — 구름섬/활주로
+    for (const [cx2, cy2] of [[20, 20], [55, 22], [30, 34], [50, 32], [24, 30]] as [number, number][]) {
+      add(c, "flowerbed", cx2, cy2); // 구름 대용 장식
+    }
+    for (const [bx, by] of [[16, 8], [63, 8], [16, H - 9], [63, H - 9]] as [number, number][]) add(c, "flag", bx, by);
+    add(c, "sign", 30, 16, {
+      name: "하늘 레이스 안내",
+      props: { text: "✈️ 하늘 비행기 레이스\n\n활주로(F로 탑승)에서 출발해 3바퀴!\n트랙 밖은 허공이니 이탈 금지.\n⚡ 부스트 · 🎁 아이템 박스로 역전을!" },
+    });
+    c.labels.push({ x: 16, y: 6, text: "✈️ 하늘 활주로 서킷" });
+  }
+
+  // ---- 관중석 + 램프 ----
+  for (let i = 0; i < 5; i++) add(c, "grandstand", 18 + i * 9, 2);
+  add(c, "lamp", 6, 6);
+  add(c, "lamp", W - 7, 6);
+  add(c, "lamp", 6, H - 7);
+  add(c, "lamp", W - 7, H - 7);
+
+  // ---- 워프 포탈(안쪽 섬) — 전체 미니맵으로 어디든 이동 ----
+  // (트랙 위에 방 포털을 두면 주행 중 오발동하므로, 안쪽 섬의 워프 포탈로만 이동)
+  add(c, "portalhub", 44, 30, { name: "워프 포탈" });
+
+  return {
+    key: theme === "sea" ? "circuit-sea" : "circuit-sky",
+    name: theme === "sea" ? "바다 요트 서킷" : "하늘 비행기 서킷",
+    description:
+      theme === "sea"
+        ? "바다 위 부두를 도는 요트 레이스. 트랙 밖은 바다 방벽으로 막혀 있어요."
+        : "구름 위 활주로를 도는 비행기 레이스. 트랙 밖은 허공 방벽으로 막혀 있어요.",
+    tiles: g.rows(),
+    objects: c.objects,
+    areas: c.areas,
+    portals: c.portals,
+    spawns: c.spawns,
+    spotlights: c.spotlights,
+    labels: c.labels,
+    vehicle: "kart",
+    race: {
+      laps: 3,
+      start: { x: 39, y: 8, w: 2, h: 6 },
+      checkpoints: [
+        { x: W - 14, y: 24, w: 6, h: 2 }, // 우측
+        { x: 39, y: H - 14, w: 2, h: 6 }, // 하단
+        { x: 8, y: 24, w: 6, h: 2 }, // 좌측
+      ],
+    },
+  };
+}
+
 // ==================== 8. 배틀 아레나 (PK 샷건존, 44 x 32) ====================
 // 무기를 구매해 서로 PK 하는 전투 구역. 엄폐물(상자/드럼통/모래주머니)로 몸을 숨긴다.
 
@@ -1192,4 +1304,6 @@ export const PRESET_MAPS: Record<string, MapData> = {
   starhall: buildStarhall(),
   cafe: buildCafe(),
   arena: buildArena(),
+  "circuit-sea": buildRingRace("sea"),
+  "circuit-sky": buildRingRace("sky"),
 };

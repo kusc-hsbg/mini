@@ -237,7 +237,9 @@ begin
     (new.id, 'Beach Resort', 'beach', 4),
     (new.id, 'Star Hall Gallery', 'starhall', 5),
     (new.id, 'Cafe Terrace', 'cafe', 6),
-    (new.id, 'Battle Arena', 'arena', 7);
+    (new.id, 'Battle Arena', 'arena', 7),
+    (new.id, 'Sea Yacht Circuit', 'circuit-sea', 8),
+    (new.id, 'Sky Plane Circuit', 'circuit-sky', 9);
   return new;
 end;
 $$;
@@ -698,4 +700,18 @@ select s.id, 'Battle Arena', 'arena', 7
 from public.spaces s
 where not exists (
   select 1 from public.rooms r where r.space_id = s.id and r.template_key = 'arena'
+);
+
+-- backfill: 테마 레이스 서킷 (바다/하늘)
+insert into public.rooms (space_id, name, template_key, sort_order)
+select s.id, 'Sea Yacht Circuit', 'circuit-sea', 8
+from public.spaces s
+where not exists (
+  select 1 from public.rooms r where r.space_id = s.id and r.template_key = 'circuit-sea'
+);
+insert into public.rooms (space_id, name, template_key, sort_order)
+select s.id, 'Sky Plane Circuit', 'circuit-sky', 9
+from public.spaces s
+where not exists (
+  select 1 from public.rooms r where r.space_id = s.id and r.template_key = 'circuit-sky'
 );
