@@ -85,6 +85,9 @@ export interface EngineCallbacks {
   onDeath?: (killerName: string) => void; // 내가 죽음
   onKill?: (victimName: string) => void; // 내가 상대를 처치
   onRespawn?: () => void;
+  onBossHit?: (amount: number) => void; // 부스트 상태로 보스를 들이받아 데미지
+  onPlayerRightClick?: (id: string) => void; // 우클릭 — 탈것 탑승 요청 등
+  onDetach?: () => void; // 탈것에서 내림(승객 해제)
 }
 
 export type RaceItemKind = "turbo" | "boost" | "slow" | "oil" | "rocket" | "ink" | "meteor";
@@ -151,6 +154,7 @@ export class GameEngine {
   private pathTarget: PathNode | null = null;
   private followId: string | null = null;
   private seat: { objId: string; prevX: number; prevY: number } | null = null; // 앉기 전 위치 복원용
+  private passengerOf: string | null = null; // 탈것(양탄자) 주인 id — 탑승 중이면 위치 미러링
 
   private currentArea: PrivateArea | null = null;
   private lockedAreas = new Set<string>();
@@ -167,6 +171,9 @@ export class GameEngine {
   private aimAngle = 0;
   private lastHitFrom: string | null = null;
   private respawnAt = 0;
+  // 보스 레이드
+  private boss: { x: number; y: number; hp: number; maxHp: number; kind: string; alive: boolean } | null = null;
+  private bossHitAt = 0;
   // 레이스 아이템 (아이템 박스/기름 웅덩이)
   private raceItems: MapObject[] = [];
   private itemCooldowns = new Map<string, number>(); // object id -> 다시 활성화되는 시각
@@ -249,6 +256,7 @@ export class GameEngine {
     this.canvas.addEventListener("dblclick", this.onDblClick);
     this.canvas.addEventListener("click", this.onClick);
     this.canvas.addEventListener("mousemove", this.onMouseMove);
+    this.canvas.addEventListener("contextmenu", this.onContextMenu);
     this.renderGround();
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.loop);
@@ -263,6 +271,7 @@ export class GameEngine {
     this.canvas.removeEventListener("dblclick", this.onDblClick);
     this.canvas.removeEventListener("click", this.onClick);
     this.canvas.removeEventListener("mousemove", this.onMouseMove);
+    this.canvas.removeEventListener("contextmenu", this.onContextMenu);
   }
 
   setMap(map: MapData, keepPosition = true) {
@@ -380,6 +389,22 @@ export class GameEngine {
     this.self.sitting = false;
     this.self.lying = false;
     this.pushState();
+  }
+
+  setPassengerOf(id: string | null) {
+    this.passengerOf = id;
+    if (id) {
+      this.self.onBike = false;
+      this.self.sitting = false;
+      this.self.lying = false;
+      this.seat = null;
+      this.path = [];
+      this.followId = null;
+    }
+    this.pushState();
+  }
+  getPassengerOf() {
+    return this.passengerOf;
   }
 
   setFollow(id: string | null) {
@@ -586,6 +611,19 @@ export class GameEngine {
     if (this.isPk()) this.setAimFromScreen(e.clientX, e.clientY);
   };
 
+  private onContextMenu = (e: MouseEvent) => {
+    e.preventDefault();
+    if (this.editorMode) return;
+    const rect = this.canvas.getBoundingClientRect();
+    const wx = (e.clientX - rect.left) / this.zoom + this.cam.x;
+    const wy = (e.clientY - rect.top) / this.zoom + this.cam.y;
+    let hit: string | null = null;
+    this.others.forEach((p) => {
+      if (Math.abs(p.x - wx) < 16 && wy > p.y - 52 && wy < p.y + 8) hit = p.id;
+    });
+    if (hit) this.cb.onPlayerRightClick?.(hit);
+  };
+
   private onClick = (e: MouseEvent) => {
     if (this.editorMode) return;
     // PK 존: 클릭한 방향으로 발사
@@ -723,6 +761,62 @@ export class GameEngine {
   }
 
   // ---------- PK 전투 (아레나) ----------
+
+  setBoss(b: { x: number; y: number; hp: number; maxHp: number; kind: string; alive: boolean } | null) {
+    this.boss = b;
+  }
+  getBoss() {
+    return this.boss;
+  }
+
+  private updateBoss(now: number) {
+    const b = this.boss;
+    if (!b || !b.alive) return;
+    const d = Math.hypot(b.x - this.self.x, b.y - this.self.y);
+    if (d < 34) {
+      const boosting = this.self.onBike && now < this.effectUntil && this.effectMult > 1.05;
+      if (boosting) {
+        if (now > this.bossHitAt) {
+          this.bossHitAt = now + 500;
+          this.cb.onBossHit?.(8);
+          this.addEmote(this.self.id, { id: `bh${now}`, kind: "emoji", value: "💥", at: Date.now() });
+        }
+      } else if (now > this.stunUntil) {
+        // 보스에게 부딪힘 — 스턴 + 넉백
+        this.stunUntil = now + 900;
+        const ang = Math.atan2(this.self.y - b.y, this.self.x - b.x);
+        this.self.x += Math.cos(ang) * 26;
+        this.self.y += Math.sin(ang) * 26;
+        this.addEmote(this.self.id, { id: `bs${now}`, kind: "emoji", value: "💫", at: Date.now() });
+      }
+    }
+  }
+
+  private renderBoss(ctx: CanvasRenderingContext2D) {
+    const b = this.boss;
+    if (!b || !b.alive) return;
+    const icon = b.kind === "kraken" ? "🦑" : b.kind === "chicken" ? "🐔" : "🦔";
+    // 그림자
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.beginPath();
+    ctx.ellipse(b.x, b.y + 16, 22, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.font = "42px serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(icon, b.x, b.y);
+    // HP 바
+    const bw = 64;
+    const ratio = Math.max(0, b.hp / b.maxHp);
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(b.x - bw / 2 - 1, b.y - 40, bw + 2, 8);
+    ctx.fillStyle = "#ef4444";
+    ctx.fillRect(b.x - bw / 2, b.y - 39, bw * ratio, 6);
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 10px ui-sans-serif";
+    ctx.fillText(`BOSS ${Math.max(0, Math.round(b.hp))}/${b.maxHp}`, b.x, b.y - 48);
+    ctx.textBaseline = "alphabetic";
+  }
 
   isPk() {
     return this.map.pk === true;
@@ -941,6 +1035,18 @@ export class GameEngine {
       dy = 0;
     }
 
+    // 탈것(양탄자) 승객 — 이동 키를 누르면 내림, 아니면 주인 위치를 따라감
+    if (this.passengerOf) {
+      const owner = this.others.get(this.passengerOf);
+      if (!owner || dx !== 0 || dy !== 0) {
+        this.passengerOf = null;
+        this.cb.onDetach?.();
+      } else {
+        dx = 0;
+        dy = 0;
+      }
+    }
+
     // 키 입력이 있으면 자동 이동 취소 + 앉아 있으면 일어남
     if (dx !== 0 || dy !== 0) {
       if (this.seat) this.standUp();
@@ -1008,6 +1114,17 @@ export class GameEngine {
       this.moveAxis(0, (dy / len) * speed * dt);
     }
 
+    // 승객: 주인 위치로 미러링 (탈것에 함께 탑승한 것처럼)
+    if (this.passengerOf) {
+      const o = this.others.get(this.passengerOf);
+      if (o) {
+        this.self.x = o.x;
+        this.self.y = o.y - 2;
+        this.self.dir = o.dir;
+        this.self.moving = o.moving;
+      }
+    }
+
     // 레이스 아이템 픽업 (탑승 중 해당 타일 위)
     if (this.self.onBike && this.raceItems.length) {
       const col = Math.floor(this.self.x / TILE);
@@ -1058,6 +1175,9 @@ export class GameEngine {
 
     // PK 전투 (아레나 전용)
     if (this.isPk()) this.updatePk(dt, now);
+
+    // 보스 레이드 (레이스 맵)
+    if (this.map.race && this.boss) this.updateBoss(now);
 
     // ----- 영역/타일 상태 감지 -----
     const area = areaAtPx(this.map, this.self.x, this.self.y);
@@ -1384,6 +1504,9 @@ export class GameEngine {
 
     // PK 전투 렌더 (투사체/이펙트/체력바)
     if (this.isPk()) this.renderPk(ctx, now);
+
+    // 보스 레이드 렌더
+    if (this.map.race && this.boss?.alive) this.renderBoss(ctx);
 
     // 프라이빗 영역: 내부에 있으면 외부 어둡게 + 경계 표시
     if (this.currentArea) {

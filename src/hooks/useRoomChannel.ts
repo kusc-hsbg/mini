@@ -36,6 +36,13 @@ const EVENTS: RtEventName[] = [
   "kill",
   "obj-place",
   "obj-remove",
+  "quiz",
+  "boss",
+  "boss-dmg",
+  "ride-req",
+  "ride-ok",
+  "ride-end",
+  "party-warp",
 ];
 
 // 한 방의 실시간 채널 (Supabase Realtime presence + broadcast).

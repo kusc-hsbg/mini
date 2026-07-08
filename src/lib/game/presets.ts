@@ -291,6 +291,14 @@ function buildPlaza(): MapData {
   add(c, "door", 39, 33, { name: "배틀 아레나 입구" });
   c.portals.push({ id: "pz-po-arena", x: 39, y: 33, kind: "room", roomTemplate: "arena", label: "🔫 배틀 아레나(PK)로" });
 
+  // OX 파티 퀴즈 존 (O = 초록 / X = 빨강 플랫폼)
+  g.rect(30, 18, 5, 4, "g");
+  g.rect(45, 18, 5, 4, "m");
+  c.areas.push({ id: "quiz-o", name: "🅾️ O 존", x: 30, y: 18, w: 5, h: 4 });
+  c.areas.push({ id: "quiz-x", name: "❌ X 존", x: 45, y: 18, w: 5, h: 4 });
+  c.labels.push({ x: 31, y: 17, text: "🅾️ O" });
+  c.labels.push({ x: 46, y: 17, text: "❌ X" });
+
   return {
     key: "plaza",
     name: "타운 스퀘어",

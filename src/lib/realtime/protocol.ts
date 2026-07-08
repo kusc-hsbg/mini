@@ -42,6 +42,22 @@ export interface RtEvents {
   // 휴대용 오브젝트(피아노) 설치/회수
   "obj-place": { id: string; otype: string; x: number; y: number; name?: string };
   "obj-remove": { id: string };
+  // OX 파티 퀴즈
+  quiz: {
+    kind: "start" | "reveal" | "end";
+    host: string;
+    hostName: string;
+    text?: string;
+    correct?: "O" | "X";
+  };
+  // 레이스 보스 레이드 (호스트 권위)
+  boss: { x: number; y: number; hp: number; maxHp: number; kind: string; alive: boolean };
+  "boss-dmg": { amount: number; byName: string };
+  // 탈것(양탄자) 동승 + 파티 워프
+  "ride-req": { from: string; fromName: string; to: string };
+  "ride-ok": { owner: string; ownerName: string; rider: string };
+  "ride-end": { rider: string; owner: string };
+  "party-warp": { by: string; roomId: string; riders: string[] };
 }
 
 export type RtEventName = keyof RtEvents;

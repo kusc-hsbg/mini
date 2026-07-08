@@ -13,6 +13,7 @@ import {
   PrivateArea,
   TILE_INFO,
   getPreset,
+  mapPixelSize,
   objectInteraction,
   resolveMap,
 } from "@/lib/game/maps";
@@ -162,6 +163,7 @@ type ModalState =
   | { kind: "bank" }
   | { kind: "collection" }
   | { kind: "auction" }
+  | { kind: "quiz" }
   | null;
 
 type PanelState = "participants" | "chat" | "meetings" | "friends" | null;
@@ -279,6 +281,19 @@ export default function GameClient({
   const [stats, setStats] = useState({ raceWins: profile?.race_wins ?? 0, kills: profile?.kills ?? 0 });
   const [roomClosed, setRoomClosedState] = useState(!!room.closed);
   const [pianoPlaced, setPianoPlaced] = useState(false);
+  const [quiz, setQuiz] = useState<{ text: string; host: string; hostName: string; correct?: "O" | "X"; myResult?: "pass" | "fail" } | null>(null);
+  const [bossHud, setBossHud] = useState<{ hp: number; maxHp: number; kind: string; alive: boolean } | null>(null);
+  const bossRef = useRef<{ x: number; y: number; hp: number; maxHp: number; kind: string; alive: boolean } | null>(null);
+  const bossRespawnRef = useRef(0);
+  // 보스 레이드 호스트 선출 (가장 작은 id) — 안정적 단일 시뮬레이터
+  const isHost = useMemo(() => {
+    if (!identity) return false;
+    let min = identity.id;
+    for (const p of players) if (p.id < min) min = p.id;
+    return min === identity.id;
+  }, [players, identity]);
+  const isHostRef = useRef(false);
+  isHostRef.current = isHost;
 
   const autoBusyRef = useRef(false);
   const myLocksRef = useRef<Set<string>>(new Set());
@@ -288,6 +303,8 @@ export default function GameClient({
   blockedRef.current = blocked;
   const walletRef = useRef(wallet);
   walletRef.current = wallet;
+  const ridersRef = useRef<Set<string>>(new Set()); // 내 양탄자에 탑승한 파티원
+  const ridingOwnerRef = useRef<string | null>(null); // 내가 탑승 중인 주인
   const statusRef = useRef(status);
   statusRef.current = status;
   const panelRef = useRef(panel);
@@ -497,6 +514,86 @@ export default function GameClient({
         engine?.removeObject(o.id);
         break;
       }
+      case "boss": {
+        const b = payload as RtEvents["boss"];
+        if (!isHostRef.current) {
+          engineRef.current?.setBoss(b);
+          setBossHud({ hp: b.hp, maxHp: b.maxHp, kind: b.kind, alive: b.alive });
+        }
+        break;
+      }
+      case "boss-dmg": {
+        const d = payload as RtEvents["boss-dmg"];
+        if (isHostRef.current) {
+          const b = bossRef.current;
+          if (b && b.alive) {
+            b.hp -= d.amount;
+            if (b.hp <= 0) {
+              b.alive = false;
+              bossRespawnRef.current = Date.now() + 15000;
+              addToast(`🏆 보스 처치! (${d.byName} 막타)`);
+            }
+          }
+        }
+        break;
+      }
+      case "ride-req": {
+        const r = payload as RtEvents["ride-req"];
+        if (r.to !== myId || blockedRef.current.has(r.from)) break;
+        // 파티 동승 가능한 탈것(양탄자)을 소환 중일 때만 수락 가능
+        const mountKey = walletRef.current.equipped.mount;
+        const mount = mountKey ? SHOP_MAP[mountKey] : null;
+        if (!mount?.rideableParty || !mounted) {
+          addToast(`${r.fromName}님이 탑승을 요청했지만, 파티 탈것(양탄자)을 소환 중이 아니에요`);
+          break;
+        }
+        if (ridersRef.current.size >= (mount.seats ?? 5) - 1) {
+          addToast("🧞 양탄자 정원이 가득 찼어요");
+          break;
+        }
+        addToast(`🧞 ${r.fromName}님의 탑승 요청`, "수락", () => {
+          ridersRef.current.add(r.from);
+          channelRef.current.send("ride-ok", { owner: myId, ownerName: identity?.name ?? "", rider: r.from });
+        });
+        break;
+      }
+      case "ride-ok": {
+        const r = payload as RtEvents["ride-ok"];
+        if (r.rider !== myId) break;
+        ridingOwnerRef.current = r.owner;
+        engine?.setPassengerOf(r.owner);
+        addToast(`🧞 ${r.ownerName}님의 양탄자에 탑승! (이동 키로 내려요)`);
+        break;
+      }
+      case "ride-end": {
+        const r = payload as RtEvents["ride-end"];
+        if (r.owner === myId) ridersRef.current.delete(r.rider);
+        break;
+      }
+      case "party-warp": {
+        const w = payload as RtEvents["party-warp"];
+        if (w.riders.includes(myId ?? "")) {
+          ridingOwnerRef.current = null;
+          router.push(`/s/${space.id}/${w.roomId}`);
+        }
+        break;
+      }
+      case "quiz": {
+        const q = payload as RtEvents["quiz"];
+        if (q.kind === "start") {
+          setQuiz({ text: q.text ?? "", host: q.host, hostName: q.hostName });
+          addToast(`🅾️❌ ${q.hostName}님의 OX 퀴즈! O/X 존으로 이동하세요`);
+        } else if (q.kind === "reveal") {
+          const myArea = engine?.getSelf().areaId ?? null;
+          const correctZone = q.correct === "O" ? "quiz-o" : "quiz-x";
+          const pass = myArea === correctZone;
+          setQuiz((cur) => (cur ? { ...cur, correct: q.correct, myResult: pass ? "pass" : "fail" } : cur));
+          addToast(pass ? `✅ 정답! (${q.correct}) 통과!` : `❌ 오답! 정답은 ${q.correct} 였어요 — 탈락`);
+        } else {
+          setQuiz(null);
+        }
+        break;
+      }
       case "race": {
         const r = payload as RtEvents["race"];
         if (blockedRef.current.has(r.from)) break;
@@ -587,6 +684,17 @@ export default function GameClient({
         onPortal: (portal) => handlePortal(portal),
         onInteractHint: (obj) => setHintObj(obj),
         onPlayerClick: () => setPanel("participants"),
+        onPlayerRightClick: (id) => {
+          if (!multiplayer) return;
+          channelRef.current.send("ride-req", { from: identity.id, fromName: identity.name, to: id });
+          addToast("🧞 탈것 탑승을 요청했어요 (상대가 수락하면 함께 이동)");
+        },
+        onDetach: () => {
+          const owner = ridingOwnerRef.current;
+          if (owner && multiplayer) channelRef.current.send("ride-end", { rider: identity.id, owner });
+          ridingOwnerRef.current = null;
+          addToast("🚶 탈것에서 내렸어요");
+        },
         onRace: (ev) => {
           if (ev.kind === "start") {
             addToast(`🚦 레이스 시작! ${ev.laps}랩 완주하세요`);
@@ -655,6 +763,21 @@ export default function GameClient({
           }
         },
         onRespawn: () => addToast("✨ 부활했습니다!"),
+        onBossHit: (amount) => {
+          if (isHostRef.current) {
+            const b = bossRef.current;
+            if (b && b.alive) {
+              b.hp -= amount;
+              if (b.hp <= 0) {
+                b.alive = false;
+                bossRespawnRef.current = Date.now() + 15000;
+                addToast("🏆 보스를 처치했습니다! 잠시 후 재등장");
+              }
+            }
+          } else if (multiplayer) {
+            channelRef.current.send("boss-dmg", { amount, byName: identity.name });
+          }
+        },
         onItem: (kind: RaceItemKind) => {
           const meta: Record<RaceItemKind, [string, string]> = {
             turbo: ["🚀 터보! 2초간 초가속", "🚀"],
@@ -795,6 +918,54 @@ export default function GameClient({
     }, 100);
     return () => clearInterval(t);
   }, [liveMap, engineReady]);
+
+  // ----- 보스 레이드 (레이스 맵) — 호스트가 시뮬레이션/브로드캐스트 -----
+  useEffect(() => {
+    if (!liveMap.race || !identity) {
+      bossRef.current = null;
+      setBossHud(null);
+      engineRef.current?.setBoss(null);
+      return;
+    }
+    if (!isHost) return; // 비호스트는 boss 이벤트로 수신
+    const kind = liveMap.key.includes("sea") ? "kraken" : liveMap.key.includes("sky") ? "chicken" : "mole";
+    const size = mapPixelSize(liveMap);
+    const t = setInterval(() => {
+      const e = engineRef.current;
+      if (!e) return;
+      const now = Date.now();
+      let b = bossRef.current;
+      if (!b || (!b.alive && now > bossRespawnRef.current)) {
+        const maxHp = 120 + e.getOthers().length * 60;
+        b = { x: size.w / 2, y: size.h / 2, hp: maxHp, maxHp, kind, alive: true };
+        bossRef.current = b;
+      }
+      if (b.alive) {
+        const pts = [e.getSelf(), ...e.getOthers()];
+        let nx = b.x;
+        let ny = b.y;
+        let best = Infinity;
+        for (const p of pts) {
+          const d = Math.hypot(p.x - b.x, p.y - b.y);
+          if (d < best) {
+            best = d;
+            nx = p.x;
+            ny = p.y;
+          }
+        }
+        const ang = Math.atan2(ny - b.y, nx - b.x);
+        b.x += Math.cos(ang) * 18; // ~120px/s
+        b.y += Math.sin(ang) * 18;
+      }
+      e.setBoss(b);
+      setBossHud({ hp: b.hp, maxHp: b.maxHp, kind: b.kind, alive: b.alive });
+      if (multiplayer) {
+        channelRef.current.send("boss", { x: b.x, y: b.y, hp: b.hp, maxHp: b.maxHp, kind: b.kind, alive: b.alive });
+      }
+    }, 150);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveMap, identity, isHost, multiplayer]);
 
   // ----- PK HUD 폴링 (아레나에서만) -----
   useEffect(() => {
@@ -1497,6 +1668,13 @@ export default function GameClient({
               📖 도감
             </button>
           )}
+          <button
+            onClick={() => setModal({ kind: "quiz" })}
+            className="rounded-xl bg-panel/80 px-3 py-2 text-sm text-slate-300 backdrop-blur hover:text-white"
+            title="OX 파티 퀴즈 진행"
+          >
+            🅾️❌ 퀴즈
+          </button>
           {wallet.equipped.mount && (
             <button
               onClick={() => {
@@ -1640,6 +1818,21 @@ export default function GameClient({
         );
       })()}
 
+      {/* OX 퀴즈 참가자 배너 */}
+      {quiz && (
+        <div className="pointer-events-none absolute left-1/2 top-16 z-20 w-[min(92vw,460px)] -translate-x-1/2 rounded-2xl border border-accent/40 bg-panel/95 p-3 text-center shadow-xl backdrop-blur">
+          <div className="text-xs text-slate-400">🅾️❌ {quiz.hostName}님의 OX 퀴즈</div>
+          <div className="mt-1 text-base font-semibold text-white">{quiz.text}</div>
+          {!quiz.correct ? (
+            <div className="mt-1 text-sm text-accent2">O존(초록) 또는 X존(빨강)으로 이동하세요!</div>
+          ) : (
+            <div className={`mt-1 text-sm font-bold ${quiz.myResult === "pass" ? "text-emerald-400" : "text-red-400"}`}>
+              정답: {quiz.correct} · {quiz.myResult === "pass" ? "✅ 통과!" : "❌ 탈락"}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 스포트라이트 알림 */}
       {selfInSpotlight && (
         <div className="pointer-events-none absolute left-1/2 top-14 z-20 -translate-x-1/2 rounded-xl bg-orange-500/90 px-4 py-1.5 text-sm font-medium text-white shadow-lg">
@@ -1658,6 +1851,19 @@ export default function GameClient({
 
       {/* ---------- 레이스 HUD (그랑프리) ---------- */}
       {identity && <RaceHud state={raceState} leaderboard={leaderboard} selfId={identity.id} />}
+
+      {/* ---------- 보스 레이드 배너 ---------- */}
+      {bossHud?.alive && (
+        <div className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-2xl border border-red-500/50 bg-panel/95 px-4 py-2 text-center shadow-xl backdrop-blur">
+          <div className="text-sm font-bold text-red-300">
+            {bossHud.kind === "kraken" ? "🦑 크라켄" : bossHud.kind === "chicken" ? "🐔 알 쏘는 치킨" : "🦔 두더지"} 보스 레이드!
+          </div>
+          <div className="mx-auto mt-1 h-2.5 w-56 overflow-hidden rounded-full bg-black/50">
+            <div className="h-full bg-red-500" style={{ width: `${Math.max(0, (bossHud.hp / bossHud.maxHp) * 100)}%` }} />
+          </div>
+          <div className="mt-1 text-xs text-slate-300">부스트/터보로 들이받아 HP를 깎으세요! (그냥 부딪히면 스턴)</div>
+        </div>
+      )}
 
       {/* ---------- PK HUD (배틀 아레나) ---------- */}
       {liveMap.pk && identity && pkState && (
@@ -1951,6 +2157,23 @@ export default function GameClient({
           onClose={() => setModal(null)}
         />
       )}
+      {modal?.kind === "quiz" && identity && (
+        <QuizModal
+          active={!!quiz}
+          onBroadcast={(kind, text, correct) => {
+            const payload = { kind, host: identity.id, hostName: identity.name, text, correct };
+            if (kind === "start") setQuiz({ text: text ?? "", host: identity.id, hostName: identity.name });
+            else if (kind === "end") setQuiz(null);
+            else if (kind === "reveal") {
+              const myArea = engineRef.current?.getSelf().areaId ?? null;
+              const pass = myArea === (correct === "O" ? "quiz-o" : "quiz-x");
+              setQuiz((cur) => (cur ? { ...cur, correct, myResult: pass ? "pass" : "fail" } : cur));
+            }
+            if (multiplayer) channelRef.current.send("quiz", payload);
+          }}
+          onClose={() => setModal(null)}
+        />
+      )}
       {modal?.kind === "auction" && (
         <AuctionModal
           wallet={wallet}
@@ -2002,7 +2225,18 @@ export default function GameClient({
           currentRoomId={room.id}
           onWarp={(rid) => {
             setModal(null);
-            if (rid !== room.id) router.push(`/s/${space.id}/${rid}`);
+            if (rid !== room.id) {
+              // 파티(내 양탄자 탑승자) 동시 이동
+              if (multiplayer && ridersRef.current.size > 0) {
+                channelRef.current.send("party-warp", {
+                  by: identity?.id ?? "",
+                  roomId: rid,
+                  riders: [...ridersRef.current],
+                });
+                ridersRef.current.clear();
+              }
+              router.push(`/s/${space.id}/${rid}`);
+            }
           }}
           onClose={() => setModal(null)}
         />
@@ -2125,6 +2359,63 @@ function NotesModal({
           ))}
         </ul>
       )}
+    </Modal>
+  );
+}
+
+// ---------- OX 파티 퀴즈 (진행자) ----------
+function QuizModal({
+  active,
+  onBroadcast,
+  onClose,
+}: {
+  active: boolean;
+  onBroadcast: (kind: "start" | "reveal" | "end", text?: string, correct?: "O" | "X") => void;
+  onClose: () => void;
+}) {
+  const [text, setText] = useState("");
+  return (
+    <Modal title="🅾️❌ OX 파티 퀴즈 진행" onClose={onClose}>
+      <div className="space-y-3">
+        <p className="text-sm text-slate-400">
+          문제를 내면 참가자들이 광장의 <b className="text-emerald-400">O존</b>/<b className="text-red-400">X존</b>으로 이동해요.
+          정답을 공개하면 틀린 쪽이 탈락 처리됩니다.
+        </p>
+        <textarea
+          className="input min-h-[80px] resize-none bg-panel2"
+          placeholder="예) 지구는 평평하다? (O/X)"
+          value={text}
+          maxLength={120}
+          onChange={(e) => setText(e.target.value)}
+        />
+        <button
+          onClick={() => {
+            if (text.trim()) onBroadcast("start", text.trim());
+          }}
+          className="btn-primary w-full"
+        >
+          📢 문제 출제 (참가자 이동 시작)
+        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => onBroadcast("reveal", undefined, "O")}
+            disabled={!active}
+            className="flex-1 rounded-lg bg-emerald-600 py-2 text-white disabled:opacity-40"
+          >
+            정답 공개: 🅾️ O
+          </button>
+          <button
+            onClick={() => onBroadcast("reveal", undefined, "X")}
+            disabled={!active}
+            className="flex-1 rounded-lg bg-red-600 py-2 text-white disabled:opacity-40"
+          >
+            정답 공개: ❌ X
+          </button>
+        </div>
+        <button onClick={() => onBroadcast("end")} disabled={!active} className="btn-ghost w-full disabled:opacity-40">
+          퀴즈 종료
+        </button>
+      </div>
     </Modal>
   );
 }
