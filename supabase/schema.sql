@@ -313,6 +313,8 @@ create table if not exists public.rooms (
   created_at   timestamptz not null default now()
 );
 create index if not exists rooms_space_idx on public.rooms(space_id);
+-- 방문 닫기: 닫힌 방은 멤버/관리자만 입장 가능
+alter table public.rooms add column if not exists closed boolean not null default false;
 
 alter table public.rooms enable row level security;
 
@@ -651,6 +653,57 @@ create policy "remove friend" on public.friendships for delete
 drop trigger if exists friendships_touch on public.friendships;
 create trigger friendships_touch before update on public.friendships
   for each row execute function public.touch_updated_at();
+
+-- ---------------------------------------------------------------
+-- auction_listings: 경매장 — 보유 아이템을 하트로 판매 (개인당 최대 3개)
+-- ---------------------------------------------------------------
+create table if not exists public.auction_listings (
+  id          uuid primary key default gen_random_uuid(),
+  seller_id   uuid not null references auth.users(id) on delete cascade,
+  seller_name text not null default '',
+  item_key    text not null,
+  price       bigint not null check (price > 0),
+  created_at  timestamptz not null default now()
+);
+create index if not exists auction_seller_idx on public.auction_listings(seller_id);
+alter table public.auction_listings enable row level security;
+
+drop policy if exists "auctions visible" on public.auction_listings;
+create policy "auctions visible" on public.auction_listings for select using (true);
+
+drop policy if exists "seller lists" on public.auction_listings;
+create policy "seller lists" on public.auction_listings for insert
+  with check (seller_id = auth.uid());
+
+drop policy if exists "seller cancels" on public.auction_listings;
+create policy "seller cancels" on public.auction_listings for delete
+  using (seller_id = auth.uid());
+
+-- 경매 구매 — 구매자 하트 차감 + 판매자 지급 + 아이템 이전 + 리스팅 삭제 (원자적)
+create or replace function public.buy_listing(p_listing uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_seller uuid;
+  v_item text;
+  v_price bigint;
+  v_bal bigint;
+  v_inv jsonb;
+begin
+  select seller_id, item_key, price into v_seller, v_item, v_price
+    from public.auction_listings where id = p_listing for update;
+  if v_seller is null then raise exception 'listing not found'; end if;
+  if v_seller = auth.uid() then raise exception 'cannot buy own listing'; end if;
+  select hearts, inventory into v_bal, v_inv from public.profiles where id = auth.uid() for update;
+  if v_bal is null or v_bal < v_price then raise exception 'insufficient hearts'; end if;
+  -- 이미 보유한 아이템이면 중복 방지
+  if v_inv ? v_item then raise exception 'already owned'; end if;
+  update public.profiles set hearts = hearts - v_price,
+    inventory = coalesce(inventory, '[]'::jsonb) || to_jsonb(v_item)
+    where id = auth.uid();
+  update public.profiles set hearts = hearts + v_price where id = v_seller;
+  delete from public.auction_listings where id = p_listing;
+end;
+$$;
 
 -- ---------------------------------------------------------------
 -- backfill: add Grand Prix Circuit room to spaces created before this update

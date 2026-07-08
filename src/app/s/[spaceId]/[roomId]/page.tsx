@@ -71,6 +71,11 @@ export default async function RoomPage({
   const room = ctx.rooms.find((r) => r.id === params.roomId);
   if (!room) redirect(`/s/${ctx.space.id}`);
 
+  // 방문 닫힘: 멤버/관리자만 입장
+  const isAdminUser =
+    ctx.space.owner_id === userId || ctx.role === "admin" || ctx.role === "moderator";
+  if (room.closed && !ctx.isMember && !isAdminUser) redirect(`/s/${ctx.space.id}`);
+
   // 차단 목록 (로그인 유저)
   let blocks: string[] = [];
   if (userId) {

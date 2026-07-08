@@ -400,6 +400,25 @@ export class GameEngine {
     this.deskOwners = m;
   }
 
+  // 런타임에 오브젝트 추가/제거 (휴대용 피아노 등). 충돌 그리드 재계산.
+  addObject(obj: MapObject) {
+    if (this.map.objects.some((o) => o.id === obj.id)) return;
+    this.map.objects.push(obj);
+    this.solid = buildSolidGrid(this.map);
+  }
+  removeObject(id: string) {
+    const idx = this.map.objects.findIndex((o) => o.id === id);
+    if (idx < 0) return;
+    this.map.objects.splice(idx, 1);
+    this.solid = buildSolidGrid(this.map);
+  }
+  hasObject(id: string) {
+    return this.map.objects.some((o) => o.id === id);
+  }
+  selfTile() {
+    return { x: Math.floor(this.self.x / TILE), y: Math.floor(this.self.y / TILE) };
+  }
+
   upsertOther(p: PlayerState) {
     if (p.id === this.self.id) return;
     const now = performance.now();

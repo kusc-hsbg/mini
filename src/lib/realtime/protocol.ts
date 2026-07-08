@@ -39,6 +39,9 @@ export interface RtEvents {
     victim: string;
     victimName: string;
   };
+  // 휴대용 오브젝트(피아노) 설치/회수
+  "obj-place": { id: string; otype: string; x: number; y: number; name?: string };
+  "obj-remove": { id: string };
 }
 
 export type RtEventName = keyof RtEvents;

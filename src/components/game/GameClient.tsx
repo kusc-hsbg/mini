@@ -24,12 +24,13 @@ import { useRoomChannel } from "@/hooks/useRoomChannel";
 import { useControlChannel, type ControlChannel } from "@/hooks/useControlChannel";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { logEvent } from "@/lib/analytics";
-import { addKill, banTarget, blockTarget, buyWeapon, claimAttendance, claimQuest, grantHearts, incrementRaceWin, saveBio as saveBioAction, sendDm, sendFriendRequest, setStatus as setStatusAction, unblockTarget } from "@/app/actions";
+import { addKill, banTarget, blockTarget, buyWeapon, claimAttendance, claimQuest, grantHearts, incrementRaceWin, saveBio as saveBioAction, sendDm, sendFriendRequest, setRoomClosed as setRoomClosedAction, setStatus as setStatusAction, unblockTarget } from "@/app/actions";
 import StoreModal, { type WalletState } from "./StoreModal";
 import FriendsPanel from "./FriendsPanel";
 import MiniGamesModal from "./MiniGamesModal";
 import BankModal from "./BankModal";
 import PkHud from "./PkHud";
+import AuctionModal from "./AuctionModal";
 import { SHOP_MAP } from "@/lib/game/shop";
 import { KILL_TITLES } from "@/lib/game/weapons";
 import type { PlayerCosmetics } from "@/lib/game/types";
@@ -160,6 +161,7 @@ type ModalState =
   | { kind: "minigame" }
   | { kind: "bank" }
   | { kind: "collection" }
+  | { kind: "auction" }
   | null;
 
 type PanelState = "participants" | "chat" | "meetings" | "friends" | null;
@@ -275,6 +277,8 @@ export default function GameClient({
   }));
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState({ raceWins: profile?.race_wins ?? 0, kills: profile?.kills ?? 0 });
+  const [roomClosed, setRoomClosedState] = useState(!!room.closed);
+  const [pianoPlaced, setPianoPlaced] = useState(false);
 
   const autoBusyRef = useRef(false);
   const myLocksRef = useRef<Set<string>>(new Set());
@@ -481,6 +485,16 @@ export default function GameClient({
       case "kill": {
         const k = payload as RtEvents["kill"];
         engine?.receiveKill(k);
+        break;
+      }
+      case "obj-place": {
+        const o = payload as RtEvents["obj-place"];
+        engine?.addObject({ id: o.id, type: o.otype as MapObject["type"], x: o.x, y: o.y, name: o.name });
+        break;
+      }
+      case "obj-remove": {
+        const o = payload as RtEvents["obj-remove"];
+        engine?.removeObject(o.id);
         break;
       }
       case "race": {
@@ -1426,6 +1440,20 @@ export default function GameClient({
               ⚙️
             </Link>
           )}
+          {isMod && (
+            <button
+              onClick={() => {
+                const next = !roomClosed;
+                setRoomClosedState(next);
+                setRoomClosedAction(room.id, next);
+                addToast(next ? "🚪 이 방의 방문을 닫았어요 (멤버/관리자만 입장)" : "🚪 이 방의 방문을 열었어요");
+              }}
+              className="btn-ghost bg-panel/80 px-3 py-2 text-sm backdrop-blur"
+              title={roomClosed ? "방문 열기" : "방문 닫기"}
+            >
+              {roomClosed ? "🔒" : "🚪"}
+            </button>
+          )}
         </div>
 
         <div className="pointer-events-auto flex items-center gap-2">
@@ -1442,6 +1470,15 @@ export default function GameClient({
           >
             🛍️ 상점
           </button>
+          {profile && (
+            <button
+              onClick={() => setModal({ kind: "auction" })}
+              className="rounded-xl bg-panel/80 px-3 py-2 text-sm text-slate-300 backdrop-blur hover:text-white"
+              title="경매장"
+            >
+              🏷️ 경매
+            </button>
+          )}
           {profile && (
             <button
               onClick={() => setPanel((cur) => (cur === "friends" ? null : "friends"))}
@@ -1470,6 +1507,31 @@ export default function GameClient({
               title="탈것 타기/내리기"
             >
               🐴 탈것
+            </button>
+          )}
+          {wallet.inventory.includes("portable-piano") && (
+            <button
+              onClick={() => {
+                const e = engineRef.current;
+                if (!e || !identity) return;
+                const id = `piano-${identity.id}`;
+                if (pianoPlaced) {
+                  e.removeObject(id);
+                  channelRef.current.send("obj-remove", { id });
+                  setPianoPlaced(false);
+                  addToast("🎹 휴대용 피아노를 회수했어요");
+                } else {
+                  const t = e.selfTile();
+                  e.addObject({ id, type: "piano", x: t.x, y: t.y, name: "휴대용 피아노" });
+                  channelRef.current.send("obj-place", { id, otype: "piano", x: t.x, y: t.y, name: "휴대용 피아노" });
+                  setPianoPlaced(true);
+                  addToast("🎹 피아노를 설치했어요 — X로 연주하세요");
+                }
+              }}
+              className={`rounded-xl px-3 py-2 text-sm backdrop-blur ${pianoPlaced ? "bg-accent text-white" : "bg-panel/80 text-slate-300 hover:text-white"}`}
+              title="휴대용 피아노 설치/회수"
+            >
+              🎹 피아노
             </button>
           )}
           <button
@@ -1886,6 +1948,13 @@ export default function GameClient({
               addToast("🎮 잘했어요! (하트 적립은 로그인 필요)");
             }
           }}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal?.kind === "auction" && (
+        <AuctionModal
+          wallet={wallet}
+          onChange={(w) => setWallet((prev) => ({ ...prev, ...w }))}
           onClose={() => setModal(null)}
         />
       )}

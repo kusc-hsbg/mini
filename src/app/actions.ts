@@ -593,6 +593,15 @@ export async function renameRoom(spaceId: string, roomId: string, name: string):
   return { ok: true };
 }
 
+// 방문 닫기/열기 (관리자/방장) — 닫힌 방은 멤버/관리자만 입장
+export async function setRoomClosed(roomId: string, closed: boolean): Promise<Result> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const { error: err } = await supabase.from("rooms").update({ closed }).eq("id", roomId);
+  if (err) return { error: err.message };
+  return { ok: true };
+}
+
 export async function deleteRoomAction(spaceId: string, roomId: string): Promise<Result> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
@@ -830,6 +839,131 @@ export async function unblockTarget(targetKey: string): Promise<Result> {
     .eq("blocked_key", targetKey);
   if (err) return { error: err.message };
   return { ok: true };
+}
+
+// ============ 경매장 (feature #15) ============
+
+export interface AuctionEntry {
+  id: string;
+  sellerId: string;
+  sellerName: string;
+  itemKey: string;
+  price: number;
+  mine: boolean;
+}
+
+// 아이템의 하트 환산 기준가 (코인가는 환율로 환산).
+function baseHeartPrice(itemKey: string): number | null {
+  const it = SHOP_MAP[itemKey];
+  if (!it) return null;
+  return it.currency === "heart" ? it.price : it.price * HEARTS_PER_COIN;
+}
+
+export async function getAuctions(): Promise<{ listings: AuctionEntry[] } | { error: string }> {
+  const supabase = getSupabaseServer();
+  if (!supabase) return { error: "Supabase 미설정" };
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data, error: err } = await supabase
+    .from("auction_listings")
+    .select("id, seller_id, seller_name, item_key, price")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (err) return { error: err.message };
+  const listings: AuctionEntry[] = (data ?? []).map((r) => ({
+    id: r.id as string,
+    sellerId: r.seller_id as string,
+    sellerName: (r.seller_name as string) ?? "",
+    itemKey: r.item_key as string,
+    price: Number(r.price),
+    mine: user?.id === r.seller_id,
+  }));
+  return { listings };
+}
+
+export async function listAuction(
+  itemKey: string,
+  price: number
+): Promise<Result<{ inventory: string[]; equipped: Record<string, string> }>> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const item = SHOP_MAP[itemKey];
+  if (!item) return { error: "존재하지 않는 아이템입니다." };
+  if (item.slot === "none" || item.consumable) return { error: "판매할 수 없는 아이템입니다." };
+  const base = baseHeartPrice(itemKey)!;
+  const min = Math.floor(base * 0.9);
+  const p = Math.floor(price);
+  if (p < min || p > base) return { error: `가격은 ${min}~${base} 하트 범위여야 해요(시중가 최대 10% 할인).` };
+  const w = await loadWallet(supabase, user.id);
+  if (!w) return { error: "프로필을 찾을 수 없습니다." };
+  if (!w.inventory.includes(itemKey)) return { error: "보유하지 않은 아이템입니다." };
+  const { count } = await supabase
+    .from("auction_listings")
+    .select("id", { count: "exact", head: true })
+    .eq("seller_id", user.id);
+  if ((count ?? 0) >= 3) return { error: "판매는 개인당 최대 3개까지 가능해요." };
+  // 인벤토리에서 제거(에스크로) + 장착 해제
+  const inventory = w.inventory.filter((k) => k !== itemKey);
+  const equipped = { ...w.equipped };
+  for (const slot of Object.keys(equipped)) if (equipped[slot] === itemKey) delete equipped[slot];
+  const { error: upErr } = await supabase.from("profiles").update({ inventory, equipped }).eq("id", user.id);
+  if (upErr) return { error: upErr.message };
+  const { error: insErr } = await supabase.from("auction_listings").insert({
+    seller_id: user.id,
+    seller_name: (await supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle()).data?.display_name ?? "판매자",
+    item_key: itemKey,
+    price: p,
+  });
+  if (insErr) {
+    // 롤백: 아이템 되돌리기
+    await supabase.from("profiles").update({ inventory: w.inventory }).eq("id", user.id);
+    return { error: insErr.message };
+  }
+  return { ok: true, inventory, equipped };
+}
+
+export async function cancelAuction(listingId: string): Promise<Result<{ inventory: string[] }>> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const { data: listing } = await supabase
+    .from("auction_listings")
+    .select("item_key, seller_id")
+    .eq("id", listingId)
+    .maybeSingle();
+  if (!listing || listing.seller_id !== user.id) return { error: "취소할 수 없는 경매입니다." };
+  const { error: delErr } = await supabase.from("auction_listings").delete().eq("id", listingId);
+  if (delErr) return { error: delErr.message };
+  const w = await loadWallet(supabase, user.id);
+  const inventory = w ? (w.inventory.includes(listing.item_key as string) ? w.inventory : [...w.inventory, listing.item_key as string]) : [];
+  await supabase.from("profiles").update({ inventory }).eq("id", user.id);
+  return { ok: true, inventory };
+}
+
+export async function buyAuction(
+  listingId: string
+): Promise<Result<{ hearts: number; inventory: string[] }>> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const { error: rpcErr } = await supabase.rpc("buy_listing", { p_listing: listingId });
+  if (rpcErr) {
+    const m = rpcErr.message;
+    return {
+      error: m.includes("insufficient")
+        ? "하트가 부족합니다."
+        : m.includes("already owned")
+          ? "이미 보유한 아이템입니다."
+          : m.includes("own listing")
+            ? "자신의 경매는 살 수 없어요."
+            : "구매에 실패했습니다.",
+    };
+  }
+  const { data } = await supabase.from("profiles").select("hearts, inventory").eq("id", user.id).maybeSingle();
+  return {
+    ok: true,
+    hearts: Number(data?.hearts ?? 0),
+    inventory: Array.isArray(data?.inventory) ? (data!.inventory as string[]) : [],
+  };
 }
 
 // ============ 친구 시스템 ============

@@ -34,6 +34,8 @@ const EVENTS: RtEventName[] = [
   "piano",
   "shot",
   "kill",
+  "obj-place",
+  "obj-remove",
 ];
 
 // 한 방의 실시간 채널 (Supabase Realtime presence + broadcast).

@@ -157,6 +157,7 @@ export interface RoomRecord {
   template_key: string;
   map_data: unknown | null; // MapData JSON (에디터로 수정된 경우)
   sort_order: number;
+  closed?: boolean; // 방문 닫힘(멤버/관리자만 입장)
   created_at: string;
 }
 
