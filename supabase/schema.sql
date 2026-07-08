@@ -236,7 +236,8 @@ begin
     (new.id, 'Grand Prix Circuit', 'circuit', 3),
     (new.id, 'Beach Resort', 'beach', 4),
     (new.id, 'Star Hall Gallery', 'starhall', 5),
-    (new.id, 'Cafe Terrace', 'cafe', 6);
+    (new.id, 'Cafe Terrace', 'cafe', 6),
+    (new.id, 'Battle Arena', 'arena', 7);
   return new;
 end;
 $$;
@@ -687,4 +688,14 @@ select s.id, 'Cafe Terrace', 'cafe', 6
 from public.spaces s
 where not exists (
   select 1 from public.rooms r where r.space_id = s.id and r.template_key = 'cafe'
+);
+
+-- ---------------------------------------------------------------
+-- backfill: add Battle Arena room to spaces created before this update
+-- ---------------------------------------------------------------
+insert into public.rooms (space_id, name, template_key, sort_order)
+select s.id, 'Battle Arena', 'arena', 7
+from public.spaces s
+where not exists (
+  select 1 from public.rooms r where r.space_id = s.id and r.template_key = 'arena'
 );

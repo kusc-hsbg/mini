@@ -40,6 +40,13 @@ export type ObjectKind =
   | "npc"
   | "minigame"
   | "atm"
+  | "crate"
+  | "barrel"
+  | "sandbag"
+  | "statue"
+  | "chess"
+  | "window"
+  | "stairs"
   | "custom";
 
 export interface ObjectDef {
@@ -91,6 +98,13 @@ export const OBJECT_DEFS: Record<ObjectKind, ObjectDef> = {
   npc: { label: "안내 NPC(퀘스트)", w: 1, h: 2, solid: true, tall: true, category: "기타" },
   minigame: { label: "미니게임 기기(낚시/리듬/농사)", w: 2, h: 1, solid: true, tall: true, category: "놀이" },
   atm: { label: "ATM(예치/이자/송금)", w: 1, h: 2, solid: true, tall: true, category: "기타" },
+  crate: { label: "나무 상자(엄폐물)", w: 1, h: 1, solid: true, category: "레이싱" },
+  barrel: { label: "드럼통(엄폐물)", w: 1, h: 1, solid: true, category: "레이싱" },
+  sandbag: { label: "모래주머니(엄폐물)", w: 2, h: 1, solid: true, category: "레이싱" },
+  statue: { label: "대형 조형물(석상)", w: 2, h: 3, solid: true, tall: true, category: "장식" },
+  chess: { label: "대형 체스말", w: 2, h: 3, solid: true, tall: true, category: "장식" },
+  window: { label: "창문", w: 1, h: 1, solid: true, category: "장식" },
+  stairs: { label: "계단", w: 2, h: 2, solid: false, category: "장식" },
   custom: { label: "커스텀(이미지 URL)", w: 1, h: 1, solid: false, interaction: "none", category: "기타" },
 };
 

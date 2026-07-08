@@ -285,6 +285,12 @@ function buildPlaza(): MapData {
   // ATM (예치/이자/송금)
   add(c, "atm", 53, 16, { name: "하트 ATM" });
 
+  // 대형 조형물(사람보다 큰 석상/체스) + 배틀 아레나 입구
+  add(c, "statue", 31, 27, { name: "광장의 수호상" });
+  add(c, "chess", 48, 27, { name: "거대 체스말", props: { color: "dark" } });
+  add(c, "door", 39, 33, { name: "배틀 아레나 입구" });
+  c.portals.push({ id: "pz-po-arena", x: 39, y: 33, kind: "room", roomTemplate: "arena", label: "🔫 배틀 아레나(PK)로" });
+
   return {
     key: "plaza",
     name: "타운 스퀘어",
@@ -1112,6 +1118,71 @@ function buildCafe(): MapData {
   };
 }
 
+// ==================== 8. 배틀 아레나 (PK 샷건존, 44 x 32) ====================
+// 무기를 구매해 서로 PK 하는 전투 구역. 엄폐물(상자/드럼통/모래주머니)로 몸을 숨긴다.
+
+function buildArena(): MapData {
+  const W = 44;
+  const H = 32;
+  const g = new Grid(W, H, "k"); // 어두운 콘크리트 바닥
+  const c = ctx("ar");
+
+  g.border(0, 0, W, H, "#");
+  // 바닥 패턴(격자 얼룩)
+  g.scatter("x", 40, 2, 2, W - 4, H - 4, 33, "k");
+  // 중앙 도로 느낌
+  g.rect(4, 15, W - 8, 2, "=");
+  g.rect(21, 4, 2, W - 12, "=");
+
+  // ---- 엄폐물 배치 (대칭) ----
+  const covers: [string, number, number][] = [
+    ["crate", 10, 8], ["crate", 11, 8], ["barrel", 13, 9],
+    ["sandbag", 8, 12], ["crate", 30, 8], ["crate", 31, 8],
+    ["barrel", 29, 9], ["sandbag", 33, 12], ["crate", 18, 12],
+    ["barrel", 24, 12], ["sandbag", 20, 20], ["crate", 12, 22],
+    ["crate", 13, 22], ["barrel", 16, 23], ["sandbag", 28, 20],
+    ["crate", 30, 22], ["barrel", 27, 23], ["crate", 21, 25],
+    ["barrel", 6, 18], ["barrel", 37, 18], ["crate", 6, 25], ["crate", 37, 25],
+  ];
+  for (const [type, cx2, cy2] of covers) add(c, type as ObjectKind, cx2, cy2);
+
+  // ---- 대형 조형물(중앙) ----
+  add(c, "statue", 21, 13, { name: "전장의 수호상" });
+
+  // ---- 무기 상점 안내 + 스폰(양측) ----
+  add(c, "sign", 3, 3, {
+    name: "무기 상점 안내",
+    props: {
+      text: "🔫 배틀 아레나 — PK 존\n\n상단 무기 아이콘으로 무기를 구매/선택하세요.\n· 클릭 또는 스페이스로 바라보는 방향으로 발사\n· HP 0이 되면 3.5초 후 부활\n· 킬을 쌓아 칭호를 획득! (킬러 = 100킬)\n\n엄폐물 뒤에 숨어 교전하세요.",
+    },
+  });
+  c.spawns.push({ x: 4, y: 6 }, { x: 6, y: 6 }, { x: 4, y: 26 }, { x: 6, y: 26 });
+  c.spawns.push({ x: 39, y: 6 }, { x: 37, y: 6 }, { x: 39, y: 26 }, { x: 37, y: 26 });
+  add(c, "lamp", 2, 2);
+  add(c, "lamp", W - 3, 2);
+  add(c, "lamp", 2, H - 3);
+  add(c, "lamp", W - 3, H - 3);
+  c.labels.push({ x: 3, y: 1, text: "🔫 배틀 아레나 (PK)" });
+
+  // ---- 포털: 광장으로 + 워프 ----
+  add(c, "door", 21, 30, { name: "아레나 출구" });
+  c.portals.push({ id: "ar-po-plaza", x: 21, y: 30, kind: "room", roomTemplate: "plaza", label: "⛲ 광장으로(안전지대)" });
+
+  return {
+    key: "arena",
+    name: "배틀 아레나",
+    description: "무기를 구매해 PK 하는 전투 구역. 엄폐물 뒤에서 교전하고 킬로 칭호를 획득하세요.",
+    tiles: g.rows(),
+    objects: c.objects,
+    areas: c.areas,
+    portals: c.portals,
+    spawns: c.spawns,
+    spotlights: c.spotlights,
+    labels: c.labels,
+    pk: true,
+  };
+}
+
 export const PRESET_MAPS: Record<string, MapData> = {
   plaza: buildPlaza(),
   office: buildOffice(),
@@ -1120,4 +1191,5 @@ export const PRESET_MAPS: Record<string, MapData> = {
   beach: buildBeach(),
   starhall: buildStarhall(),
   cafe: buildCafe(),
+  arena: buildArena(),
 };

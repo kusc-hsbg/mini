@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { filterProfanity } from "@/lib/game/moderation";
 import { SHOP_MAP, HEARTS_PER_COIN } from "@/lib/game/shop";
+import { WEAPON_MAP, titleForKills } from "@/lib/game/weapons";
 import type { SpaceRole, UserStatus } from "@/lib/game/types";
 
 type Result<T = object> = ({ ok: true } & T) | { error: string };
@@ -233,6 +234,54 @@ export async function grantHearts(amount: number): Promise<Result<{ hearts: numb
   const { error: err } = await supabase.from("profiles").update({ hearts }).eq("id", user.id);
   if (err) return { error: err.message };
   return { ok: true, hearts };
+}
+
+// ---- PK 무기 구매 + 킬 기록 ----
+
+export async function buyWeapon(
+  weaponKey: string
+): Promise<Result<{ hearts: number; coins: number; inventory: string[] }>> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const wp = WEAPON_MAP[weaponKey];
+  if (!wp) return { error: "존재하지 않는 무기입니다." };
+  const invKey = `weapon-${weaponKey}`;
+  const w = await loadWallet(supabase, user.id);
+  if (!w) return { error: "프로필을 찾을 수 없습니다." };
+  if (w.inventory.includes(invKey)) return { error: "이미 보유한 무기입니다." };
+  const bal = wp.currency === "heart" ? w.hearts : w.coins;
+  if (bal < wp.price) return { error: wp.currency === "heart" ? "하트가 부족합니다." : "코인이 부족합니다." };
+  const inventory = [...w.inventory, invKey];
+  const patch: Record<string, unknown> = { inventory };
+  if (wp.currency === "heart") patch.hearts = w.hearts - wp.price;
+  else patch.coins = w.coins - wp.price;
+  const { error: err } = await supabase.from("profiles").update(patch).eq("id", user.id);
+  if (err) return { error: err.message };
+  return {
+    ok: true,
+    hearts: (patch.hearts as number) ?? w.hearts,
+    coins: (patch.coins as number) ?? w.coins,
+    inventory,
+  };
+}
+
+export async function addKill(): Promise<Result<{ kills: number; newTitle: string | null }>> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const { data } = await supabase.from("profiles").select("kills, titles").eq("id", user.id).maybeSingle();
+  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  const kills = Number(data.kills ?? 0) + 1;
+  const titles = Array.isArray(data.titles) ? (data.titles as string[]) : [];
+  const earned = titleForKills(kills);
+  let newTitle: string | null = null;
+  const patch: Record<string, unknown> = { kills };
+  if (earned && !titles.includes(earned.title)) {
+    newTitle = earned.label;
+    patch.titles = [...titles, earned.title];
+  }
+  const { error: err } = await supabase.from("profiles").update(patch).eq("id", user.id);
+  if (err) return { error: err.message };
+  return { ok: true, kills, newTitle };
 }
 
 // ---- ATM (예치/이자/출금) + 송금 ----

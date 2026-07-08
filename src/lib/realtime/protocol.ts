@@ -24,6 +24,21 @@ export interface RtEvents {
     totalMs?: number;
     bestLapMs?: number;
   };
+  // PK 전투 (아레나)
+  shot: {
+    id: string;
+    from: string;
+    x: number;
+    y: number;
+    angle: number;
+    weapon: string;
+  };
+  kill: {
+    killer: string;
+    killerName: string;
+    victim: string;
+    victimName: string;
+  };
 }
 
 export type RtEventName = keyof RtEvents;

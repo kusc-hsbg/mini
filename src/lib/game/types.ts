@@ -88,6 +88,11 @@ export interface PlayerState {
   ghost?: boolean; // 고스트 모드(G) — 반투명, 근접 하트 미발생
   cosmetics?: PlayerCosmetics; // 상점 장착 아이템(날개/펫/프레임/카드/탈것/카트)
   mounted?: boolean; // 상점 탈것 탑승 여부
+  // PK 전투(아레나)
+  hp?: number;
+  dead?: boolean;
+  weapon?: string; // 장착 무기 키
+  kills?: number; // 세션 킬(스코어보드)
 }
 
 // 장착된 상점 아이템 키(슬롯별). 아바타/프로필 카드 렌더에 사용.

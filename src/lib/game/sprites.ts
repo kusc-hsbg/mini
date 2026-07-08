@@ -1124,6 +1124,159 @@ export function drawObject(
       ctx.fill();
       break;
     }
+    case "crate": {
+      ctx.fillStyle = "rgba(0,0,0,0.2)";
+      ctx.fillRect(x + 2, y + h - 4, w - 4, 4);
+      ctx.fillStyle = "#a3722e";
+      roundRect(ctx, x + 3, y + 4, w - 6, h - 7, 3);
+      ctx.fill();
+      ctx.fillStyle = "#c68a3e";
+      ctx.fillRect(x + 3, y + 4, w - 6, 4);
+      ctx.strokeStyle = "#6b4a1e";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + 4, y + 5);
+      ctx.lineTo(x + w - 4, y + h - 4);
+      ctx.moveTo(x + w - 4, y + 5);
+      ctx.lineTo(x + 4, y + h - 4);
+      ctx.stroke();
+      break;
+    }
+    case "barrel": {
+      ctx.fillStyle = "rgba(0,0,0,0.2)";
+      ctx.beginPath();
+      ctx.ellipse(x + 16, y + h - 3, 10, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = o.props?.color ?? "#b91c1c";
+      roundRect(ctx, x + 6, y + 3, 20, h - 6, 4);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.18)";
+      ctx.fillRect(x + 6, y + 9, 20, 2);
+      ctx.fillRect(x + 6, y + h - 12, 20, 2);
+      ctx.fillStyle = "rgba(0,0,0,0.2)";
+      ctx.fillRect(x + 6, y + 6, 20, 1.5);
+      break;
+    }
+    case "sandbag": {
+      ctx.fillStyle = "rgba(0,0,0,0.2)";
+      ctx.fillRect(x + 2, y + h - 3, w - 4, 3);
+      for (let row = 0; row < 2; row++) {
+        for (let cc = 0; cc < 3; cc++) {
+          ctx.fillStyle = row % 2 === cc % 2 ? "#9a8c5a" : "#847a4e";
+          roundRect(ctx, x + 2 + cc * 20 + (row ? 10 : 0), y + 6 + row * 10, 20, 11, 5);
+          ctx.fill();
+        }
+      }
+      break;
+    }
+    case "statue": {
+      // 대형 석상 (사람보다 큰 조형물) — 받침 + 로브를 두른 인물
+      const cx = x + w / 2;
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.beginPath();
+      ctx.ellipse(cx, y + h - 3, 22, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 받침
+      ctx.fillStyle = "#9ca3af";
+      roundRect(ctx, cx - 20, y + h - 16, 40, 14, 3);
+      ctx.fill();
+      ctx.fillStyle = "#b6bcc6";
+      ctx.fillRect(cx - 20, y + h - 16, 40, 4);
+      // 몸통(로브)
+      ctx.fillStyle = "#cbd5e1";
+      ctx.beginPath();
+      ctx.moveTo(cx - 14, y + h - 16);
+      ctx.lineTo(cx + 14, y + h - 16);
+      ctx.lineTo(cx + 9, y + 20);
+      ctx.lineTo(cx - 9, y + 20);
+      ctx.closePath();
+      ctx.fill();
+      // 머리
+      ctx.fillStyle = "#dbe2ea";
+      ctx.beginPath();
+      ctx.arc(cx, y + 14, 10, 0, Math.PI * 2);
+      ctx.fill();
+      // 들어올린 팔
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(cx + 6, y + 26);
+      ctx.lineTo(cx + 18, y + 8);
+      ctx.stroke();
+      // 이끼/음영
+      ctx.fillStyle = "rgba(52,120,80,0.25)";
+      ctx.fillRect(cx - 14, y + h - 22, 28, 5);
+      break;
+    }
+    case "chess": {
+      // 대형 체스말(나이트/킹 느낌)
+      const cx = x + w / 2;
+      const dark = o.props?.color === "dark";
+      const body = dark ? "#1f2937" : "#e5e7eb";
+      const shade = dark ? "#111827" : "#c7ccd6";
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.beginPath();
+      ctx.ellipse(cx, y + h - 3, 20, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 받침
+      ctx.fillStyle = body;
+      roundRect(ctx, cx - 16, y + h - 14, 32, 12, 4);
+      ctx.fill();
+      // 기둥
+      ctx.fillStyle = body;
+      roundRect(ctx, cx - 9, y + 20, 18, h - 32, 5);
+      ctx.fill();
+      ctx.fillStyle = shade;
+      roundRect(ctx, cx - 9, y + 20, 6, h - 32, 5);
+      ctx.fill();
+      // 머리(왕관)
+      ctx.fillStyle = body;
+      ctx.beginPath();
+      ctx.arc(cx, y + 18, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = shade;
+      ctx.fillRect(cx - 2, y + 2, 4, 12); // 십자 세로
+      ctx.fillRect(cx - 6, y + 5, 12, 4); // 십자 가로
+      break;
+    }
+    case "window": {
+      // 벽에 난 창문 — 프레임 + 유리 + 하늘/빛
+      ctx.fillStyle = "#5b4632";
+      roundRect(ctx, x + 3, y + 3, w - 6, h - 6, 3);
+      ctx.fill();
+      const sky = ctx.createLinearGradient(x, y, x, y + h);
+      sky.addColorStop(0, "#7dd3fc");
+      sky.addColorStop(1, "#bae6fd");
+      ctx.fillStyle = sky;
+      ctx.fillRect(x + 6, y + 6, w - 12, h - 12);
+      ctx.strokeStyle = "#5b4632";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + w / 2, y + 6);
+      ctx.lineTo(x + w / 2, y + h - 6);
+      ctx.moveTo(x + 6, y + h / 2);
+      ctx.lineTo(x + w - 6, y + h / 2);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.beginPath();
+      ctx.moveTo(x + 7, y + 7);
+      ctx.lineTo(x + 13, y + 7);
+      ctx.lineTo(x + 7, y + 13);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case "stairs": {
+      // 계단 — 원근감 있는 3단
+      for (let i = 0; i < 3; i++) {
+        const sh = (h / 3) * i;
+        ctx.fillStyle = i % 2 ? "#9aa0ab" : "#b4bac4";
+        ctx.fillRect(x + 2 + i * 3, y + 4 + sh, w - 4 - i * 6, h / 3 - 1);
+        ctx.fillStyle = "rgba(0,0,0,0.15)";
+        ctx.fillRect(x + 2 + i * 3, y + 4 + sh, w - 4 - i * 6, 2);
+      }
+      break;
+    }
     case "custom": {
       const url = o.props?.url;
       const img = url ? getImage(url) : null;

@@ -143,6 +143,7 @@ export interface MapData {
   labels: MapLabel[];
   vehicle?: "bike" | "kart"; // B 타일 탑승 시 탈것 종류 (기본 bike)
   race?: RaceConfig;
+  pk?: boolean; // PK(전투) 존 — 무기/HP/사망 활성화
 }
 
 // ---------- 조회 헬퍼 ----------

@@ -24,11 +24,12 @@ import { useRoomChannel } from "@/hooks/useRoomChannel";
 import { useControlChannel, type ControlChannel } from "@/hooks/useControlChannel";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { logEvent } from "@/lib/analytics";
-import { banTarget, blockTarget, claimAttendance, claimQuest, grantHearts, saveBio as saveBioAction, sendDm, sendFriendRequest, setStatus as setStatusAction, unblockTarget } from "@/app/actions";
+import { addKill, banTarget, blockTarget, buyWeapon, claimAttendance, claimQuest, grantHearts, saveBio as saveBioAction, sendDm, sendFriendRequest, setStatus as setStatusAction, unblockTarget } from "@/app/actions";
 import StoreModal, { type WalletState } from "./StoreModal";
 import FriendsPanel from "./FriendsPanel";
 import MiniGamesModal from "./MiniGamesModal";
 import BankModal from "./BankModal";
+import PkHud from "./PkHud";
 import { SHOP_MAP } from "@/lib/game/shop";
 import type { PlayerCosmetics } from "@/lib/game/types";
 import type { RtEventName, RtEvents, WbOp } from "@/lib/realtime/protocol";
@@ -262,6 +263,7 @@ export default function GameClient({
   const [raceState, setRaceState] = useState<RaceState | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderEntry[]>([]);
   const [touchedId, setTouchedId] = useState<string | null>(null);
+  const [pkState, setPkState] = useState<{ hp: number; dead: boolean; weapon: string; kills: number } | null>(null);
   const [myBio, setMyBio] = useState("");
   const [wallet, setWallet] = useState<WalletState>(() => ({
     hearts: profile?.hearts ?? 0,
@@ -467,6 +469,17 @@ export default function GameClient({
         refetchDesks();
         break;
       }
+      case "shot": {
+        const s = payload as RtEvents["shot"];
+        if (blockedRef.current.has(s.from)) break;
+        engine?.receiveShot(s);
+        break;
+      }
+      case "kill": {
+        const k = payload as RtEvents["kill"];
+        engine?.receiveKill(k);
+        break;
+      }
       case "race": {
         const r = payload as RtEvents["race"];
         if (blockedRef.current.has(r.from)) break;
@@ -589,6 +602,23 @@ export default function GameClient({
         onTouch: (id) => setTouchedId(id),
         onGhost: (active) =>
           addToast(active ? "👻 고스트 모드 (10초) — 반투명 상태예요" : "고스트 모드 해제"),
+        onShot: (p) => {
+          if (multiplayer) channelRef.current.send("shot", p);
+        },
+        onKillBroadcast: (p) => {
+          if (multiplayer) channelRef.current.send("kill", p);
+        },
+        onDeath: (killerName) =>
+          addToast(killerName ? `💀 ${killerName}님에게 당했습니다! 곧 부활합니다` : "💀 사망! 곧 부활합니다"),
+        onKill: (victimName) => {
+          addToast(`🎯 ${victimName}님을 처치했습니다!`);
+          if (profile) {
+            addKill().then((res) => {
+              if (!("error" in res) && res.newTitle) addToast(`🏅 새 칭호 획득: ${res.newTitle}!`);
+            });
+          }
+        },
+        onRespawn: () => addToast("✨ 부활했습니다!"),
         onItem: (kind: RaceItemKind) => {
           const meta: Record<RaceItemKind, [string, string]> = {
             turbo: ["🚀 터보! 2초간 초가속", "🚀"],
@@ -724,6 +754,20 @@ export default function GameClient({
     const t = setInterval(() => {
       setRaceState(engineRef.current?.getRaceState() ?? null);
     }, 100);
+    return () => clearInterval(t);
+  }, [liveMap, engineReady]);
+
+  // ----- PK HUD 폴링 (아레나에서만) -----
+  useEffect(() => {
+    if (!liveMap.pk) {
+      setPkState(null);
+      return;
+    }
+    const t = setInterval(() => {
+      const e = engineRef.current;
+      if (!e) return;
+      setPkState({ hp: e.getSelfHp(), dead: e.isDead(), weapon: e.getWeapon(), kills: e.getSelf().kills ?? 0 });
+    }, 120);
     return () => clearInterval(t);
   }, [liveMap, engineReady]);
 
@@ -1518,6 +1562,34 @@ export default function GameClient({
 
       {/* ---------- 레이스 HUD (그랑프리) ---------- */}
       {identity && <RaceHud state={raceState} leaderboard={leaderboard} selfId={identity.id} />}
+
+      {/* ---------- PK HUD (배틀 아레나) ---------- */}
+      {liveMap.pk && identity && pkState && (
+        <PkHud
+          hp={pkState.hp}
+          dead={pkState.dead}
+          weapon={pkState.weapon}
+          selfKills={pkState.kills}
+          inventory={wallet.inventory}
+          hearts={wallet.hearts}
+          coins={wallet.coins}
+          players={players}
+          selfId={identity.id}
+          onSetWeapon={(k) => {
+            engineRef.current?.setWeapon(k);
+            setPkState((p) => (p ? { ...p, weapon: k } : p));
+          }}
+          onBuyWeapon={(k) => {
+            buyWeapon(k).then((res) => {
+              if ("error" in res) addToast("❌ " + res.error);
+              else {
+                setWallet((w) => ({ ...w, hearts: res.hearts, coins: res.coins, inventory: res.inventory }));
+                addToast("🔫 무기를 구매했어요!");
+              }
+            });
+          }}
+        />
+      )}
 
       {/* ---------- 하단 툴바 ---------- */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center p-3">

@@ -31,6 +31,7 @@ import {
   WALK_SPEED,
 } from "./constants";
 import { findPath, type PathNode } from "./pathfinding";
+import { WEAPON_MAP, MAX_HP, RESPAWN_MS } from "./weapons";
 import type {
   CharacterAppearance,
   Direction,
@@ -79,9 +80,52 @@ export interface EngineCallbacks {
   onItem?: (kind: RaceItemKind) => void; // 레이스 아이템 획득/기름 밟음
   onTouch?: (id: string | null) => void; // 근접(닿음)한 상대 — 하트/소개 팝업
   onGhost?: (active: boolean) => void; // 고스트 모드 토글
+  onShot?: (p: ShotPayload) => void; // PK 발사(브로드캐스트용)
+  onKillBroadcast?: (p: KillPayload) => void; // 내가 죽었을 때 킬 정보 브로드캐스트
+  onDeath?: (killerName: string) => void; // 내가 죽음
+  onKill?: (victimName: string) => void; // 내가 상대를 처치
+  onRespawn?: () => void;
 }
 
 export type RaceItemKind = "turbo" | "boost" | "slow" | "oil";
+
+// PK 투사체
+interface Projectile {
+  id: string;
+  from: string;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  weapon: string;
+  traveled: number;
+  maxDist: number;
+  mine: boolean;
+}
+interface Effect {
+  kind: "explosion" | "smoke";
+  x: number;
+  y: number;
+  r: number;
+  until: number;
+  born: number;
+}
+
+// PK 발사 브로드캐스트 payload
+export interface ShotPayload {
+  id: string;
+  from: string;
+  x: number;
+  y: number;
+  angle: number;
+  weapon: string;
+}
+export interface KillPayload {
+  killer: string;
+  killerName: string;
+  victim: string;
+  victimName: string;
+}
 
 export class GameEngine {
   private canvas: HTMLCanvasElement;
@@ -116,6 +160,13 @@ export class GameEngine {
 
   private bikeCooldown = 0;
   private ghostUntil = 0; // 고스트 모드 만료 시각(performance.now 기준)
+  // PK 전투
+  private projectiles: Projectile[] = [];
+  private effects: Effect[] = [];
+  private lastFire = 0;
+  private aimAngle = 0;
+  private lastHitFrom: string | null = null;
+  private respawnAt = 0;
   // 레이스 아이템 (아이템 박스/기름 웅덩이)
   private raceItems: MapObject[] = [];
   private itemCooldowns = new Map<string, number>(); // object id -> 다시 활성화되는 시각
@@ -178,6 +229,10 @@ export class GameEngine {
       bio: opts?.bio,
       cosmetics: opts?.cosmetics,
       mounted: false,
+      hp: MAX_HP,
+      dead: false,
+      weapon: "pistol",
+      kills: 0,
     };
     this.raceItems = map.objects.filter((o) => o.type === "itembox" || o.type === "oil");
   }
@@ -191,6 +246,7 @@ export class GameEngine {
     window.addEventListener("blur", this.clearKeys);
     this.canvas.addEventListener("dblclick", this.onDblClick);
     this.canvas.addEventListener("click", this.onClick);
+    this.canvas.addEventListener("mousemove", this.onMouseMove);
     this.renderGround();
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.loop);
@@ -204,6 +260,7 @@ export class GameEngine {
     window.removeEventListener("blur", this.clearKeys);
     this.canvas.removeEventListener("dblclick", this.onDblClick);
     this.canvas.removeEventListener("click", this.onClick);
+    this.canvas.removeEventListener("mousemove", this.onMouseMove);
   }
 
   setMap(map: MapData, keepPosition = true) {
@@ -387,6 +444,10 @@ export class GameEngine {
         existing.ghost = p.ghost;
         existing.cosmetics = p.cosmetics;
         existing.mounted = p.mounted;
+        existing.hp = p.hp;
+        existing.dead = p.dead;
+        existing.weapon = p.weapon;
+        existing.kills = p.kills;
         // presence 위치는 최대 3초 묵은 값이므로, 이동 중(최근 move 수신)인
         // 플레이어에게 덮어쓰면 뒤로 순간이동(고무줄)한다.
         // move 가 한동안 없을 때만 presence 위치로 수렴.
@@ -456,7 +517,10 @@ export class GameEngine {
     if (k === "f") this.tryToggleBike();
     if (k === "z") this.toggleDance();
     if (k === "g") this.toggleGhost();
-    if (k === " " && this.self.onBike) this.tryTurbo();
+    if (k === " ") {
+      if (this.isPk() && !this.self.dead) this.fire(this.aimAngle);
+      else if (this.self.onBike) this.tryTurbo();
+    }
   };
 
   private turboReady = 0; // 스페이스 터보 재사용 가능 시각
@@ -497,8 +561,18 @@ export class GameEngine {
     this.walkToTile(t.x, t.y);
   };
 
+  private onMouseMove = (e: MouseEvent) => {
+    if (this.isPk()) this.setAimFromScreen(e.clientX, e.clientY);
+  };
+
   private onClick = (e: MouseEvent) => {
     if (this.editorMode) return;
+    // PK 존: 클릭한 방향으로 발사
+    if (this.isPk() && !this.inputLocked) {
+      this.setAimFromScreen(e.clientX, e.clientY);
+      this.fire(this.aimAngle);
+      return;
+    }
     // 플레이어 클릭 감지
     const rect = this.canvas.getBoundingClientRect();
     const wx = (e.clientX - rect.left) / this.zoom + this.cam.x;
@@ -627,6 +701,183 @@ export class GameEngine {
     this.wasInStartRect = inStart;
   }
 
+  // ---------- PK 전투 (아레나) ----------
+
+  isPk() {
+    return this.map.pk === true;
+  }
+  getSelfHp() {
+    return this.self.hp ?? MAX_HP;
+  }
+  isDead() {
+    return !!this.self.dead;
+  }
+  getWeapon() {
+    return this.self.weapon ?? "pistol";
+  }
+  setWeapon(key: string) {
+    if (WEAPON_MAP[key]) {
+      this.self.weapon = key;
+      this.pushState();
+    }
+  }
+
+  // 조준 각도 갱신 (마우스 월드 좌표 기준)
+  setAimFromScreen(sx: number, sy: number) {
+    const rect = this.canvas.getBoundingClientRect();
+    const wx = (sx - rect.left) / this.zoom + this.cam.x;
+    const wy = (sy - rect.top) / this.zoom + this.cam.y;
+    this.aimAngle = Math.atan2(wy - this.self.y, wx - this.self.x);
+  }
+
+  // 발사 (angle 라디안). 무기의 pellet/spread 만큼 투사체 생성 + 브로드캐스트.
+  fire(angle: number) {
+    if (!this.isPk() || this.self.dead) return;
+    const w = WEAPON_MAP[this.self.weapon ?? "pistol"];
+    if (!w) return;
+    const now = performance.now();
+    if (now < this.lastFire + w.cooldownMs) return;
+    this.lastFire = now;
+    for (let i = 0; i < w.pellets; i++) {
+      const spread = w.spreadDeg ? ((Math.random() - 0.5) * w.spreadDeg * Math.PI) / 180 : 0;
+      const a = angle + spread;
+      const id = `sh${now.toFixed(0)}_${i}_${Math.random().toString(36).slice(2, 5)}`;
+      const payload: ShotPayload = { id, from: this.self.id, x: this.self.x, y: this.self.y, angle: a, weapon: w.key };
+      this.spawnProjectile(payload, true);
+      this.cb.onShot?.(payload);
+    }
+  }
+
+  receiveShot(p: ShotPayload) {
+    if (!this.isPk()) return;
+    if (p.from === this.self.id) return; // 내 발사는 로컬에서 이미 생성
+    this.spawnProjectile(p, false);
+  }
+
+  private spawnProjectile(p: ShotPayload, mine: boolean) {
+    const w = WEAPON_MAP[p.weapon];
+    if (!w) return;
+    const speed = w.kind === "melee" ? 900 : w.speed;
+    this.projectiles.push({
+      id: p.id,
+      from: p.from,
+      x: p.x,
+      y: p.y,
+      vx: Math.cos(p.angle) * speed,
+      vy: Math.sin(p.angle) * speed,
+      weapon: p.weapon,
+      traveled: 0,
+      maxDist: w.rangePx,
+      mine,
+    });
+  }
+
+  private explode(x: number, y: number, w: (typeof WEAPON_MAP)[string], from: string) {
+    const now = performance.now();
+    if (w.kind === "smoke") {
+      this.effects.push({ kind: "smoke", x, y, r: w.radiusPx ?? 90, until: now + 6000, born: now });
+      return;
+    }
+    this.effects.push({ kind: "explosion", x, y, r: w.radiusPx ?? 40, until: now + 350, born: now });
+    // 광역 데미지 (자신에게만 판정)
+    if (from !== this.self.id && !this.self.dead) {
+      const d = Math.hypot(x - this.self.x, y - this.self.y);
+      if (d <= (w.radiusPx ?? 40)) {
+        const falloff = 1 - d / (w.radiusPx ?? 40);
+        this.applyDamage(Math.round(w.damage * (0.5 + falloff * 0.5)), from);
+      }
+    }
+  }
+
+  private applyDamage(dmg: number, from: string) {
+    if (dmg <= 0 || this.self.dead) return;
+    this.self.hp = Math.max(0, (this.self.hp ?? MAX_HP) - dmg);
+    this.lastHitFrom = from;
+    if (this.self.hp <= 0) this.die();
+    else this.pushState();
+  }
+
+  private die() {
+    if (this.self.dead) return;
+    this.self.dead = true;
+    this.self.hp = 0;
+    this.self.moving = false;
+    this.path = [];
+    this.respawnAt = performance.now() + RESPAWN_MS;
+    const killer = this.lastHitFrom;
+    const kName = killer ? this.others.get(killer)?.name ?? "" : "";
+    this.cb.onDeath?.(kName);
+    if (killer) {
+      this.cb.onKillBroadcast?.({
+        killer,
+        killerName: kName,
+        victim: this.self.id,
+        victimName: this.self.name,
+      });
+    }
+    this.pushState();
+  }
+
+  // 다른 곳에서 온 kill 이벤트 — 내가 킬러면 킬 수 증가
+  receiveKill(p: KillPayload) {
+    if (p.killer !== this.self.id) return;
+    this.self.kills = (this.self.kills ?? 0) + 1;
+    this.cb.onKill?.(p.victimName);
+    this.pushState();
+  }
+
+  private respawn() {
+    const sp = this.map.spawns[Math.floor(Math.random() * Math.max(1, this.map.spawns.length))] ?? { x: 2, y: 2 };
+    this.self.x = sp.x * TILE + TILE / 2;
+    this.self.y = sp.y * TILE + TILE / 2;
+    this.self.hp = MAX_HP;
+    this.self.dead = false;
+    this.lastHitFrom = null;
+    this.cb.onRespawn?.();
+    this.pushState();
+  }
+
+  private updatePk(dt: number, now: number) {
+    // 부활
+    if (this.self.dead && now >= this.respawnAt) this.respawn();
+
+    // 투사체 이동/충돌
+    const remain: Projectile[] = [];
+    for (const pr of this.projectiles) {
+      const w = WEAPON_MAP[pr.weapon];
+      if (!w) continue;
+      const step = Math.hypot(pr.vx, pr.vy) * dt;
+      pr.x += pr.vx * dt;
+      pr.y += pr.vy * dt;
+      pr.traveled += step;
+      let consumed = false;
+      // 벽/엄폐물 충돌
+      if (isSolidPx(this.solid, pr.x, pr.y)) {
+        if (w.radiusPx) this.explode(pr.x, pr.y, w, pr.from);
+        consumed = true;
+      }
+      // 사거리 초과
+      if (!consumed && pr.traveled >= pr.maxDist) {
+        if (w.radiusPx) this.explode(pr.x, pr.y, w, pr.from);
+        consumed = true;
+      }
+      // 자신 피격 판정 (내가 쏜 것 제외)
+      if (!consumed && pr.from !== this.self.id && !this.self.dead && !this.self.ghost) {
+        const d = Math.hypot(pr.x - this.self.x, pr.y - this.self.y);
+        if (d < PLAYER_RADIUS + 4) {
+          if (w.radiusPx) this.explode(pr.x, pr.y, w, pr.from);
+          else this.applyDamage(w.damage, pr.from);
+          consumed = true;
+        }
+      }
+      if (!consumed) remain.push(pr);
+    }
+    this.projectiles = remain;
+
+    // 이펙트 만료
+    this.effects = this.effects.filter((e) => e.until > now);
+  }
+
   // ---------- 루프 ----------
 
   private loop = (now: number) => {
@@ -661,6 +912,12 @@ export class GameEngine {
       if (k.has("arrowdown") || k.has("s")) dy += 1;
       if (k.has("arrowleft") || k.has("a")) dx -= 1;
       if (k.has("arrowright") || k.has("d")) dx += 1;
+    }
+
+    // PK: 사망 중에는 이동 불가
+    if (this.self.dead) {
+      dx = 0;
+      dy = 0;
     }
 
     // 키 입력이 있으면 자동 이동 취소 + 앉아 있으면 일어남
@@ -764,6 +1021,9 @@ export class GameEngine {
     // 레이스 진행 체크
     this.updateRace(now);
 
+    // PK 전투 (아레나 전용)
+    if (this.isPk()) this.updatePk(dt, now);
+
     // ----- 영역/타일 상태 감지 -----
     const area = areaAtPx(this.map, this.self.x, this.self.y);
     if ((area?.id ?? null) !== (this.currentArea?.id ?? null)) {
@@ -816,7 +1076,7 @@ export class GameEngine {
     // Supabase Realtime rate limit 에 걸려 이모트/채팅까지 드랍된다).
     if (now - this.lastSent > NET_TICK) {
       const s = this.self;
-      const sig = `${Math.round(s.x)},${Math.round(s.y)},${s.dir},${s.moving},${s.onBike},${s.dancing},${s.sitting},${s.lying},${s.hand},${s.status},${s.areaId},${s.spotlight}`;
+      const sig = `${Math.round(s.x)},${Math.round(s.y)},${s.dir},${s.moving},${s.onBike},${s.dancing},${s.sitting},${s.lying},${s.hand},${s.status},${s.areaId},${s.spotlight},${s.hp},${s.dead}`;
       if (sig !== this.lastSentSig) {
         this.lastSentSig = sig;
         this.lastSent = now;
@@ -1087,6 +1347,9 @@ export class GameEngine {
       }
     }
 
+    // PK 전투 렌더 (투사체/이펙트/체력바)
+    if (this.isPk()) this.renderPk(ctx, now);
+
     // 프라이빗 영역: 내부에 있으면 외부 어둡게 + 경계 표시
     if (this.currentArea) {
       const a = this.currentArea;
@@ -1115,6 +1378,72 @@ export class GameEngine {
 
     // 미니맵
     if (this.showMinimap && this.ground) this.renderMinimap(ctx, W);
+  }
+
+  private renderPk(ctx: CanvasRenderingContext2D, now: number) {
+    // 투사체
+    for (const pr of this.projectiles) {
+      const w = WEAPON_MAP[pr.weapon];
+      if (!w) continue;
+      if (w.kind === "throw" || w.kind === "smoke" || w.kind === "cannon" || w.kind === "tank") {
+        ctx.font = "14px serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(w.icon, pr.x, pr.y);
+        ctx.textBaseline = "alphabetic";
+      } else {
+        // 총알 — 진행 방향 짧은 선
+        const len = w.kind === "sniper" ? 14 : 8;
+        const m = Math.hypot(pr.vx, pr.vy) || 1;
+        ctx.strokeStyle = w.color;
+        ctx.lineWidth = w.kind === "sniper" ? 3 : 2;
+        ctx.beginPath();
+        ctx.moveTo(pr.x, pr.y);
+        ctx.lineTo(pr.x - (pr.vx / m) * len, pr.y - (pr.vy / m) * len);
+        ctx.stroke();
+      }
+    }
+    // 이펙트
+    for (const e of this.effects) {
+      if (e.kind === "explosion") {
+        const t = (now - e.born) / (e.until - e.born);
+        ctx.globalAlpha = Math.max(0, 1 - t);
+        ctx.fillStyle = "rgba(251,146,60,0.6)";
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.r * (0.4 + t * 0.6), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.8)";
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.r * 0.3 * (1 - t), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      } else {
+        // 연막
+        ctx.fillStyle = "rgba(120,130,140,0.55)";
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // 체력바 + 사망 표시 (자신 포함 모든 플레이어)
+    const all: PlayerState[] = [this.self, ...this.others.values()];
+    for (const p of all) {
+      const hp = p.hp ?? MAX_HP;
+      const barY = p.y - 42;
+      if (p.dead) {
+        ctx.font = "16px serif";
+        ctx.textAlign = "center";
+        ctx.fillText("💀", p.x, barY);
+        continue;
+      }
+      if (hp >= MAX_HP && p.id !== this.self.id) continue; // 만피는 생략(자기 자신은 항상 표시)
+      const bw = 26;
+      const ratio = Math.max(0, hp / MAX_HP);
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.fillRect(p.x - bw / 2 - 1, barY - 1, bw + 2, 5);
+      ctx.fillStyle = ratio > 0.5 ? "#34d399" : ratio > 0.25 ? "#fbbf24" : "#ef4444";
+      ctx.fillRect(p.x - bw / 2, barY, bw * ratio, 3);
+    }
   }
 
   private renderEditorOverlay(ctx: CanvasRenderingContext2D) {
