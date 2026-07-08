@@ -77,6 +77,7 @@ export default function CustomizeForm({
       face: "smile",
       special: "none",
       headImg: "none",
+      nameAbove: false,
     };
     if (profile) {
       return {
@@ -95,6 +96,7 @@ export default function CustomizeForm({
         face: profile.face as FaceType,
         special: normalizeSpecial(profile.special),
         headImg: profile.head_img ?? "none",
+        nameAbove: !!profile.name_above,
       };
     }
     if (typeof window !== "undefined") {
@@ -135,6 +137,7 @@ export default function CustomizeForm({
           face: app.face,
           special: app.special,
           head_img: app.headImg ?? "none",
+          name_above: app.nameAbove ?? false,
         });
         if ("error" in res) {
           // 실패를 조용히 삼키면 "입장 버튼이 안 눌리는" 것처럼 보인다 — 반드시 표시.
@@ -170,6 +173,7 @@ export default function CustomizeForm({
       face: pick(FACES).key as FaceType,
       special: "none",
       headImg: "none",
+      nameAbove: app.nameAbove ?? false,
     });
   }
 
@@ -203,6 +207,15 @@ export default function CustomizeForm({
             onChange={(e) => setName(e.target.value)}
             placeholder="표시될 이름"
           />
+          <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              checked={!!app.nameAbove}
+              onChange={(e) => patch({ nameAbove: e.target.checked })}
+              className="h-4 w-4 accent-accent"
+            />
+            닉네임을 머리카락 위로 올리기 (긴 머리 스타일이 가려지지 않아요)
+          </label>
         </div>
 
         {/* 카테고리 탭 */}

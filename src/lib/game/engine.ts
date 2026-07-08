@@ -35,6 +35,7 @@ import type {
   CharacterAppearance,
   Direction,
   EmoteMessage,
+  PlayerCosmetics,
   PlayerState,
   UserStatus,
 } from "./types";
@@ -42,6 +43,9 @@ import type {
 interface ActiveEmote extends EmoteMessage {
   expires: number;
 }
+
+// 캐릭터 몸이 서로 "닿는" 것으로 간주하는 최대 거리(px).
+const TOUCH_PX = TILE * 1.15;
 
 // 레이스 이벤트 (그랑프리)
 export interface RaceEvent {
@@ -73,6 +77,8 @@ export interface EngineCallbacks {
   onAreaBlocked?: (area: PrivateArea, reason: "locked" | "full") => void;
   onRace?: (ev: RaceEvent) => void;
   onItem?: (kind: RaceItemKind) => void; // 레이스 아이템 획득/기름 밟음
+  onTouch?: (id: string | null) => void; // 근접(닿음)한 상대 — 하트/소개 팝업
+  onGhost?: (active: boolean) => void; // 고스트 모드 토글
 }
 
 export type RaceItemKind = "turbo" | "boost" | "slow" | "oil";
@@ -106,8 +112,10 @@ export class GameEngine {
   private lockedAreas = new Set<string>();
   private portalArmed = true; // 포털 재발동 방지
   private hintObj: MapObject | null = null;
+  private touchedId: string | null = null; // 근접(닿음)한 상대 — 하트 표시 대상
 
   private bikeCooldown = 0;
+  private ghostUntil = 0; // 고스트 모드 만료 시각(performance.now 기준)
   // 레이스 아이템 (아이템 박스/기름 웅덩이)
   private raceItems: MapObject[] = [];
   private itemCooldowns = new Map<string, number>(); // object id -> 다시 활성화되는 시각
@@ -136,7 +144,13 @@ export class GameEngine {
     name: string,
     appearance: CharacterAppearance,
     cb: EngineCallbacks,
-    opts?: { spawn?: { x: number; y: number }; guest?: boolean; status?: UserStatus }
+    opts?: {
+      spawn?: { x: number; y: number };
+      guest?: boolean;
+      status?: UserStatus;
+      bio?: string;
+      cosmetics?: PlayerCosmetics;
+    }
   ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
@@ -161,6 +175,9 @@ export class GameEngine {
       spotlight: false,
       hand: false,
       guest: opts?.guest ?? false,
+      bio: opts?.bio,
+      cosmetics: opts?.cosmetics,
+      mounted: false,
     };
     this.raceItems = map.objects.filter((o) => o.type === "itembox" || o.type === "oil");
   }
@@ -279,10 +296,12 @@ export class GameEngine {
       this.notifyBlocked(area, "locked");
       return false;
     }
+    const isBed = obj.type === "bed";
     this.seat = { objId: obj.id, prevX: this.self.x, prevY: this.self.y };
     this.self.x = cx;
     this.self.y = cy;
-    this.self.sitting = true;
+    this.self.sitting = !isBed;
+    this.self.lying = isBed;
     this.self.moving = false;
     this.self.dancing = false;
     this.self.dir = obj.dir === "up" ? "up" : "down";
@@ -300,6 +319,7 @@ export class GameEngine {
     this.self.y = this.seat.prevY;
     this.seat = null;
     this.self.sitting = false;
+    this.self.lying = false;
     this.pushState();
   }
 
@@ -363,6 +383,10 @@ export class GameEngine {
         existing.status = p.status;
         existing.statusMsg = p.statusMsg;
         existing.hand = p.hand;
+        existing.bio = p.bio;
+        existing.ghost = p.ghost;
+        existing.cosmetics = p.cosmetics;
+        existing.mounted = p.mounted;
         // presence 위치는 최대 3초 묵은 값이므로, 이동 중(최근 move 수신)인
         // 플레이어에게 덮어쓰면 뒤로 순간이동(고무줄)한다.
         // move 가 한동안 없을 때만 presence 위치로 수렴.
@@ -408,6 +432,10 @@ export class GameEngine {
     return this.hintObj;
   }
 
+  getTouchedId() {
+    return this.touchedId;
+  }
+
   screenToTile(sx: number, sy: number): { x: number; y: number } {
     const rect = this.canvas.getBoundingClientRect();
     const x = (sx - rect.left) / this.zoom + this.cam.x;
@@ -427,7 +455,34 @@ export class GameEngine {
     this.keys.add(k);
     if (k === "f") this.tryToggleBike();
     if (k === "z") this.toggleDance();
+    if (k === "g") this.toggleGhost();
+    if (k === " " && this.self.onBike) this.tryTurbo();
   };
+
+  private turboReady = 0; // 스페이스 터보 재사용 가능 시각
+  private tryTurbo() {
+    const now = performance.now();
+    if (now < this.turboReady) return;
+    this.turboReady = now + 8000; // 8초 쿨다운
+    this.effectMult = 1.7;
+    this.effectUntil = now + 1200;
+    this.cb.onItem?.("turbo");
+  }
+
+  private toggleGhost() {
+    // 탈것 탑승 중에는 고스트 불가
+    if (this.self.onBike) return;
+    if (this.self.ghost) {
+      this.self.ghost = false;
+      this.ghostUntil = 0;
+      this.cb.onGhost?.(false);
+    } else {
+      this.self.ghost = true;
+      this.ghostUntil = performance.now() + 10_000;
+      this.cb.onGhost?.(true);
+    }
+    this.pushState();
+  }
 
   private onKeyUp = (e: KeyboardEvent) => {
     this.keys.delete(e.key.toLowerCase());
@@ -464,6 +519,12 @@ export class GameEngine {
     } else if (bikeZoneAt(this.map, this.self.x, this.self.y)) {
       this.self.onBike = true;
       this.self.dancing = false;
+      // 탈것 탑승 시 고스트 해제 (탈것에는 적용 안 됨)
+      if (this.self.ghost) {
+        this.self.ghost = false;
+        this.ghostUntil = 0;
+        this.cb.onGhost?.(false);
+      }
       this.bikeCooldown = 350;
     }
   }
@@ -583,6 +644,14 @@ export class GameEngine {
 
   private update(dt: number, now: number) {
     if (this.bikeCooldown > 0) this.bikeCooldown -= dt * 1000;
+
+    // 고스트 모드 자동 해제 (10초)
+    if (this.self.ghost && now >= this.ghostUntil) {
+      this.self.ghost = false;
+      this.ghostUntil = 0;
+      this.cb.onGhost?.(false);
+      this.pushState();
+    }
 
     let dx = 0;
     let dy = 0;
@@ -726,11 +795,28 @@ export class GameEngine {
       this.cb.onInteractHint?.(hint);
     }
 
+    // 근접(닿음) 감지 — 가장 가까운 상대. 하트/소개 팝업 대상.
+    let touched: string | null = null;
+    let touchedDist = TOUCH_PX;
+    const iAmGhost = !!this.self.ghost;
+    this.others.forEach((p) => {
+      if (p.ghost || iAmGhost) return; // 고스트는 하트/소개 발생 안 함
+      const d = Math.hypot(p.x - this.self.x, p.y - this.self.y);
+      if (d < touchedDist) {
+        touchedDist = d;
+        touched = p.id;
+      }
+    });
+    if (touched !== this.touchedId) {
+      this.touchedId = touched;
+      this.cb.onTouch?.(touched);
+    }
+
     // 위치 전송 — 상태가 실제로 바뀌었을 때만 (가만히 있을 때 스팸 전송하면
     // Supabase Realtime rate limit 에 걸려 이모트/채팅까지 드랍된다).
     if (now - this.lastSent > NET_TICK) {
       const s = this.self;
-      const sig = `${Math.round(s.x)},${Math.round(s.y)},${s.dir},${s.moving},${s.onBike},${s.dancing},${s.sitting},${s.hand},${s.status},${s.areaId},${s.spotlight}`;
+      const sig = `${Math.round(s.x)},${Math.round(s.y)},${s.dir},${s.moving},${s.onBike},${s.dancing},${s.sitting},${s.lying},${s.hand},${s.status},${s.areaId},${s.spotlight}`;
       if (sig !== this.lastSentSig) {
         this.lastSentSig = sig;
         this.lastSent = now;
@@ -885,8 +971,8 @@ export class GameEngine {
     const allPlayers: PlayerState[] = [...this.others.values(), this.self];
     for (const p of allPlayers) {
       items.push({
-        // 앉은 캐릭터는 좌석 오브젝트보다 나중에(위에) 그려야 가려지지 않는다
-        y: p.sitting ? p.y + 12 : p.y,
+        // 앉거나 누운 캐릭터는 좌석/침대 오브젝트보다 나중에(위에) 그려야 가려지지 않는다
+        y: p.sitting || p.lying ? p.y + 12 : p.y,
         draw: () =>
           drawCharacter(
             ctx,
@@ -904,7 +990,11 @@ export class GameEngine {
               hand: p.hand,
               dancing: p.dancing,
               sitting: p.sitting,
+              lying: p.lying,
               vehicle: this.map.vehicle ?? "bike",
+              ghost: p.ghost,
+              cosmetics: p.cosmetics,
+              mounted: p.mounted,
             }
           ),
       });
@@ -981,6 +1071,20 @@ export class GameEngine {
       ctx.textBaseline = "middle";
       ctx.fillText("X", hx, hy + 0.5);
       ctx.textBaseline = "alphabetic";
+    }
+
+    // 하이파이브 하트 — 닿은 상대 머리 위 (나에게만 보임)
+    if (this.touchedId) {
+      const tp = this.others.get(this.touchedId);
+      if (tp) {
+        const hx = tp.x;
+        const hy = tp.y - 50 - (tp.onBike ? 8 : 0) - Math.abs(Math.sin(now / 260)) * 4;
+        ctx.font = "20px serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("💗", hx, hy);
+        ctx.textBaseline = "alphabetic";
+      }
     }
 
     // 프라이빗 영역: 내부에 있으면 외부 어둡게 + 경계 표시

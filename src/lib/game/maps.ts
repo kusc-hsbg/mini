@@ -68,9 +68,11 @@ export type InteractionKind =
 
 export interface ObjectProps {
   url?: string; // website/image/video/external/sound/spotify/game/커스텀 이미지
-  text?: string; // note 내용
+  text?: string; // note 내용 / 전시대 설명
   color?: string; // 색 변형(러그/소파 등)
   interaction?: InteractionKind; // 기본 상호작용 덮어쓰기
+  title?: string; // 전시대: 캐릭터 칭호/부제
+  head?: string; // 전시대: 그림책 캐릭터 헤어 키 (headImgUrl 용)
 }
 
 export interface MapObject {
@@ -234,7 +236,7 @@ export function portalAtPx(map: MapData, px: number, py: number): Portal | null 
 }
 
 // interaction 필드 없이도 타입 자체로 상호작용되는 오브젝트.
-export const TYPE_INTERACTIVE = new Set(["desk", "chair", "sofa", "bench", "coffee", "vending"]);
+export const TYPE_INTERACTIVE = new Set(["desk", "chair", "sofa", "bench", "coffee", "vending", "exhibit", "bed", "portalhub", "npc", "minigame", "atm"]);
 
 // 상호작용 가능한 가장 가까운 오브젝트 (중심 기준 거리, 픽셀).
 export function nearestInteractive(

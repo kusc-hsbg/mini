@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { filterProfanity } from "@/lib/game/moderation";
+import { SHOP_MAP, HEARTS_PER_COIN } from "@/lib/game/shop";
 import type { SpaceRole, UserStatus } from "@/lib/game/types";
 
 type Result<T = object> = ({ ok: true } & T) | { error: string };
@@ -35,6 +37,7 @@ export async function saveProfile(form: {
   face: string;
   special: string;
   head_img: string;
+  name_above?: boolean;
 }): Promise<Result> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
@@ -55,10 +58,22 @@ export async function saveProfile(form: {
     face: form.face,
     special: form.special,
     head_img: form.head_img,
+    name_above: form.name_above ?? false,
     updated_at: new Date().toISOString(),
   });
   if (err) return { error: err.message };
   revalidatePath("/spaces");
+  return { ok: true };
+}
+
+export async function saveBio(bio: string): Promise<Result> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const { error: err } = await supabase
+    .from("profiles")
+    .update({ bio: filterProfanity(bio.slice(0, 200)) || null })
+    .eq("id", user.id);
+  if (err) return { error: err.message };
   return { ok: true };
 }
 
@@ -71,6 +86,250 @@ export async function setStatus(status: UserStatus, message: string): Promise<Re
     .eq("id", user.id);
   if (err) return { error: err.message };
   return { ok: true };
+}
+
+// ============ 경제 / 인벤토리 (하트·코인·상점) ============
+
+interface Wallet {
+  hearts: number;
+  coins: number;
+  inventory: string[];
+  equipped: Record<string, string>;
+}
+
+async function loadWallet(supabase: NonNullable<ReturnType<typeof getSupabaseServer>>, userId: string): Promise<Wallet | null> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("hearts, coins, inventory, equipped")
+    .eq("id", userId)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    hearts: Number(data.hearts ?? 0),
+    coins: Number(data.coins ?? 0),
+    inventory: Array.isArray(data.inventory) ? (data.inventory as string[]) : [],
+    equipped: (data.equipped as Record<string, string>) ?? {},
+  };
+}
+
+export async function buyItem(
+  itemKey: string
+): Promise<Result<{ hearts: number; coins: number; inventory: string[] }>> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const item = SHOP_MAP[itemKey];
+  if (!item) return { error: "존재하지 않는 아이템입니다." };
+  const w = await loadWallet(supabase, user.id);
+  if (!w) return { error: "프로필을 찾을 수 없습니다." };
+  if (w.inventory.includes(itemKey)) return { error: "이미 보유한 아이템입니다." };
+  const bal = item.currency === "heart" ? w.hearts : w.coins;
+  if (bal < item.price) {
+    return { error: item.currency === "heart" ? "하트가 부족합니다." : "코인이 부족합니다." };
+  }
+  const inventory = [...w.inventory, itemKey];
+  const patch: Record<string, unknown> = { inventory };
+  if (item.currency === "heart") patch.hearts = w.hearts - item.price;
+  else patch.coins = w.coins - item.price;
+  const { error: err } = await supabase.from("profiles").update(patch).eq("id", user.id);
+  if (err) return { error: err.message };
+  return {
+    ok: true,
+    hearts: (patch.hearts as number) ?? w.hearts,
+    coins: (patch.coins as number) ?? w.coins,
+    inventory,
+  };
+}
+
+export async function equipItem(slot: string, itemKey: string | null): Promise<Result<{ equipped: Record<string, string> }>> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const w = await loadWallet(supabase, user.id);
+  if (!w) return { error: "프로필을 찾을 수 없습니다." };
+  const equipped = { ...w.equipped };
+  if (itemKey === null) {
+    delete equipped[slot];
+  } else {
+    if (!w.inventory.includes(itemKey)) return { error: "보유하지 않은 아이템입니다." };
+    equipped[slot] = itemKey;
+  }
+  const { error: err } = await supabase.from("profiles").update({ equipped }).eq("id", user.id);
+  if (err) return { error: err.message };
+  return { ok: true, equipped };
+}
+
+// 소모품 사용(휴대용 피아노 등) — 인벤토리에서 제거.
+export async function consumeItem(itemKey: string): Promise<Result<{ inventory: string[] }>> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const w = await loadWallet(supabase, user.id);
+  if (!w) return { error: "프로필을 찾을 수 없습니다." };
+  if (!w.inventory.includes(itemKey)) return { error: "보유하지 않은 아이템입니다." };
+  const inventory = w.inventory.filter((k) => k !== itemKey);
+  const { error: err } = await supabase.from("profiles").update({ inventory }).eq("id", user.id);
+  if (err) return { error: err.message };
+  return { ok: true, inventory };
+}
+
+// 하트 → 코인 환전
+export async function exchangeToCoins(
+  coinAmount: number
+): Promise<Result<{ hearts: number; coins: number }>> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const n = Math.floor(coinAmount);
+  if (n < 1) return { error: "1코인 이상 환전하세요." };
+  const w = await loadWallet(supabase, user.id);
+  if (!w) return { error: "프로필을 찾을 수 없습니다." };
+  const cost = n * HEARTS_PER_COIN;
+  if (w.hearts < cost) return { error: `하트가 부족합니다. (${cost} 하트 필요)` };
+  const hearts = w.hearts - cost;
+  const coins = w.coins + n;
+  const { error: err } = await supabase.from("profiles").update({ hearts, coins }).eq("id", user.id);
+  if (err) return { error: err.message };
+  return { ok: true, hearts, coins };
+}
+
+// 출석 보상 — 하루 1회 하트 지급, 7일 연속마다 코인 지급.
+export async function claimAttendance(): Promise<
+  Result<{ already?: boolean; hearts: number; coins: number; streak: number; rewardHearts: number; rewardCoins: number }>
+> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const { data } = await supabase
+    .from("profiles")
+    .select("hearts, coins, last_attendance, attendance_streak")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  const hearts0 = Number(data.hearts ?? 0);
+  const coins0 = Number(data.coins ?? 0);
+  const today = new Date().toISOString().slice(0, 10);
+  const last = (data.last_attendance as string | null)?.slice(0, 10) ?? null;
+  if (last === today) {
+    return { ok: true, already: true, hearts: hearts0, coins: coins0, streak: Number(data.attendance_streak ?? 0), rewardHearts: 0, rewardCoins: 0 };
+  }
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const streak = last === yesterday ? Number(data.attendance_streak ?? 0) + 1 : 1;
+  const rewardHearts = 50 + Math.min(streak, 7) * 10;
+  const rewardCoins = streak % 7 === 0 ? 1 : 0;
+  const hearts = hearts0 + rewardHearts;
+  const coins = coins0 + rewardCoins;
+  const { error: err } = await supabase
+    .from("profiles")
+    .update({ hearts, coins, last_attendance: today, attendance_streak: streak })
+    .eq("id", user.id);
+  if (err) return { error: err.message };
+  return { ok: true, hearts, coins, streak, rewardHearts, rewardCoins };
+}
+
+// 미니게임 보상 하트 지급 (호출당 최대 30하트로 제한 — 남용 방지)
+export async function grantHearts(amount: number): Promise<Result<{ hearts: number }>> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const add = Math.max(0, Math.min(30, Math.floor(amount)));
+  const { data } = await supabase.from("profiles").select("hearts").eq("id", user.id).maybeSingle();
+  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  const hearts = Number(data.hearts ?? 0) + add;
+  const { error: err } = await supabase.from("profiles").update({ hearts }).eq("id", user.id);
+  if (err) return { error: err.message };
+  return { ok: true, hearts };
+}
+
+// ---- ATM (예치/이자/출금) + 송금 ----
+
+// 복리 이자 계산: 하루 1% 복리. 경과 일수만큼 bank 에 적용.
+function accrueInterest(bank: number, bankAtIso: string | null): number {
+  if (bank <= 0 || !bankAtIso) return bank;
+  const elapsedMs = Date.now() - new Date(bankAtIso).getTime();
+  if (elapsedMs <= 0) return bank;
+  const days = Math.min(365, elapsedMs / 86400000); // 과도한 지수 방지 상한
+  return Math.floor(bank * Math.pow(1.01, days));
+}
+
+export async function refreshBank(): Promise<Result<{ hearts: number; bank: number; gained: number }>> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const { data } = await supabase.from("profiles").select("hearts, bank, bank_at").eq("id", user.id).maybeSingle();
+  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  const bank0 = Number(data.bank ?? 0);
+  const bank = accrueInterest(bank0, data.bank_at as string | null);
+  const gained = bank - bank0;
+  if (gained > 0) {
+    await supabase.from("profiles").update({ bank, bank_at: new Date().toISOString() }).eq("id", user.id);
+  }
+  return { ok: true, hearts: Number(data.hearts ?? 0), bank, gained };
+}
+
+export async function depositBank(amount: number): Promise<Result<{ hearts: number; bank: number }>> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const n = Math.floor(amount);
+  if (n < 1) return { error: "1하트 이상 예치하세요." };
+  const { data } = await supabase.from("profiles").select("hearts, bank, bank_at").eq("id", user.id).maybeSingle();
+  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  const hearts0 = Number(data.hearts ?? 0);
+  if (hearts0 < n) return { error: "하트가 부족합니다." };
+  const bank = accrueInterest(Number(data.bank ?? 0), data.bank_at as string | null) + n;
+  const hearts = hearts0 - n;
+  const { error: err } = await supabase
+    .from("profiles")
+    .update({ hearts, bank, bank_at: new Date().toISOString() })
+    .eq("id", user.id);
+  if (err) return { error: err.message };
+  return { ok: true, hearts, bank };
+}
+
+export async function withdrawBank(amount: number): Promise<Result<{ hearts: number; bank: number }>> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const n = Math.floor(amount);
+  if (n < 1) return { error: "1하트 이상 출금하세요." };
+  const { data } = await supabase.from("profiles").select("hearts, bank, bank_at").eq("id", user.id).maybeSingle();
+  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  const bank0 = accrueInterest(Number(data.bank ?? 0), data.bank_at as string | null);
+  if (bank0 < n) return { error: "예치금이 부족합니다." };
+  const bank = bank0 - n;
+  const hearts = Number(data.hearts ?? 0) + n;
+  const { error: err } = await supabase
+    .from("profiles")
+    .update({ hearts, bank, bank_at: new Date().toISOString() })
+    .eq("id", user.id);
+  if (err) return { error: err.message };
+  return { ok: true, hearts, bank };
+}
+
+export async function transferHearts(toId: string, amount: number): Promise<Result<{ hearts: number }>> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const n = Math.floor(amount);
+  if (n < 1) return { error: "1하트 이상 송금하세요." };
+  if (toId === user.id) return { error: "자신에게는 송금할 수 없어요." };
+  const { error: err } = await supabase.rpc("transfer_hearts", { p_to: toId, p_amount: n });
+  if (err) return { error: err.message.includes("insufficient") ? "하트가 부족합니다." : err.message };
+  const { data } = await supabase.from("profiles").select("hearts").eq("id", user.id).maybeSingle();
+  return { ok: true, hearts: Number(data?.hearts ?? 0) };
+}
+
+// 온보딩 퀘스트 완료 보상 (계정당 1회) — 100하트 + 'tutorial' 칭호
+export async function claimQuest(): Promise<Result<{ hearts: number; already?: boolean }>> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const { data } = await supabase
+    .from("profiles")
+    .select("hearts, titles")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  const titles = Array.isArray(data.titles) ? (data.titles as string[]) : [];
+  const hearts0 = Number(data.hearts ?? 0);
+  if (titles.includes("tutorial")) return { ok: true, hearts: hearts0, already: true };
+  const hearts = hearts0 + 100;
+  const { error: err } = await supabase
+    .from("profiles")
+    .update({ hearts, titles: [...titles, "tutorial"] })
+    .eq("id", user.id);
+  if (err) return { error: err.message };
+  return { ok: true, hearts };
 }
 
 // ============ 스페이스 ============
@@ -358,7 +617,7 @@ export async function leaveDeskNote(form: {
     desk_object_id: form.deskObjectId,
     to_user: form.toUser,
     from_name: form.fromName.slice(0, 24),
-    message: form.message.slice(0, 300),
+    message: filterProfanity(form.message.slice(0, 300)),
     gift: form.gift,
   });
   if (err) return { error: err.message };
@@ -431,7 +690,7 @@ export async function addBulletinPost(form: {
     object_id: form.objectId,
     author_id: user.id,
     author_name: form.authorName.slice(0, 24),
-    content: form.content.slice(0, 500),
+    content: filterProfanity(form.content.slice(0, 500)),
     url: form.url,
   });
   if (err) return { error: err.message };
@@ -482,7 +741,7 @@ export async function sendDm(form: {
     from_id: user.id,
     from_name: form.fromName.slice(0, 24),
     to_id: form.toId,
-    body: form.body.slice(0, 500),
+    body: filterProfanity(form.body.slice(0, 500)),
   });
   if (err) return { error: err.message };
   return { ok: true };
@@ -508,6 +767,99 @@ export async function unblockTarget(targetKey: string): Promise<Result> {
     .delete()
     .eq("user_id", user.id)
     .eq("blocked_key", targetKey);
+  if (err) return { error: err.message };
+  return { ok: true };
+}
+
+// ============ 친구 시스템 ============
+
+export interface FriendEntry {
+  id: string; // 상대 user id
+  name: string;
+  status: "accepted" | "incoming" | "outgoing";
+  rowId: string;
+}
+
+export async function getFriends(): Promise<{ friends: FriendEntry[] } | { error: string }> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const { data, error: err } = await supabase
+    .from("friendships")
+    .select("id, requester, addressee, status")
+    .or(`requester.eq.${user.id},addressee.eq.${user.id}`);
+  if (err) return { error: err.message };
+  const rows = (data ?? []) as { id: string; requester: string; addressee: string; status: string }[];
+  const otherIds = Array.from(
+    new Set(rows.map((r) => (r.requester === user.id ? r.addressee : r.requester)))
+  );
+  const names = new Map<string, string>();
+  if (otherIds.length) {
+    const { data: profs } = await supabase
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", otherIds);
+    for (const p of (profs ?? []) as { id: string; display_name: string }[]) {
+      names.set(p.id, p.display_name);
+    }
+  }
+  const friends: FriendEntry[] = rows
+    .filter((r) => r.status !== "blocked")
+    .map((r) => {
+      const other = r.requester === user.id ? r.addressee : r.requester;
+      let status: FriendEntry["status"];
+      if (r.status === "accepted") status = "accepted";
+      else status = r.requester === user.id ? "outgoing" : "incoming";
+      return { id: other, name: names.get(other) ?? "이름없음", status, rowId: r.id };
+    });
+  return { friends };
+}
+
+export async function sendFriendRequest(targetId: string): Promise<Result> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  if (targetId === user.id) return { error: "자기 자신에게는 요청할 수 없어요." };
+  if (targetId.startsWith("guest_")) return { error: "게스트에게는 친구 요청을 보낼 수 없어요." };
+  // 이미 상대가 나에게 보낸 요청이 있으면 수락 처리
+  const { data: reverse } = await supabase
+    .from("friendships")
+    .select("id, status")
+    .eq("requester", targetId)
+    .eq("addressee", user.id)
+    .maybeSingle();
+  if (reverse) {
+    if (reverse.status === "pending") {
+      await supabase.from("friendships").update({ status: "accepted" }).eq("id", reverse.id);
+    }
+    return { ok: true };
+  }
+  const { error: err } = await supabase
+    .from("friendships")
+    .insert({ requester: user.id, addressee: targetId, status: "pending" });
+  if (err && !err.message.includes("duplicate")) return { error: err.message };
+  return { ok: true };
+}
+
+export async function respondFriendRequest(rowId: string, accept: boolean): Promise<Result> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  if (accept) {
+    const { error: err } = await supabase
+      .from("friendships")
+      .update({ status: "accepted" })
+      .eq("id", rowId)
+      .eq("addressee", user.id);
+    if (err) return { error: err.message };
+  } else {
+    const { error: err } = await supabase.from("friendships").delete().eq("id", rowId);
+    if (err) return { error: err.message };
+  }
+  return { ok: true };
+}
+
+export async function removeFriend(rowId: string): Promise<Result> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const { error: err } = await supabase.from("friendships").delete().eq("id", rowId);
   if (err) return { error: err.message };
   return { ok: true };
 }

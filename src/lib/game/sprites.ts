@@ -1,8 +1,9 @@
 // 캐릭터/타일/오브젝트를 코드로 그리는 픽셀아트 렌더러 (외부 이미지 에셋 0개).
-import type { CharacterAppearance, Direction, UserStatus } from "./types";
+import type { CharacterAppearance, Direction, PlayerCosmetics, UserStatus } from "./types";
 import { TILE_INFO, type MapObject } from "./maps";
 import { OBJECT_DEFS } from "./objects";
 import { STATUS_META, TILE, headImgUrl } from "./constants";
+import { SHOP_MAP } from "./shop";
 
 // ---------- 유틸 ----------
 
@@ -887,6 +888,242 @@ export function drawObject(
       }
       break;
     }
+    case "exhibit": {
+      // 명예의전당 전시대 — 대리석 받침 + 금색 액자 + 그림책 캐릭터 초상 + 스포트라이트
+      const cx = x + w / 2;
+      // 바닥 그림자
+      ctx.fillStyle = "rgba(0,0,0,0.28)";
+      ctx.beginPath();
+      ctx.ellipse(cx, y + h - 4, 22, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 스포트라이트 콘 (위에서 내리쬐는 빛)
+      const glow = 0.10 + Math.sin(t / 600 + o.x) * 0.03;
+      const grd = ctx.createLinearGradient(cx, y - 6, cx, y + h - 10);
+      grd.addColorStop(0, `rgba(255,236,170,${glow + 0.12})`);
+      grd.addColorStop(1, "rgba(255,236,170,0)");
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.moveTo(cx - 6, y - 6);
+      ctx.lineTo(cx + 6, y - 6);
+      ctx.lineTo(cx + 26, y + h - 12);
+      ctx.lineTo(cx - 26, y + h - 12);
+      ctx.closePath();
+      ctx.fill();
+      // 대리석 받침
+      const pedTop = y + h - 26;
+      ctx.fillStyle = "#cbd5e1";
+      roundRect(ctx, cx - 20, pedTop, 40, 22, 3);
+      ctx.fill();
+      ctx.fillStyle = "#e2e8f0";
+      ctx.fillRect(cx - 20, pedTop, 40, 5);
+      ctx.fillStyle = "#94a3b8";
+      ctx.fillRect(cx - 20, pedTop + 18, 40, 4);
+      // 금색 액자
+      const frTop = y + 2;
+      const frH = h - 30;
+      const frW = 50;
+      ctx.fillStyle = "#7c5c1e";
+      roundRect(ctx, cx - frW / 2 - 3, frTop - 3, frW + 6, frH + 6, 5);
+      ctx.fill();
+      ctx.fillStyle = "#e5b74a";
+      roundRect(ctx, cx - frW / 2, frTop, frW, frH, 4);
+      ctx.fill();
+      ctx.fillStyle = "#f5d780";
+      roundRect(ctx, cx - frW / 2 + 2, frTop + 2, frW - 4, 5, 2);
+      ctx.fill();
+      // 초상 배경 + 캐릭터 헤어 이미지
+      const inX = cx - frW / 2 + 5;
+      const inY = frTop + 5;
+      const inW = frW - 10;
+      const inH = frH - 10;
+      ctx.fillStyle = "#1e293b";
+      ctx.fillRect(inX, inY, inW, inH);
+      const head = o.props?.head;
+      const img = head ? getImage(headImgUrl(head)) : null;
+      if (img) {
+        const s = Math.min(inW, inH);
+        ctx.drawImage(img, inX + (inW - s) / 2, inY + 2, s, s);
+      } else {
+        ctx.fillStyle = "#475569";
+        ctx.font = "20px serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("🖼️", cx, inY + inH / 2);
+        ctx.textBaseline = "alphabetic";
+      }
+      // 명판(이름)
+      if (o.name) {
+        ctx.font = "bold 9px ui-sans-serif, system-ui";
+        ctx.textAlign = "center";
+        const tw = ctx.measureText(o.name).width;
+        ctx.fillStyle = "#3b2a0a";
+        roundRect(ctx, cx - tw / 2 - 5, pedTop + 5, tw + 10, 12, 3);
+        ctx.fill();
+        ctx.fillStyle = "#f5d780";
+        ctx.fillText(o.name, cx, pedTop + 14);
+      }
+      break;
+    }
+    case "portalhub": {
+      // 워프 포탈 패드 — 회전하는 빛의 소용돌이
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+      ctx.save();
+      ctx.translate(cx, cy);
+      // 바닥 링
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.beginPath();
+      ctx.ellipse(0, 8, 26, 9, 0, 0, Math.PI * 2);
+      ctx.fill();
+      for (let i = 0; i < 3; i++) {
+        const rr = 24 - i * 6;
+        ctx.strokeStyle = `hsla(${(t / 12 + i * 40) % 360}, 90%, 65%, ${0.8 - i * 0.15})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.ellipse(0, 6, rr, rr * 0.4, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      // 중앙 소용돌이
+      ctx.rotate((t / 400) % (Math.PI * 2));
+      const grd = ctx.createRadialGradient(0, 0, 2, 0, 0, 18);
+      grd.addColorStop(0, "rgba(255,255,255,0.95)");
+      grd.addColorStop(0.5, "rgba(124,140,255,0.7)");
+      grd.addColorStop(1, "rgba(59,7,100,0)");
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.ellipse(0, 4, 16, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      break;
+    }
+    case "minigame": {
+      // 미니게임 기기 — 알록달록 아케이드 캐비닛 2칸
+      ctx.fillStyle = "rgba(0,0,0,0.2)";
+      ctx.fillRect(x + 2, y + h - 4, w - 4, 4);
+      ctx.fillStyle = "#1e293b";
+      roundRect(ctx, x + 2, y - 18, w - 4, h + 16, 5);
+      ctx.fill();
+      // 화면
+      const hue = Math.floor(t / 20) % 360;
+      ctx.fillStyle = `hsl(${hue},70%,55%)`;
+      roundRect(ctx, x + 5, y - 14, w - 10, 14, 3);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.font = "10px serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("🎣🎵🌱", x + w / 2, y - 7);
+      // 버튼
+      ctx.fillStyle = "#ef4444";
+      ctx.beginPath();
+      ctx.arc(x + 10, y + 6, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#3b82f6";
+      ctx.beginPath();
+      ctx.arc(x + 18, y + 6, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.textBaseline = "alphabetic";
+      break;
+    }
+    case "atm": {
+      // ATM 기기 — 금색 캐비닛 + 화면 + 하트 로고
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.fillRect(x + 3, y + h - 4, w - 6, 4);
+      ctx.fillStyle = "#0f766e";
+      roundRect(ctx, x + 3, y, w - 6, h - 2, 5);
+      ctx.fill();
+      ctx.fillStyle = "#134e4a";
+      roundRect(ctx, x + 3, y, w - 6, 6, 5);
+      ctx.fill();
+      // 화면
+      ctx.fillStyle = "#a7f3d0";
+      roundRect(ctx, x + 6, y + 8, w - 12, 12, 3);
+      ctx.fill();
+      ctx.font = "9px serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("💗", x + w / 2, y + 14);
+      // 키패드
+      ctx.fillStyle = "#0b3b36";
+      roundRect(ctx, x + 7, y + 24, w - 14, 20, 3);
+      ctx.fill();
+      ctx.fillStyle = "#5eead4";
+      ctx.font = "bold 7px ui-sans-serif";
+      ctx.fillText("ATM", x + w / 2, y + 34);
+      ctx.textBaseline = "alphabetic";
+      break;
+    }
+    case "npc": {
+      // 안내 NPC — 로브를 입은 가이드 + 말풍선
+      const cx = x + w / 2;
+      const footY = y + h;
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.beginPath();
+      ctx.ellipse(cx, footY - 2, 9, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 로브
+      ctx.fillStyle = "#6d28d9";
+      roundRect(ctx, cx - 9, y + 16, 18, h - 18, 5);
+      ctx.fill();
+      ctx.fillStyle = "#7c3aed";
+      roundRect(ctx, cx - 9, y + 16, 18, 6, 5);
+      ctx.fill();
+      // 얼굴
+      ctx.fillStyle = "#f1c27d";
+      ctx.beginPath();
+      ctx.arc(cx, y + 12, 8, 0, Math.PI * 2);
+      ctx.fill();
+      // 모자(고깔)
+      ctx.fillStyle = "#4c1d95";
+      ctx.beginPath();
+      ctx.moveTo(cx - 9, y + 8);
+      ctx.lineTo(cx + 9, y + 8);
+      ctx.lineTo(cx, y - 8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#fbbf24";
+      ctx.beginPath();
+      ctx.arc(cx, y - 8, 2, 0, Math.PI * 2);
+      ctx.fill();
+      // 눈
+      ctx.fillStyle = "#111827";
+      ctx.fillRect(cx - 3, y + 11, 1.6, 2);
+      ctx.fillRect(cx + 1.5, y + 11, 1.6, 2);
+      // 말풍선 "!"
+      const by = y - 18 + Math.sin(t / 300) * 2;
+      ctx.fillStyle = "#fde68a";
+      roundRect(ctx, cx + 6, by, 14, 13, 4);
+      ctx.fill();
+      ctx.fillStyle = "#92400e";
+      ctx.font = "bold 11px ui-sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("!", cx + 13, by + 7);
+      ctx.textBaseline = "alphabetic";
+      break;
+    }
+    case "bed": {
+      // 침대 — 프레임 + 매트리스 + 베개 + 이불
+      ctx.fillStyle = "rgba(0,0,0,0.2)";
+      ctx.fillRect(x + 2, y + h - 4, w - 4, 4);
+      ctx.fillStyle = "#6b4b2f"; // 원목 프레임
+      roundRect(ctx, x + 1, y + 2, w - 2, h - 4, 5);
+      ctx.fill();
+      ctx.fillStyle = "#eef2ff"; // 매트리스/시트
+      roundRect(ctx, x + 4, y + 5, w - 8, h - 10, 4);
+      ctx.fill();
+      // 이불 (아래쪽 2/3)
+      ctx.fillStyle = o.props?.color ?? "#6c8cff";
+      roundRect(ctx, x + 4, y + Math.floor(h * 0.42), w - 8, Math.floor(h * 0.5), 4);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.18)";
+      ctx.fillRect(x + 4, y + Math.floor(h * 0.42), w - 8, 3);
+      // 베개 (상단)
+      ctx.fillStyle = "#ffffff";
+      roundRect(ctx, x + 6, y + 7, w - 12, 10, 4);
+      ctx.fill();
+      break;
+    }
     case "custom": {
       const url = o.props?.url;
       const img = url ? getImage(url) : null;
@@ -940,6 +1177,20 @@ export function drawObjectTop(
     ctx.fillStyle = `rgba(251,146,60,${glow})`;
     ctx.beginPath();
     ctx.arc(x + 16, y + 14, 34, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (o.type === "portalhub") {
+    // 위로 솟는 빛 기둥
+    const cx = x + TILE;
+    const grd = ctx.createLinearGradient(cx, y - 40, cx, y + 20);
+    grd.addColorStop(0, "rgba(124,140,255,0)");
+    grd.addColorStop(1, `rgba(167,180,255,${0.14 + Math.sin(t / 300) * 0.05})`);
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.moveTo(cx - 14, y + 16);
+    ctx.lineTo(cx + 14, y + 16);
+    ctx.lineTo(cx + 8, y - 40);
+    ctx.lineTo(cx - 8, y - 40);
+    ctx.closePath();
     ctx.fill();
   }
 }
@@ -1068,6 +1319,96 @@ export interface CharacterExtras {
   dancing?: boolean;
   sitting?: boolean;
   vehicle?: "bike" | "kart";
+  ghost?: boolean; // 고스트 모드 — 반투명 렌더
+  cosmetics?: PlayerCosmetics; // 날개/펫/탈것 등
+  mounted?: boolean; // 상점 탈것 탑승
+  lying?: boolean; // 침대에 누움
+}
+
+// ---------- 코스메틱(날개/펫/탈것) ----------
+
+function drawWings(ctx: CanvasRenderingContext2D, cy: number, color: string, t: number) {
+  const flap = Math.sin(t / 220) * 0.18;
+  const top = cy - 40;
+  ctx.save();
+  ctx.globalAlpha = 0.92;
+  for (const sgn of [-1, 1]) {
+    ctx.save();
+    ctx.translate(sgn * 6, top);
+    ctx.rotate(sgn * (0.5 + flap));
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(sgn * 22, -6, sgn * 26, 12);
+    ctx.quadraticCurveTo(sgn * 18, 10, 0, 20);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.25)";
+    ctx.beginPath();
+    ctx.moveTo(0, 2);
+    ctx.quadraticCurveTo(sgn * 14, 0, sgn * 18, 10);
+    ctx.quadraticCurveTo(sgn * 12, 9, 0, 16);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawPet(ctx: CanvasRenderingContext2D, cx: number, cy: number, color: string, t: number) {
+  // 캐릭터 옆에서 따라다니는 작은 고양이
+  const px = cx - 20;
+  const py = cy - 2 + Math.sin(t / 300) * 1.5;
+  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  ctx.beginPath();
+  ctx.ellipse(px, cy + 1, 6, 2.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = color;
+  // 몸통
+  roundRect(ctx, px - 5, py - 8, 10, 9, 3);
+  ctx.fill();
+  // 머리
+  ctx.beginPath();
+  ctx.arc(px, py - 10, 5, 0, Math.PI * 2);
+  ctx.fill();
+  // 귀
+  ctx.beginPath();
+  ctx.moveTo(px - 5, py - 13);
+  ctx.lineTo(px - 2, py - 16);
+  ctx.lineTo(px - 1, py - 12);
+  ctx.moveTo(px + 5, py - 13);
+  ctx.lineTo(px + 2, py - 16);
+  ctx.lineTo(px + 1, py - 12);
+  ctx.fill();
+  // 꼬리
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(px + 5, py - 2);
+  ctx.quadraticCurveTo(px + 12, py - 4, px + 10, py - 10 + Math.sin(t / 200) * 2);
+  ctx.stroke();
+  // 눈
+  ctx.fillStyle = "#111827";
+  ctx.beginPath();
+  ctx.arc(px - 2, py - 10, 1, 0, Math.PI * 2);
+  ctx.arc(px + 2, py - 10, 1, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawMount(ctx: CanvasRenderingContext2D, cx: number, cy: number, color: string, icon: string) {
+  // 상점 탈것(늑대/곰/토끼 등) — 캐릭터 발 밑 크리처. 아이콘 이모지로 표현.
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 2, 20, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = color;
+  roundRect(ctx, cx - 18, cy - 14, 36, 16, 8);
+  ctx.fill();
+  ctx.font = "20px serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(icon, cx, cy - 6);
+  ctx.textBaseline = "alphabetic";
 }
 
 const OUTLINE = "rgba(18,22,34,0.55)";
@@ -1087,7 +1428,8 @@ export function drawCharacter(
   extras?: CharacterExtras
 ) {
   const u = 2; // 픽셀 유닛
-  const sitting = !!extras?.sitting && !onBike;
+  const lying = !!extras?.lying && !onBike;
+  const sitting = (!!extras?.sitting || lying) && !onBike;
   const dancing = !!extras?.dancing && !moving && !onBike && !sitting;
   const step = moving && !sitting ? Math.floor(t / 130) % 4 : 0; // 걷기 프레임 0..3
   const danceBeat = Math.floor(t / 200) % 2; // 춤 비트
@@ -1114,13 +1456,34 @@ export function drawCharacter(
   ctx.ellipse(cx, cy, onBike ? 18 : 9, 4, 0, 0, Math.PI * 2);
   ctx.fill();
 
+  // 고스트 모드 — 캐릭터 몸체를 반투명하게 (이름표는 이후 100%로 복원)
+  const ghost = !!extras?.ghost;
+  if (ghost) ctx.globalAlpha = 0.4;
+
+  // 상점 탈것(마운트) — 캐릭터 아래
+  const cos = extras?.cosmetics;
+  if (extras?.mounted && cos?.mount) {
+    const mi = SHOP_MAP[cos.mount];
+    if (mi) drawMount(ctx, cx, cy - 2, mi.color ?? "#94a3b8", mi.icon);
+  }
+  // 날개 — 몸통 뒤
+  if (cos?.wings && !onBike) {
+    const wi = SHOP_MAP[cos.wings];
+    if (wi) drawWings(ctx, cy, wi.color ?? "#f8fafc", t);
+  }
+
   if (onBike) {
-    if (extras?.vehicle === "kart") drawKart(ctx, cx, cy - 2, dir, moving ? t : 0, app.color);
+    if (extras?.vehicle === "kart") drawKart(ctx, cx, cy - 2, dir, moving ? t : 0, cos?.kart ? (SHOP_MAP[cos.kart]?.color ?? app.color) : app.color);
     else drawBike(ctx, cx, cy - 2, dir, moving ? t : 0);
   }
 
   ctx.save();
   ctx.translate(Math.round(cx), Math.round(cy + bob * u - (onBike ? 8 : 0)));
+  if (lying) {
+    // 침대에 누운 자세 — 몸 전체를 눕힘
+    ctx.rotate(-1.35);
+    ctx.translate(6, 4);
+  }
   if (dancing && danceBeat === 1) {
     ctx.rotate(0.06); // 좌우 리듬
   } else if (dancing) {
@@ -1354,8 +1717,23 @@ export function drawCharacter(
 
   ctx.restore();
 
+  // 펫 — 캐릭터 옆 (반투명 영향 후 원복 전에 그려 고스트 시 함께 흐려짐)
+  if (cos?.pet && !onBike) {
+    const pi = SHOP_MAP[cos.pet];
+    if (pi) drawPet(ctx, cx, cy, pi.color ?? "#9ca3af", t);
+  }
+  if (ghost) ctx.globalAlpha = 1;
+
+  if (lying) {
+    ctx.font = "13px serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#a5b4fc";
+    ctx.fillText("💤", cx + 14, cy - 24 + Math.sin(t / 500) * 2);
+  }
+
   // ----- 이름표 + 상태 -----
-  const labelY = cy - 46 - (onBike ? 8 : 0);
+  // nameAbove: 긴 머리 스타일이 가려지지 않도록 이름표를 더 위로 올린다.
+  const labelY = cy - (app.nameAbove ? 62 : 46) - (onBike ? 8 : 0);
   ctx.font = "bold 11px ui-sans-serif, system-ui";
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";

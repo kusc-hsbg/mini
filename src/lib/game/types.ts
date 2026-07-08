@@ -26,6 +26,7 @@ export interface CharacterAppearance {
   face: FaceType;
   special: SpecialType;
   headImg?: string; // 특별 헤어 스타일 키 ("none"/undefined = 픽셀 머리)
+  nameAbove?: boolean; // 닉네임을 머리카락 위로 올려 표시
 }
 
 // DB(profiles 테이블) 행 형태 — snake_case.
@@ -46,8 +47,22 @@ export interface Profile {
   face: string;
   special: string | null;
   head_img: string | null;
+  bio: string | null;
+  name_above: boolean | null;
   status: UserStatus;
   status_message: string | null;
+  // 경제/인벤토리 (feature #5/#9/#12/#15)
+  hearts: number;
+  coins: number;
+  inventory: string[]; // 보유 아이템 키
+  equipped: Record<string, string>; // 슬롯 → 아이템 키
+  bank: number;
+  bank_at: string | null;
+  last_attendance: string | null;
+  attendance_streak: number;
+  titles: string[];
+  kills: number;
+  race_wins: number;
 }
 
 // 네트워크로 주고받는 플레이어 상태(presence payload).
@@ -61,6 +76,7 @@ export interface PlayerState {
   onBike: boolean; // 탈것(오토바이/카트) 탑승 여부
   dancing: boolean; // Z 키 춤
   sitting: boolean; // 의자/소파/벤치에 앉음
+  lying?: boolean; // 침대에 누움
   appearance: CharacterAppearance;
   status: UserStatus;
   statusMsg?: string;
@@ -68,6 +84,20 @@ export interface PlayerState {
   spotlight: boolean; // 스포트라이트 타일 위
   hand: boolean; // 손들기
   guest: boolean;
+  bio?: string; // 자기소개 (근접 시 상대에게 보이는 프로필 카드)
+  ghost?: boolean; // 고스트 모드(G) — 반투명, 근접 하트 미발생
+  cosmetics?: PlayerCosmetics; // 상점 장착 아이템(날개/펫/프레임/카드/탈것/카트)
+  mounted?: boolean; // 상점 탈것 탑승 여부
+}
+
+// 장착된 상점 아이템 키(슬롯별). 아바타/프로필 카드 렌더에 사용.
+export interface PlayerCosmetics {
+  frame?: string;
+  card?: string;
+  pet?: string;
+  wings?: string;
+  mount?: string;
+  kart?: string;
 }
 
 // 이모지 / 채팅 브로드캐스트 메시지 (머리 위 말풍선).

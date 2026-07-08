@@ -16,6 +16,8 @@ export default function ParticipantsPanel({
   onFollow,
   onDm,
   onBlockToggle,
+  onAddFriend,
+  canFriend,
   onKick,
   onBan,
   onClose,
@@ -30,6 +32,8 @@ export default function ParticipantsPanel({
   onFollow: (id: string | null) => void;
   onDm: (id: string) => void;
   onBlockToggle: (id: string, name: string) => void;
+  onAddFriend: (id: string, name: string) => void;
+  canFriend: boolean;
   onKick: (id: string) => void;
   onBan: (id: string, name: string) => void;
   onClose: () => void;
@@ -91,6 +95,9 @@ export default function ParticipantsPanel({
                     {followId === p.id ? "팔로우 중지" : "🔗 따라가기"}
                   </Btn>
                   <Btn onClick={() => onDm(p.id)}>✉️ DM</Btn>
+                  {canFriend && !p.guest && (
+                    <Btn onClick={() => onAddFriend(p.id, p.name)}>➕ 친구</Btn>
+                  )}
                   <Btn onClick={() => onBlockToggle(p.id, p.name)} danger={!blocked.has(p.id)}>
                     {blocked.has(p.id) ? "차단 해제" : "🚫 차단"}
                   </Btn>

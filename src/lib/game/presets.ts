@@ -226,6 +226,7 @@ function buildPlaza(): MapData {
   add(c, "roundtable", 69, 35);
   add(c, "chair", 68, 36);
   add(c, "chair", 71, 36);
+  add(c, "minigame", 61, 37, { name: "미니게임 기기" });
   c.areas.push({ id: "game-corner", name: "🕹️ 게임 코너", x: 60, y: 33, w: 14, h: 6 });
   c.labels.push({ x: 61, y: 33, text: "🕹️ 게임 코너" });
 
@@ -264,10 +265,25 @@ function buildPlaza(): MapData {
   add(c, "flag", 49, 13);
   add(c, "door", 50, 14, { name: "비치 입구" });
   c.portals.push({ id: "pz-po-beach", x: 50, y: 14, kind: "room", roomTemplate: "beach", label: "🏖️ 비치 리조트로" });
+  add(c, "door", 52, 14, { name: "스타홀 입구" });
+  c.portals.push({ id: "pz-po-starhall", x: 52, y: 14, kind: "room", roomTemplate: "starhall", label: "⭐ 스타홀 갤러리로" });
+  add(c, "door", 54, 14, { name: "카페 입구" });
+  c.portals.push({ id: "pz-po-cafe", x: 54, y: 14, kind: "room", roomTemplate: "cafe", label: "🌿 야외 카페로" });
   add(c, "door", 74, 41, { name: "지름길" });
   c.portals.push({ id: "pz-tp-1", x: 74, y: 41, kind: "same", tx: 5, ty: 41, label: "↔ 반대편 도로" });
   add(c, "door", 5, 44, { name: "지름길" });
   c.portals.push({ id: "pz-tp-2", x: 5, y: 44, kind: "same", tx: 73, ty: 41, label: "↔ 반대편 도로" });
+
+  // 중앙 워프 포탈 (전체 미니맵)
+  add(c, "portalhub", 44, 25, { name: "워프 포탈" });
+  c.labels.push({ x: 44, y: 24, text: "🌀 워프 포탈 (X/스페이스)" });
+
+  // 안내 NPC (온보딩 퀘스트)
+  add(c, "npc", 36, 25, { name: "안내원 삐삐" });
+  c.labels.push({ x: 34, y: 24, text: "💬 안내원 삐삐 (X)" });
+
+  // ATM (예치/이자/송금)
+  add(c, "atm", 53, 16, { name: "하트 ATM" });
 
   return {
     key: "plaza",
@@ -389,6 +405,7 @@ function buildOffice(): MapData {
   add(c, "chair", 65, 38);
   add(c, "chair", 68, 38);
   add(c, "piano", 71, 40, { name: "라운지 피아노" });
+  add(c, "bed", 53, 39, { name: "낮잠 침대", props: { color: "#7c5cd6" } });
   add(c, "bookshelf", 53, 33);
   c.areas.push({ id: "lounge", name: "🛋️ 라운지", x: 53, y: 33, w: 20, h: 9 });
   c.labels.push({ x: 53, y: 32, text: "🛋️ 라운지 & 키친" });
@@ -428,9 +445,11 @@ function buildOffice(): MapData {
     label: "🔑 서버실 (비밀번호: 관리자에게 문의)",
   });
 
-  // ---- 포털: 광장으로 ----
+  // ---- 포털: 광장으로 + 중앙 워프 포탈 ----
   add(c, "door", 38, 42, { name: "정문" });
   c.portals.push({ id: "of-po-plaza", x: 38, y: 42, kind: "room", roomTemplate: "plaza", label: "⛲ 광장으로" });
+  add(c, "portalhub", 37, 38, { name: "워프 포탈" });
+  add(c, "atm", 46, 37, { name: "하트 ATM" });
 
   return {
     key: "office",
@@ -550,9 +569,10 @@ function buildGarden(): MapData {
     if ((ch === "," || ch === ";") && (ch2 === "," || ch2 === ";")) add(c, "tree", tx, ty);
   }
 
-  // 포털: 광장으로
+  // 포털: 광장으로 + 중앙 워프 포탈
   add(c, "door", 38, 41, { name: "파크 출구" });
   c.portals.push({ id: "gd-po-plaza", x: 38, y: 41, kind: "room", roomTemplate: "plaza", label: "⛲ 광장으로" });
+  add(c, "portalhub", 34, 28, { name: "워프 포탈" });
 
   return {
     key: "garden",
@@ -695,9 +715,10 @@ function buildCircuit(): MapData {
   add(c, "lamp", 6, 46);
   add(c, "lamp", 81, 46);
 
-  // ---- 포털: 광장으로 ----
+  // ---- 포털: 광장으로 + 중앙 워프 포탈 ----
   add(c, "door", 4, 27, { name: "서킷 출구" });
   c.portals.push({ id: "cc-po-plaza", x: 4, y: 27, kind: "room", roomTemplate: "plaza", label: "⛲ 광장으로" });
+  add(c, "portalhub", 50, 19, { name: "워프 포탈" });
 
   return {
     key: "circuit",
@@ -798,8 +819,7 @@ function buildBeach(): MapData {
     g.rect(bx, by, 6, 5, "w");
     g.border(bx, by, 6, 5, "#");
     g.set(bx, by + 2, "w"); // 서쪽 출입구
-    add(c, "sofa", bx + 2, by + 1);
-    add(c, "rug", bx + 1, by + 2, { props: { color: "#0d9488" } });
+    add(c, "bed", bx + 2, by + 1, { name: `카바나 침대 ${i + 1}`, props: { color: "#0d9488" } });
     c.areas.push({
       id: `cabana-${i + 1}`,
       name: `⛱️ 카바나 ${i + 1}`,
@@ -872,11 +892,216 @@ function buildBeach(): MapData {
   c.spawns.push({ x: 36, y: 20 }, { x: 38, y: 20 }, { x: 36, y: 22 }, { x: 38, y: 22 });
   add(c, "door", 30, 21, { name: "리조트 출구" });
   c.portals.push({ id: "bc-po-plaza", x: 30, y: 21, kind: "room", roomTemplate: "plaza", label: "⛲ 광장으로" });
+  add(c, "portalhub", 37, 24, { name: "워프 포탈" });
 
   return {
     key: "beach",
     name: "비치 리조트",
     description: "바다, 부두, 티키 바, 비치 발리볼, 카바나, 캠프파이어가 있는 휴양지 맵",
+    tiles: g.rows(),
+    objects: c.objects,
+    areas: c.areas,
+    portals: c.portals,
+    spawns: c.spawns,
+    spotlights: c.spotlights,
+    labels: c.labels,
+  };
+}
+
+// ==================== 6. 스타홀 갤러리 (46 x 30) ====================
+// 명예의전당 컨셉 — 그림책 캐릭터 5인을 전시대(exhibit)에 전시. X 키로 정보 팝업.
+
+function buildStarhall(): MapData {
+  const W = 46;
+  const H = 30;
+  const g = new Grid(W, H, "k"); // 어두운 마루
+  const c = ctx("sh");
+
+  // 벽 + 바닥 마감
+  g.border(0, 0, W, H, "#");
+  // 중앙 레드카펫 러너 (입구 → 안쪽)
+  g.rect(21, 6, 4, H - 7, "m");
+  // 앞쪽 대리석 통로
+  g.rect(4, 5, W - 8, 3, "-");
+
+  // ---- 전시대 5인 (뒷벽 라인) ----
+  const stars: { head: string; name: string; title: string; text: string }[] = [
+    {
+      head: "b-lucian",
+      name: "루시안",
+      title: "빛의 기사",
+      text: "어둠이 가장 짙은 밤, 스스로 등불이 되기를 택한 소년.\n두려움 앞에서도 한 걸음 더 나아가는 용기의 상징입니다.",
+    },
+    {
+      head: "g-lucia",
+      name: "루시아",
+      title: "여명의 성녀",
+      text: "새벽의 첫 빛과 함께 나타난다는 소녀.\n지친 이들의 마음에 가장 먼저 아침을 가져다줍니다.",
+    },
+    {
+      head: "b-moses",
+      name: "모세",
+      title: "물길을 가르는 자",
+      text: "지팡이 하나로 바다를 갈랐다는 전설의 인도자.\n막다른 길에서도 새로운 길을 여는 지혜를 지녔습니다.",
+    },
+    {
+      head: "g-ariel",
+      name: "아리엘",
+      title: "바람의 노래",
+      text: "하늘과 바다를 잇는 노래를 부르는 음유시인.\n그 선율을 들은 이는 누구나 다시 꿈을 꾼다고 합니다.",
+    },
+    {
+      head: "b-cross",
+      name: "크로스",
+      title: "맹세의 수호자",
+      text: "마지막 순간까지 약속을 지켜낸 방패의 기사.\n한 번 맺은 언약은 결코 저버리지 않습니다.",
+    },
+  ];
+  const startX = 5;
+  const gap = 8;
+  stars.forEach((s, i) => {
+    const ex = startX + i * gap;
+    add(c, "exhibit", ex, 2, {
+      name: s.name,
+      props: { head: s.head, title: s.title, text: s.text },
+    });
+    // 전시대 사이 장식 램프
+    if (i < stars.length - 1) add(c, "lamp", ex + gap - 3, 3);
+  });
+  add(c, "lamp", 3, 3);
+  add(c, "lamp", W - 4, 3);
+
+  // ---- 관람 벤치 + 중앙 트로피(분수 대용) ----
+  add(c, "bench", 10, 18);
+  add(c, "bench", 16, 18);
+  add(c, "bench", 30, 18);
+  add(c, "bench", 36, 18);
+  add(c, "fountain", 21, 12);
+  add(c, "flowerbed", 8, 24);
+  add(c, "flowerbed", 12, 24);
+  add(c, "flowerbed", 33, 24);
+  add(c, "flowerbed", 37, 24);
+  add(c, "plant", 2, 26);
+  add(c, "plant", W - 3, 26);
+
+  // ---- 안내판 + 스폰 + 포털 ----
+  add(c, "sign", 18, 25, {
+    name: "스타홀 안내",
+    props: {
+      text: "⭐ 스타홀 갤러리\n\n그림책 속 전설의 인물 다섯을 전시한 명예의 전당입니다.\n전시대 앞에서 X 키를 누르면 그 인물의 이야기를 볼 수 있어요.",
+    },
+  });
+  c.spawns.push({ x: 22, y: 24 }, { x: 23, y: 24 }, { x: 21, y: 23 }, { x: 24, y: 23 });
+  add(c, "door", 22, 28, { name: "갤러리 출구" });
+  c.portals.push({ id: "sh-po-plaza", x: 22, y: 28, kind: "room", roomTemplate: "plaza", label: "⛲ 광장으로" });
+  add(c, "door", 23, 28, { name: "갤러리 출구" });
+  c.portals.push({ id: "sh-po-plaza2", x: 23, y: 28, kind: "room", roomTemplate: "plaza", label: "⛲ 광장으로" });
+  add(c, "portalhub", 29, 20, { name: "워프 포탈" });
+  c.labels.push({ x: 4, y: 1, text: "⭐ 스타홀 갤러리 — 명예의 전당" });
+
+  return {
+    key: "starhall",
+    name: "스타홀 갤러리",
+    description: "그림책 캐릭터 5인을 전시한 명예의 전당. 전시대에서 X 키로 인물 정보를 볼 수 있어요.",
+    tiles: g.rows(),
+    objects: c.objects,
+    areas: c.areas,
+    portals: c.portals,
+    spawns: c.spawns,
+    spotlights: c.spotlights,
+    labels: c.labels,
+  };
+}
+
+// ==================== 7. 야외 카페 테라스 (50 x 36) ====================
+// 아늑한 야외 카페 — 원목 데크, 파라솔 테이블, 스트링 라이트, 커피바, 피아노, 작은 무대.
+
+function buildCafe(): MapData {
+  const W = 50;
+  const H = 36;
+  const g = new Grid(W, H, ",");
+  const c = ctx("cf");
+
+  g.scatter(";", 260, 1, 1, W - 2, H - 2, 61, ",");
+
+  // 외곽 나무 울타리
+  for (let x = 0; x < W; x += 3) {
+    add(c, "tree", x, 0);
+    add(c, "tree", x, H - 2);
+  }
+  for (let y = 3; y < H - 3; y += 4) {
+    add(c, "tree", 0, y);
+    add(c, "tree", W - 2, y);
+  }
+
+  // 원목 데크 (중앙 테라스)
+  g.rect(6, 5, 38, 24, "w");
+  // 보도블럭 진입로
+  g.rect(22, 29, 6, 6, "-");
+
+  // ---- 커피 바 (상단) ----
+  g.rect(10, 5, 14, 4, "k");
+  add(c, "counter", 11, 7);
+  add(c, "counter", 12, 7);
+  add(c, "counter", 13, 7);
+  add(c, "coffee", 11, 6);
+  add(c, "coffee", 14, 6);
+  add(c, "vending", 22, 6);
+  add(c, "speaker", 17, 6, {
+    name: "카페 재즈",
+    props: { url: "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3" },
+  });
+  c.labels.push({ x: 10, y: 5, text: "☕ 커피 바" });
+
+  // ---- 파라솔 테이블 6세트 ----
+  const tables: [number, number][] = [
+    [10, 13], [18, 13], [26, 13],
+    [10, 20], [18, 20], [26, 20],
+  ];
+  tables.forEach(([tx, ty], i) => {
+    add(c, "roundtable", tx, ty, { name: `테이블 ${i + 1}` });
+    add(c, "chair", tx - 1, ty + 1);
+    add(c, "chair", tx + 2, ty + 1);
+    add(c, "chair", tx, ty + 2, { dir: "up" });
+  });
+
+  // ---- 작은 무대 (스포트라이트) + 피아노 ----
+  g.rect(33, 11, 9, 8, "m");
+  for (let i = 0; i < 2; i++) c.spotlights.push({ x: 35 + i * 2, y: 13 });
+  add(c, "piano", 34, 12, { name: "카페 피아노" });
+  add(c, "speaker", 40, 12);
+  add(c, "bench", 34, 16);
+  add(c, "bench", 38, 16);
+  c.labels.push({ x: 33, y: 11, text: "🎹 라이브 무대" });
+
+  // ---- 스트링 라이트(램프) & 화분 ----
+  add(c, "lamp", 6, 5);
+  add(c, "lamp", 43, 5);
+  add(c, "lamp", 6, 28);
+  add(c, "lamp", 43, 28);
+  for (let i = 0; i < 5; i++) add(c, "flowerbed", 8 + i * 3, 27);
+  add(c, "plant", 7, 12);
+  add(c, "plant", 42, 22);
+  add(c, "minigame", 8, 24, { name: "미니게임 기기" });
+
+  // ---- 게시판 + 안내 ----
+  add(c, "bulletin", 30, 6, { name: "카페 게시판" });
+  add(c, "sign", 28, 6, {
+    name: "카페 안내",
+    props: { text: "🌿 야외 카페 테라스\n\n커피 한 잔 내리고(X) 파라솔 아래에서 쉬어가세요.\n무대의 피아노는 누구나 연주할 수 있어요." },
+  });
+
+  // ---- 스폰 + 포털 + 워프 ----
+  c.spawns.push({ x: 24, y: 24 }, { x: 26, y: 24 }, { x: 22, y: 23 });
+  add(c, "door", 25, 34, { name: "카페 출구" });
+  c.portals.push({ id: "cf-po-plaza", x: 25, y: 34, kind: "room", roomTemplate: "plaza", label: "⛲ 광장으로" });
+  add(c, "portalhub", 20, 24, { name: "워프 포탈" });
+  c.labels.push({ x: 6, y: 4, text: "🌿 야외 카페 테라스" });
+
+  return {
+    key: "cafe",
+    name: "야외 카페 테라스",
+    description: "원목 데크, 파라솔 테이블, 커피 바, 라이브 피아노 무대가 있는 아늑한 야외 카페",
     tiles: g.rows(),
     objects: c.objects,
     areas: c.areas,
@@ -893,4 +1118,6 @@ export const PRESET_MAPS: Record<string, MapData> = {
   garden: buildGarden(),
   circuit: buildCircuit(),
   beach: buildBeach(),
+  starhall: buildStarhall(),
+  cafe: buildCafe(),
 };

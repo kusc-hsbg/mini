@@ -39,6 +39,22 @@ alter table public.profiles add column if not exists glasses text not null defau
 alter table public.profiles add column if not exists special text not null default 'none';
 -- 특별 헤어 스타일 (이미지 머리, 'none' = 픽셀 머리)
 alter table public.profiles add column if not exists head_img text not null default 'none';
+-- 소개(자기소개) — 근접 시 상대에게 보이는 프로필 카드 내용 (계정당 영구)
+alter table public.profiles add column if not exists bio text;
+-- 닉네임을 머리카락 위로 올릴지 여부 (캐릭터 커스텀)
+alter table public.profiles add column if not exists name_above boolean not null default false;
+-- 경제(하트/코인) + 인벤토리(보유 아이템 키 배열) + 장착(슬롯→아이템)
+alter table public.profiles add column if not exists hearts bigint not null default 100;
+alter table public.profiles add column if not exists coins bigint not null default 0;
+alter table public.profiles add column if not exists inventory jsonb not null default '[]'::jsonb;
+alter table public.profiles add column if not exists equipped jsonb not null default '{}'::jsonb;
+alter table public.profiles add column if not exists bank bigint not null default 0;           -- ATM 예치 하트
+alter table public.profiles add column if not exists bank_at timestamptz;                       -- 마지막 이자 정산 시각
+alter table public.profiles add column if not exists last_attendance date;                      -- 마지막 출석 보상일
+alter table public.profiles add column if not exists attendance_streak int not null default 0;  -- 연속 출석일
+alter table public.profiles add column if not exists titles jsonb not null default '[]'::jsonb;  -- 획득 칭호(킬러 등)
+alter table public.profiles add column if not exists kills int not null default 0;               -- PK 누적 킬
+alter table public.profiles add column if not exists race_wins int not null default 0;           -- 레이스 1등 횟수(도감)
 
 alter table public.profiles enable row level security;
 
@@ -83,6 +99,20 @@ $$;
 drop trigger if exists profiles_touch on public.profiles;
 create trigger profiles_touch before update on public.profiles
   for each row execute function public.touch_updated_at();
+
+-- 하트 송금 (다른 유저에게) — RLS 우회를 위해 security definer 로 원자적 처리
+create or replace function public.transfer_hearts(p_to uuid, p_amount bigint)
+returns void language plpgsql security definer set search_path = public as $$
+declare bal bigint;
+begin
+  if p_amount is null or p_amount <= 0 then raise exception 'invalid amount'; end if;
+  if p_to = auth.uid() then raise exception 'cannot send to self'; end if;
+  select hearts into bal from public.profiles where id = auth.uid();
+  if bal is null or bal < p_amount then raise exception 'insufficient hearts'; end if;
+  update public.profiles set hearts = hearts - p_amount where id = auth.uid();
+  update public.profiles set hearts = hearts + p_amount where id = p_to;
+end;
+$$;
 
 -- ---------------------------------------------------------------
 -- spaces: 媛??怨듦컙 (怨좎쑀 URL slug 蹂댁쑀)
@@ -204,7 +234,9 @@ begin
     (new.id, 'Office', 'office', 1),
     (new.id, 'Garden', 'garden', 2),
     (new.id, 'Grand Prix Circuit', 'circuit', 3),
-    (new.id, 'Beach Resort', 'beach', 4);
+    (new.id, 'Beach Resort', 'beach', 4),
+    (new.id, 'Star Hall Gallery', 'starhall', 5),
+    (new.id, 'Cafe Terrace', 'cafe', 6);
   return new;
 end;
 $$;
@@ -580,6 +612,44 @@ create policy "remove block"
   using (user_id = auth.uid());
 
 -- ---------------------------------------------------------------
+-- friendships: 친구 시스템 (요청/수락/차단)
+--   방향성: requester → addressee. status: pending | accepted | blocked
+-- ---------------------------------------------------------------
+create table if not exists public.friendships (
+  id           uuid primary key default gen_random_uuid(),
+  requester    uuid not null references auth.users(id) on delete cascade,
+  addressee    uuid not null references auth.users(id) on delete cascade,
+  status       text not null default 'pending' check (status in ('pending','accepted','blocked')),
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  unique (requester, addressee),
+  check (requester <> addressee)
+);
+create index if not exists friendships_addr_idx on public.friendships(addressee, status);
+create index if not exists friendships_req_idx on public.friendships(requester, status);
+alter table public.friendships enable row level security;
+
+drop policy if exists "friendships visible" on public.friendships;
+create policy "friendships visible" on public.friendships for select
+  using (requester = auth.uid() or addressee = auth.uid());
+
+drop policy if exists "send friend request" on public.friendships;
+create policy "send friend request" on public.friendships for insert
+  with check (requester = auth.uid());
+
+drop policy if exists "respond friend request" on public.friendships;
+create policy "respond friend request" on public.friendships for update
+  using (requester = auth.uid() or addressee = auth.uid());
+
+drop policy if exists "remove friend" on public.friendships;
+create policy "remove friend" on public.friendships for delete
+  using (requester = auth.uid() or addressee = auth.uid());
+
+drop trigger if exists friendships_touch on public.friendships;
+create trigger friendships_touch before update on public.friendships
+  for each row execute function public.touch_updated_at();
+
+-- ---------------------------------------------------------------
 -- backfill: add Grand Prix Circuit room to spaces created before this update
 -- ---------------------------------------------------------------
 insert into public.rooms (space_id, name, template_key, sort_order)
@@ -597,4 +667,24 @@ select s.id, 'Beach Resort', 'beach', 4
 from public.spaces s
 where not exists (
   select 1 from public.rooms r where r.space_id = s.id and r.template_key = 'beach'
+);
+
+-- ---------------------------------------------------------------
+-- backfill: add Star Hall Gallery room to spaces created before this update
+-- ---------------------------------------------------------------
+insert into public.rooms (space_id, name, template_key, sort_order)
+select s.id, 'Star Hall Gallery', 'starhall', 5
+from public.spaces s
+where not exists (
+  select 1 from public.rooms r where r.space_id = s.id and r.template_key = 'starhall'
+);
+
+-- ---------------------------------------------------------------
+-- backfill: add Cafe Terrace room to spaces created before this update
+-- ---------------------------------------------------------------
+insert into public.rooms (space_id, name, template_key, sort_order)
+select s.id, 'Cafe Terrace', 'cafe', 6
+from public.spaces s
+where not exists (
+  select 1 from public.rooms r where r.space_id = s.id and r.template_key = 'cafe'
 );

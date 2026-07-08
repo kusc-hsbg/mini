@@ -34,6 +34,12 @@ export type ObjectKind =
   | "grandstand"
   | "itembox"
   | "oil"
+  | "exhibit"
+  | "bed"
+  | "portalhub"
+  | "npc"
+  | "minigame"
+  | "atm"
   | "custom";
 
 export interface ObjectDef {
@@ -79,6 +85,12 @@ export const OBJECT_DEFS: Record<ObjectKind, ObjectDef> = {
   grandstand: { label: "관중석", w: 3, h: 2, solid: true, category: "레이싱" },
   itembox: { label: "아이템 박스(랜덤 효과)", w: 1, h: 1, solid: false, category: "레이싱" },
   oil: { label: "기름 웅덩이(미끄러짐)", w: 1, h: 1, solid: false, category: "레이싱" },
+  exhibit: { label: "전시대(그림책 캐릭터)", w: 2, h: 3, solid: true, tall: true, category: "장식" },
+  bed: { label: "침대(눕기)", w: 2, h: 3, solid: true, category: "가구" },
+  portalhub: { label: "워프 포탈(전체 미니맵)", w: 2, h: 2, solid: false, tall: true, category: "기타" },
+  npc: { label: "안내 NPC(퀘스트)", w: 1, h: 2, solid: true, tall: true, category: "기타" },
+  minigame: { label: "미니게임 기기(낚시/리듬/농사)", w: 2, h: 1, solid: true, tall: true, category: "놀이" },
+  atm: { label: "ATM(예치/이자/송금)", w: 1, h: 2, solid: true, tall: true, category: "기타" },
   custom: { label: "커스텀(이미지 URL)", w: 1, h: 1, solid: false, interaction: "none", category: "기타" },
 };
 
