@@ -25,7 +25,7 @@ import { useRoomChannel } from "@/hooks/useRoomChannel";
 import { useControlChannel, type ControlChannel } from "@/hooks/useControlChannel";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { logEvent } from "@/lib/analytics";
-import { addKill, banTarget, blockTarget, buyWeapon, claimAttendance, claimQuest, grantHearts, incrementRaceWin, saveBio as saveBioAction, sendDm, sendFriendRequest, setRoomClosed as setRoomClosedAction, setStatus as setStatusAction, unblockTarget } from "@/app/actions";
+import { addKill, banTarget, blockTarget, buyWeapon, claimAttendance, claimQuest, grantHearts, incrementRaceWin, saveBio as saveBioAction, sendDm, sendFriendRequest, setRoomClosed as setRoomClosedAction, setStatus as setStatusAction, spendHearts, unblockTarget } from "@/app/actions";
 import StoreModal, { type WalletState } from "./StoreModal";
 import FriendsPanel from "./FriendsPanel";
 import MiniGamesModal from "./MiniGamesModal";
@@ -72,6 +72,26 @@ const GUEST_ID_KEY = "pixeltown:guest-id";
 const BLOCK_KEY = "pixeltown:blocked";
 const GUEST_WALLET_KEY = "affinity:guest-wallet";
 const GUEST_ATT_KEY = "affinity:guest-attendance";
+const SPORTSCAR_SUMMON_KEY = "mount-sportscar";
+const CAR_SUMMON_COST = 10;
+
+function bioStorageKey(id: string) {
+  return `affinity:bio:${id}`;
+}
+
+function loadRememberedBio(id: string): string {
+  try {
+    return typeof localStorage !== "undefined" ? localStorage.getItem(bioStorageKey(id)) ?? "" : "";
+  } catch {
+    return "";
+  }
+}
+
+function rememberBio(id: string, bio: string) {
+  try {
+    localStorage.setItem(bioStorageKey(id), bio);
+  } catch {}
+}
 
 function loadGuestWallet(): WalletState {
   try {
@@ -222,11 +242,12 @@ export default function GameClient({
   const [identity, setIdentity] = useState<Identity | null>(null);
   useEffect(() => {
     if (profile) {
+      const rememberedBio = profile.bio?.trim() ? profile.bio : loadRememberedBio(profile.id);
       setIdentity({
         id: profile.id,
         name: profile.display_name || "Player",
         guest: false,
-        bio: profile.bio ?? "",
+        bio: rememberedBio,
         appearance: {
           skin: profile.skin,
           color: profile.color,
@@ -253,8 +274,10 @@ export default function GameClient({
   const bioPromptedRef = useRef(false);
   useEffect(() => {
     if (!identity) return;
-    setMyBio(identity.bio);
-    if (!identity.bio && !bioPromptedRef.current) {
+    const rememberedBio = identity.bio?.trim() ? identity.bio : loadRememberedBio(identity.id);
+    if (rememberedBio !== identity.bio) identity.bio = rememberedBio;
+    setMyBio(rememberedBio);
+    if (!rememberedBio && !bioPromptedRef.current) {
       bioPromptedRef.current = true;
       setModal({ kind: "bio" });
     }
@@ -309,6 +332,12 @@ export default function GameClient({
     }
   }, [wallet, profile]);
   const [mounted, setMounted] = useState(false);
+  const [summonedMount, setSummonedMount] = useState<string | null>(null);
+  const activeCosmetics = useMemo(() => {
+    const cos = equippedToCosmetics(wallet.equipped);
+    if (summonedMount) cos.mount = summonedMount;
+    return cos;
+  }, [wallet.equipped, summonedMount]);
   const [stats, setStats] = useState({ raceWins: profile?.race_wins ?? 0, kills: profile?.kills ?? 0 });
   const [roomClosed, setRoomClosedState] = useState(!!room.closed);
   const [pianoPlaced, setPianoPlaced] = useState(false);
@@ -336,6 +365,7 @@ export default function GameClient({
   walletRef.current = wallet;
   const ridersRef = useRef<Set<string>>(new Set()); // 내 양탄자에 탑승한 파티원
   const ridingOwnerRef = useRef<string | null>(null); // 내가 탑승 중인 주인
+  const touchRewardRef = useRef<Map<string, number>>(new Map());
   const statusRef = useRef(status);
   statusRef.current = status;
   const panelRef = useRef(panel);
@@ -548,6 +578,7 @@ export default function GameClient({
       case "boss": {
         const b = payload as RtEvents["boss"];
         if (!isHostRef.current) {
+          bossRef.current = b;
           engineRef.current?.setBoss(b);
           setBossHud({ hp: b.hp, maxHp: b.maxHp, kind: b.kind, alive: b.alive });
         }
@@ -561,7 +592,7 @@ export default function GameClient({
             b.hp -= d.amount;
             if (b.hp <= 0) {
               b.alive = false;
-              bossRespawnRef.current = Date.now() + 15000;
+              bossRespawnRef.current = Number.POSITIVE_INFINITY;
               addToast(`🏆 보스 처치! (${d.byName} 막타)`);
             }
           }
@@ -772,7 +803,16 @@ export default function GameClient({
               });
           }
         },
-        onTouch: (id) => setTouchedId(id),
+        onTouch: (id) => {
+          setTouchedId(id);
+          if (!id) return;
+          const now = Date.now();
+          const prev = touchRewardRef.current.get(id) ?? 0;
+          if (now - prev > 60_000) {
+            touchRewardRef.current.set(id, now);
+            awardHearts(1, "하이파이브");
+          }
+        },
         onGhost: (active) =>
           addToast(active ? "👻 고스트 모드 (10초) — 반투명 상태예요" : "고스트 모드 해제"),
         onShot: (p) => {
@@ -802,8 +842,8 @@ export default function GameClient({
               b.hp -= amount;
               if (b.hp <= 0) {
                 b.alive = false;
-                bossRespawnRef.current = Date.now() + 15000;
-                addToast("🏆 보스를 처치했습니다! 잠시 후 재등장");
+                bossRespawnRef.current = Number.POSITIVE_INFINITY;
+                addToast("🏆 보스를 처치했습니다! 레버를 다시 내리기 전까지 재등장하지 않아요");
               }
             }
           } else if (multiplayer) {
@@ -844,7 +884,7 @@ export default function GameClient({
         guest: identity.guest,
         status: statusRef.current,
         bio: identity.bio,
-        cosmetics: equippedToCosmetics(walletRef.current.equipped),
+        cosmetics: activeCosmetics,
       }
     );
     engineRef.current = engine;
@@ -877,10 +917,9 @@ export default function GameClient({
   // 장착 코스메틱 / 탈것 상태를 엔진(내 캐릭터)에 반영 + presence 전파
   useEffect(() => {
     if (!engineRef.current) return;
-    const cos = equippedToCosmetics(wallet.equipped);
-    engineRef.current.patchSelf({ cosmetics: cos, mounted: mounted && !!cos.mount });
+    engineRef.current.patchSelf({ cosmetics: activeCosmetics, mounted: mounted && !!activeCosmetics.mount });
     pushPresence();
-  }, [wallet.equipped, mounted, engineReady, pushPresence]);
+  }, [activeCosmetics, mounted, engineReady, pushPresence]);
 
   // 모달 열림 → 게임 입력 잠금
   useEffect(() => {
@@ -1424,6 +1463,55 @@ export default function GameClient({
     })();
   }, [chatTab, profile, identity]);
 
+  // ----- 하트 지급/사용 -----
+  function awardHearts(amount: number, label = "보상") {
+    const gain = Math.max(0, Math.min(30, Math.floor(amount)));
+    if (gain <= 0) return;
+    setWallet((w) => ({ ...w, hearts: w.hearts + gain }));
+    if (profile) {
+      grantHearts(gain).then((res) => {
+        if ("error" in res) {
+          addToast(`❌ ${label} 저장 실패: ${res.error}`);
+          return;
+        }
+        setWallet((w) => ({ ...w, hearts: Math.max(w.hearts, res.hearts) }));
+      });
+    }
+    addToast(`💗 ${label} +${gain}`);
+  }
+
+  function summonCar() {
+    if (mounted && summonedMount === SPORTSCAR_SUMMON_KEY) {
+      setMounted(false);
+      setSummonedMount(null);
+      addToast("🚶 자동차에서 내렸어요");
+      return;
+    }
+    if (walletRef.current.hearts < CAR_SUMMON_COST) {
+      addToast(`❌ 자동차 소환에는 ${CAR_SUMMON_COST}하트가 필요해요`);
+      return;
+    }
+    const activate = () => {
+      setSummonedMount(SPORTSCAR_SUMMON_KEY);
+      setMounted(true);
+      addToast(`🚗 자동차를 소환했어요 (-${CAR_SUMMON_COST}💗)`);
+    };
+    setWallet((w) => ({ ...w, hearts: w.hearts - CAR_SUMMON_COST }));
+    if (profile) {
+      spendHearts(CAR_SUMMON_COST).then((res) => {
+        if ("error" in res) {
+          setWallet((w) => ({ ...w, hearts: w.hearts + CAR_SUMMON_COST }));
+          setMounted(false);
+          setSummonedMount(null);
+          addToast("❌ 자동차 소환 실패: " + res.error);
+          return;
+        }
+        setWallet((w) => ({ ...w, hearts: res.hearts }));
+      });
+    }
+    activate();
+  }
+
   // ----- 소개(bio) 저장 -----
   function applyBio(text: string) {
     const bio = filterProfanity(text.slice(0, 200));
@@ -1431,8 +1519,11 @@ export default function GameClient({
     engineRef.current?.patchSelf({ bio: bio || undefined });
     pushPresence();
     if (identity) identity.bio = bio;
+    if (identity) rememberBio(identity.id, bio);
     if (profile) {
-      saveBioAction(bio);
+      saveBioAction(bio).then((res) => {
+        if ("error" in res) addToast("❌ 소개 서버 저장 실패: " + res.error);
+      });
     } else {
       // 게스트: 로컬 저장 (다음 접속에도 유지)
       try {
@@ -1720,15 +1811,28 @@ export default function GameClient({
           {wallet.equipped.mount && (
             <button
               onClick={() => {
-                setMounted((m) => !m);
-                addToast(mounted ? "🚶 탈것에서 내렸어요" : "🐺 탈것을 소환했어요");
+                const wasMounted = mounted && !summonedMount;
+                setSummonedMount(null);
+                setMounted(!wasMounted);
+                addToast(wasMounted ? "🚶 탈것에서 내렸어요" : "🐺 탈것을 소환했어요");
               }}
-              className={`rounded-xl px-3 py-2 text-sm backdrop-blur ${mounted ? "bg-accent text-white" : "bg-panel/80 text-slate-300 hover:text-white"}`}
+              className={`rounded-xl px-3 py-2 text-sm backdrop-blur ${mounted && !summonedMount ? "bg-accent text-white" : "bg-panel/80 text-slate-300 hover:text-white"}`}
               title="탈것 타기/내리기"
             >
               🐴 탈것
             </button>
           )}
+          <button
+            onClick={summonCar}
+            className={`rounded-xl px-3 py-2 text-sm backdrop-blur ${
+              mounted && summonedMount === SPORTSCAR_SUMMON_KEY
+                ? "bg-accent text-white"
+                : "bg-panel/80 text-slate-300 hover:text-white"
+            }`}
+            title={`자동차 소환/내리기 — ${CAR_SUMMON_COST}하트`}
+          >
+            🚗 자동차 -{CAR_SUMMON_COST}💗
+          </button>
           {wallet.inventory.includes("portable-piano") && (
             <button
               onClick={() => {
@@ -1904,7 +2008,7 @@ export default function GameClient({
           <div className="mx-auto mt-1 h-2.5 w-56 overflow-hidden rounded-full bg-black/50">
             <div className="h-full bg-red-500" style={{ width: `${Math.max(0, (bossHud.hp / bossHud.maxHp) * 100)}%` }} />
           </div>
-          <div className="mt-1 text-xs text-slate-300">부스트/터보로 들이받아 HP를 깎으세요! (그냥 부딪히면 스턴)</div>
+          <div className="mt-1 text-xs text-slate-300">클릭/스페이스 원거리 공격으로 HP를 깎으세요! (부딪히면 스턴)</div>
         </div>
       )}
 
@@ -2207,16 +2311,7 @@ export default function GameClient({
         <MiniGamesModal
           initialGame={modal.game}
           onReward={(hearts) => {
-            if (hearts <= 0) return;
-            const gain = Math.min(30, hearts);
-            if (profile) {
-              grantHearts(hearts).then((res) => {
-                if (!("error" in res)) setWallet((w) => ({ ...w, hearts: res.hearts }));
-              });
-            } else {
-              setWallet((w) => ({ ...w, hearts: w.hearts + gain }));
-            }
-            addToast(`🎮 미니게임 보상 +${gain}💗`);
+            awardHearts(hearts, "미니게임 보상");
           }}
           onClose={() => setModal(null)}
         />
@@ -2645,7 +2740,7 @@ function WarpModal({
     if (!sel) return;
     setProgress(0);
     const start = Date.now();
-    const dur = 5000;
+    const dur = 2500;
     const t = setInterval(() => {
       const p = Math.min(1, (Date.now() - start) / dur);
       setProgress(p);
@@ -2662,7 +2757,7 @@ function WarpModal({
     <Modal title="🌀 워프 — 전체 지도" onClose={onClose}>
       <div className="space-y-3">
         <p className="text-sm text-slate-400">
-          이동할 장소를 선택하면 5초 게이지가 찬 뒤 워프합니다. (도중에 취소 가능)
+          이동할 장소를 선택하면 2.5초 게이지가 찬 뒤 워프합니다. (도중에 취소 가능)
         </p>
         <div className="grid max-h-[52vh] grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3">
           {rooms.map((r) => {

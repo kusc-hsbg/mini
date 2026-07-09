@@ -85,7 +85,7 @@ export interface EngineCallbacks {
   onDeath?: (killerName: string) => void; // 내가 죽음
   onKill?: (victimName: string) => void; // 내가 상대를 처치
   onRespawn?: () => void;
-  onBossHit?: (amount: number) => void; // 부스트 상태로 보스를 들이받아 데미지
+  onBossHit?: (amount: number) => void; // 보스에게 원거리 공격 명중
   onPlayerRightClick?: (id: string) => void; // 우클릭 — 탈것 탑승 요청 등
   onDetach?: () => void; // 탈것에서 내림(승객 해제)
   onFishingSpot?: (near: boolean) => void; // 물가 근접 여부 변화 (낚시)
@@ -175,7 +175,6 @@ export class GameEngine {
   private respawnAt = 0;
   // 보스 레이드
   private boss: { x: number; y: number; hp: number; maxHp: number; kind: string; alive: boolean } | null = null;
-  private bossHitAt = 0;
   // 레이스 아이템 (아이템 박스/기름 웅덩이)
   private raceItems: MapObject[] = [];
   private itemCooldowns = new Map<string, number>(); // object id -> 다시 활성화되는 시각
@@ -557,6 +556,14 @@ export class GameEngine {
     return false;
   }
 
+  private canAttackBoss(): boolean {
+    return !!(this.map.race && this.boss?.alive && !this.self.dead);
+  }
+
+  private canShoot(): boolean {
+    return !this.self.dead && (this.isPk() || this.canAttackBoss());
+  }
+
   screenToTile(sx: number, sy: number): { x: number; y: number } {
     const rect = this.canvas.getBoundingClientRect();
     const x = (sx - rect.left) / this.zoom + this.cam.x;
@@ -578,7 +585,7 @@ export class GameEngine {
     if (k === "z") this.toggleDance();
     if (k === "g") this.toggleGhost();
     if (k === " ") {
-      if (this.isPk() && !this.self.dead) this.fire(this.aimAngle);
+      if (this.canShoot()) this.fire(this.aimAngle);
       else if (this.self.onBike) this.tryTurbo();
     }
   };
@@ -622,7 +629,7 @@ export class GameEngine {
   };
 
   private onMouseMove = (e: MouseEvent) => {
-    if (this.isPk()) this.setAimFromScreen(e.clientX, e.clientY);
+    if (this.canShoot()) this.setAimFromScreen(e.clientX, e.clientY);
   };
 
   private onContextMenu = (e: MouseEvent) => {
@@ -640,8 +647,8 @@ export class GameEngine {
 
   private onClick = (e: MouseEvent) => {
     if (this.editorMode) return;
-    // PK 존: 클릭한 방향으로 발사
-    if (this.isPk() && !this.inputLocked) {
+    // PK 존 또는 레이스 보스: 클릭한 방향으로 발사
+    if (this.canShoot() && !this.inputLocked) {
       this.setAimFromScreen(e.clientX, e.clientY);
       this.fire(this.aimAngle);
       return;
@@ -788,14 +795,7 @@ export class GameEngine {
     if (!b || !b.alive) return;
     const d = Math.hypot(b.x - this.self.x, b.y - this.self.y);
     if (d < 34) {
-      const boosting = this.self.onBike && now < this.effectUntil && this.effectMult > 1.05;
-      if (boosting) {
-        if (now > this.bossHitAt) {
-          this.bossHitAt = now + 500;
-          this.cb.onBossHit?.(8);
-          this.addEmote(this.self.id, { id: `bh${now}`, kind: "emoji", value: "💥", at: Date.now() });
-        }
-      } else if (now > this.stunUntil) {
+      if (now > this.stunUntil) {
         // 보스에게 부딪힘 — 스턴 + 넉백
         this.stunUntil = now + 900;
         const ang = Math.atan2(this.self.y - b.y, this.self.x - b.x);
@@ -861,7 +861,7 @@ export class GameEngine {
 
   // 발사 (angle 라디안). 무기의 pellet/spread 만큼 투사체 생성 + 브로드캐스트.
   fire(angle: number) {
-    if (!this.isPk() || this.self.dead) return;
+    if (!this.canShoot()) return;
     const w = WEAPON_MAP[this.self.weapon ?? "pistol"];
     if (!w) return;
     const now = performance.now();
@@ -878,7 +878,7 @@ export class GameEngine {
   }
 
   receiveShot(p: ShotPayload) {
-    if (!this.isPk()) return;
+    if (!this.isPk() && !this.map.race) return;
     if (p.from === this.self.id) return; // 내 발사는 로컬에서 이미 생성
     this.spawnProjectile(p, false);
   }
@@ -926,6 +926,11 @@ export class GameEngine {
     else this.pushState();
   }
 
+  private bossDamage(w: (typeof WEAPON_MAP)[string]) {
+    if (w.damage <= 0) return 0;
+    return Math.max(4, Math.round(w.damage * 0.6));
+  }
+
   private die() {
     if (this.self.dead) return;
     this.self.dead = true;
@@ -968,7 +973,7 @@ export class GameEngine {
 
   private updatePk(dt: number, now: number) {
     // 부활
-    if (this.self.dead && now >= this.respawnAt) this.respawn();
+    if (this.isPk() && this.self.dead && now >= this.respawnAt) this.respawn();
 
     // 투사체 이동/충돌
     const remain: Projectile[] = [];
@@ -990,8 +995,20 @@ export class GameEngine {
         if (w.radiusPx) this.explode(pr.x, pr.y, w, pr.from);
         consumed = true;
       }
+      // 레이스 보스 피격 판정: 내 투사체만 피해를 보고한다.
+      if (!consumed && pr.mine && this.canAttackBoss() && w.damage > 0) {
+        const b = this.boss!;
+        const d = Math.hypot(pr.x - b.x, pr.y - b.y);
+        const hitRadius = (w.radiusPx ?? 0) > 0 ? (w.radiusPx ?? 40) : 24;
+        if (d <= hitRadius + 18) {
+          if (w.radiusPx) this.explode(pr.x, pr.y, w, pr.from);
+          this.cb.onBossHit?.(this.bossDamage(w));
+          this.addEmote(this.self.id, { id: `bh${now}`, kind: "emoji", value: "💥", at: Date.now() });
+          consumed = true;
+        }
+      }
       // 자신 피격 판정 (내가 쏜 것 제외)
-      if (!consumed && pr.from !== this.self.id && !this.self.dead && !this.self.ghost) {
+      if (!consumed && this.isPk() && pr.from !== this.self.id && !this.self.dead && !this.self.ghost) {
         const d = Math.hypot(pr.x - this.self.x, pr.y - this.self.y);
         if (d < PLAYER_RADIUS + 4) {
           if (w.radiusPx) this.explode(pr.x, pr.y, w, pr.from);
@@ -1188,7 +1205,7 @@ export class GameEngine {
     this.updateRace(now);
 
     // PK 전투 (아레나 전용)
-    if (this.isPk()) this.updatePk(dt, now);
+    if (this.isPk() || this.map.race) this.updatePk(dt, now);
 
     // 보스 레이드 (레이스 맵)
     if (this.map.race && this.boss) this.updateBoss(now);
@@ -1542,7 +1559,7 @@ export class GameEngine {
     }
 
     // PK 전투 렌더 (투사체/이펙트/체력바)
-    if (this.isPk()) this.renderPk(ctx, now);
+    if (this.isPk() || this.projectiles.length > 0 || this.effects.length > 0) this.renderPk(ctx, now);
 
     // 보스 레이드 렌더
     if (this.map.race && this.boss?.alive) this.renderBoss(ctx);

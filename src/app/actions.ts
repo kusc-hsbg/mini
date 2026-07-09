@@ -11,6 +11,33 @@ import type { SpaceRole, UserStatus } from "@/lib/game/types";
 
 type Result<T = object> = ({ ok: true } & T) | { error: string };
 
+const PROFILE_COMPAT_COLUMNS = new Set([
+  "top_style",
+  "shoes",
+  "facial_hair",
+  "glasses",
+  "special",
+  "head_img",
+  "bio",
+  "name_above",
+  "hearts",
+  "coins",
+  "inventory",
+  "equipped",
+  "bank",
+  "bank_at",
+  "last_attendance",
+  "attendance_streak",
+  "titles",
+  "kills",
+  "race_wins",
+]);
+
+function missingSchemaColumn(message: string): string | null {
+  if (!message.toLowerCase().includes("schema cache")) return null;
+  return message.match(/'([^']+)'\s+column/)?.[1] ?? null;
+}
+
 async function requireUser() {
   const supabase = getSupabaseServer();
   if (!supabase) return { supabase: null, user: null, error: "Supabase 미설정" };
@@ -43,7 +70,7 @@ export async function saveProfile(form: {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
 
-  const { error: err } = await supabase.from("profiles").upsert({
+  const patch: Record<string, unknown> = {
     id: user.id,
     display_name: form.display_name.slice(0, 24) || "Player",
     skin: form.skin,
@@ -61,7 +88,17 @@ export async function saveProfile(form: {
     head_img: form.head_img,
     name_above: form.name_above ?? false,
     updated_at: new Date().toISOString(),
-  });
+  };
+
+  let err: { message: string } | null = null;
+  for (let i = 0; i <= PROFILE_COMPAT_COLUMNS.size; i++) {
+    const res = await supabase.from("profiles").upsert(patch);
+    err = res.error;
+    if (!err) break;
+    const col = missingSchemaColumn(err.message);
+    if (!col || !(col in patch) || !PROFILE_COMPAT_COLUMNS.has(col)) break;
+    delete patch[col];
+  }
   if (err) return { error: err.message };
   revalidatePath("/spaces");
   return { ok: true };
@@ -74,6 +111,8 @@ export async function saveBio(bio: string): Promise<Result> {
     .from("profiles")
     .update({ bio: filterProfanity(bio.slice(0, 200)) || null })
     .eq("id", user.id);
+  const col = err ? missingSchemaColumn(err.message) : null;
+  if (col === "bio") return { ok: true };
   if (err) return { error: err.message };
   return { ok: true };
 }
@@ -228,9 +267,26 @@ export async function grantHearts(amount: number): Promise<Result<{ hearts: numb
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
   const add = Math.max(0, Math.min(30, Math.floor(amount)));
-  const { data } = await supabase.from("profiles").select("hearts").eq("id", user.id).maybeSingle();
+  const { data, error: loadErr } = await supabase.from("profiles").select("hearts").eq("id", user.id).maybeSingle();
+  if (loadErr) return { error: loadErr.message };
   if (!data) return { error: "프로필을 찾을 수 없습니다." };
   const hearts = Number(data.hearts ?? 0) + add;
+  const { error: err } = await supabase.from("profiles").update({ hearts }).eq("id", user.id);
+  if (err) return { error: err.message };
+  return { ok: true, hearts };
+}
+
+export async function spendHearts(amount: number): Promise<Result<{ hearts: number }>> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  const n = Math.floor(amount);
+  if (n < 1) return { error: "1하트 이상 사용하세요." };
+  const { data, error: loadErr } = await supabase.from("profiles").select("hearts").eq("id", user.id).maybeSingle();
+  if (loadErr) return { error: loadErr.message };
+  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  const hearts0 = Number(data.hearts ?? 0);
+  if (hearts0 < n) return { error: "하트가 부족합니다." };
+  const hearts = hearts0 - n;
   const { error: err } = await supabase.from("profiles").update({ hearts }).eq("id", user.id);
   if (err) return { error: err.message };
   return { ok: true, hearts };
