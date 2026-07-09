@@ -33,7 +33,7 @@ import BankModal from "./BankModal";
 import PkHud from "./PkHud";
 import AuctionModal from "./AuctionModal";
 import { SHOP_MAP } from "@/lib/game/shop";
-import { KILL_TITLES } from "@/lib/game/weapons";
+import { KILL_TITLES, WEAPON_MAP } from "@/lib/game/weapons";
 import type { PlayerCosmetics } from "@/lib/game/types";
 import type { RtEventName, RtEvents, WbOp } from "@/lib/realtime/protocol";
 import type {
@@ -70,6 +70,24 @@ import { Modal, ToastStack, type ToastItem } from "./ui";
 const GUEST_KEY = "pixeltown:guest-appearance";
 const GUEST_ID_KEY = "pixeltown:guest-id";
 const BLOCK_KEY = "pixeltown:blocked";
+const GUEST_WALLET_KEY = "affinity:guest-wallet";
+const GUEST_ATT_KEY = "affinity:guest-attendance";
+
+function loadGuestWallet(): WalletState {
+  try {
+    const raw = typeof localStorage !== "undefined" ? localStorage.getItem(GUEST_WALLET_KEY) : null;
+    if (raw) {
+      const w = JSON.parse(raw);
+      return {
+        hearts: Number(w.hearts ?? 200),
+        coins: Number(w.coins ?? 0),
+        inventory: Array.isArray(w.inventory) ? w.inventory : [],
+        equipped: w.equipped ?? {},
+      };
+    }
+  } catch {}
+  return { hearts: 200, coins: 0, inventory: [], equipped: {} };
+}
 
 interface Identity {
   id: string;
@@ -159,7 +177,7 @@ type ModalState =
   | { kind: "store" }
   | { kind: "warp" }
   | { kind: "quest" }
-  | { kind: "minigame" }
+  | { kind: "minigame"; game?: "fishing" | "rhythm" | "farming" }
   | { kind: "bank" }
   | { kind: "collection" }
   | { kind: "auction" }
@@ -264,6 +282,7 @@ export default function GameClient({
   const [blocked, setBlocked] = useState<Set<string>>(() => new Set(initialBlocks));
   const [followId, setFollowId] = useState<string | null>(null);
   const [hintObj, setHintObj] = useState<MapObject | null>(null);
+  const [nearWater, setNearWater] = useState(false);
   const [liveMap, setLiveMap] = useState<MapData>(() => resolveMap(room.template_key, room.map_data));
   const [mapEditorKey, setMapEditorKey] = useState(0);
   const [raceState, setRaceState] = useState<RaceState | null>(null);
@@ -271,12 +290,24 @@ export default function GameClient({
   const [touchedId, setTouchedId] = useState<string | null>(null);
   const [pkState, setPkState] = useState<{ hp: number; dead: boolean; weapon: string; kills: number } | null>(null);
   const [myBio, setMyBio] = useState("");
-  const [wallet, setWallet] = useState<WalletState>(() => ({
-    hearts: profile?.hearts ?? 0,
-    coins: profile?.coins ?? 0,
-    inventory: profile?.inventory ?? [],
-    equipped: profile?.equipped ?? {},
-  }));
+  const [wallet, setWallet] = useState<WalletState>(() =>
+    profile
+      ? {
+          hearts: profile.hearts ?? 0,
+          coins: profile.coins ?? 0,
+          inventory: profile.inventory ?? [],
+          equipped: profile.equipped ?? {},
+        }
+      : loadGuestWallet()
+  );
+  // 게스트 지갑은 로컬에 영속화 (하트/아이템이 실제로 유지·증가하도록)
+  useEffect(() => {
+    if (!profile) {
+      try {
+        localStorage.setItem(GUEST_WALLET_KEY, JSON.stringify(wallet));
+      } catch {}
+    }
+  }, [wallet, profile]);
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState({ raceWins: profile?.race_wins ?? 0, kills: profile?.kills ?? 0 });
   const [roomClosed, setRoomClosedState] = useState(!!room.closed);
@@ -683,6 +714,7 @@ export default function GameClient({
         },
         onPortal: (portal) => handlePortal(portal),
         onInteractHint: (obj) => setHintObj(obj),
+        onFishingSpot: (near) => setNearWater(near),
         onPlayerClick: () => setPanel("participants"),
         onPlayerRightClick: (id) => {
           if (!multiplayer) return;
@@ -1008,18 +1040,29 @@ export default function GameClient({
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [pushPresence]);
 
-  // ----- 출석 보상 (로그인 유저, 하루 1회) -----
+  // ----- 출석 보상 (하루 1회) -----
   useEffect(() => {
-    if (!profile) return;
     let done = false;
-    (async () => {
-      const res = await claimAttendance();
-      if (done || "error" in res || res.already) return;
-      setWallet((w) => ({ ...w, hearts: res.hearts, coins: res.coins }));
-      addToast(
-        `📅 출석 완료! 💗${res.rewardHearts}${res.rewardCoins ? ` +🪙${res.rewardCoins}` : ""} 획득 (연속 ${res.streak}일)`
-      );
-    })();
+    if (profile) {
+      (async () => {
+        const res = await claimAttendance();
+        if (done || "error" in res || res.already) return;
+        setWallet((w) => ({ ...w, hearts: res.hearts, coins: res.coins }));
+        addToast(
+          `📅 출석 완료! 💗${res.rewardHearts}${res.rewardCoins ? ` +🪙${res.rewardCoins}` : ""} 획득 (연속 ${res.streak}일)`
+        );
+      })();
+    } else {
+      // 게스트: 로컬 하루 1회 출석
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        if (localStorage.getItem(GUEST_ATT_KEY) !== today) {
+          localStorage.setItem(GUEST_ATT_KEY, today);
+          setWallet((w) => ({ ...w, hearts: w.hearts + 60 }));
+          addToast("📅 출석 완료! 💗60 획득 (게스트)");
+        }
+      } catch {}
+    }
     return () => {
       done = true;
     };
@@ -1207,6 +1250,7 @@ export default function GameClient({
       } else if (e.key.toLowerCase() === "x") {
         const obj = engineRef.current?.getHintObject();
         if (obj) openObject(obj);
+        else if (engineRef.current?.isNearWater()) setModal({ kind: "minigame", game: "fishing" });
       } else if (e.key === " ") {
         // 워프 포탈 근처에서 스페이스 → 전체 미니맵 워프
         const obj = engineRef.current?.getHintObject();
@@ -1628,12 +1672,10 @@ export default function GameClient({
         </div>
 
         <div className="pointer-events-auto flex items-center gap-2">
-          {profile && (
-            <div className="flex items-center gap-2 rounded-xl bg-panel/80 px-3 py-2 text-sm backdrop-blur">
-              <span className="font-semibold text-pink-400">💗 {wallet.hearts.toLocaleString()}</span>
-              <span className="font-semibold text-yellow-400">🪙 {wallet.coins.toLocaleString()}</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2 rounded-xl bg-panel/80 px-3 py-2 text-sm backdrop-blur">
+            <span className="font-semibold text-pink-400">💗 {wallet.hearts.toLocaleString()}</span>
+            <span className="font-semibold text-yellow-400">🪙 {wallet.coins.toLocaleString()}</span>
+          </div>
           <button
             onClick={() => setModal({ kind: "store" })}
             className="rounded-xl bg-panel/80 px-3 py-2 text-sm text-slate-300 backdrop-blur hover:text-white"
@@ -1845,6 +1887,7 @@ export default function GameClient({
         <div>
           WASD/방향키 이동 · 더블클릭 자동 이동 · X 상호작용
           {hintObj ? ` (${hintObj.name ?? OBJECT_DEFS[hintObj.type]?.label ?? "오브젝트"})` : ""}
+          {!hintObj && nearWater ? <span className="text-cyan-300"> · 🎣 X로 낚시</span> : ""}
         </div>
         <div>1~0 이모지 · Z 춤 · X 의자 앉기 · F {liveMap.vehicle === "kart" ? "카트" : "오토바이"} · G 고스트 · M 미니맵</div>
       </div>
@@ -1882,13 +1925,32 @@ export default function GameClient({
             setPkState((p) => (p ? { ...p, weapon: k } : p));
           }}
           onBuyWeapon={(k) => {
-            buyWeapon(k).then((res) => {
-              if ("error" in res) addToast("❌ " + res.error);
-              else {
-                setWallet((w) => ({ ...w, hearts: res.hearts, coins: res.coins, inventory: res.inventory }));
-                addToast("🔫 무기를 구매했어요!");
-              }
-            });
+            const wp = WEAPON_MAP[k];
+            if (!wp) return;
+            const invKey = `weapon-${k}`;
+            if (wallet.inventory.includes(invKey)) return;
+            const bal = wp.currency === "heart" ? wallet.hearts : wallet.coins;
+            if (bal < wp.price) {
+              addToast(wp.currency === "heart" ? "❌ 하트가 부족합니다." : "❌ 코인이 부족합니다.");
+              return;
+            }
+            if (profile) {
+              buyWeapon(k).then((res) => {
+                if ("error" in res) addToast("❌ " + res.error);
+                else {
+                  setWallet((w) => ({ ...w, hearts: res.hearts, coins: res.coins, inventory: res.inventory }));
+                  addToast("🔫 무기를 구매했어요!");
+                }
+              });
+            } else {
+              setWallet((w) => ({
+                ...w,
+                hearts: wp.currency === "heart" ? w.hearts - wp.price : w.hearts,
+                coins: wp.currency === "coin" ? w.coins - wp.price : w.coins,
+                inventory: [...w.inventory, invKey],
+              }));
+              addToast("🔫 무기를 구매했어요!");
+            }
           }}
         />
       )}
@@ -2143,16 +2205,18 @@ export default function GameClient({
       )}
       {modal?.kind === "minigame" && (
         <MiniGamesModal
+          initialGame={modal.game}
           onReward={(hearts) => {
             if (hearts <= 0) return;
+            const gain = Math.min(30, hearts);
             if (profile) {
               grantHearts(hearts).then((res) => {
                 if (!("error" in res)) setWallet((w) => ({ ...w, hearts: res.hearts }));
               });
-              addToast(`🎮 미니게임 보상 +${Math.min(30, hearts)}💗`);
             } else {
-              addToast("🎮 잘했어요! (하트 적립은 로그인 필요)");
+              setWallet((w) => ({ ...w, hearts: w.hearts + gain }));
             }
+            addToast(`🎮 미니게임 보상 +${gain}💗`);
           }}
           onClose={() => setModal(null)}
         />

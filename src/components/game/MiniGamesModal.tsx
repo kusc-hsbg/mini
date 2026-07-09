@@ -9,11 +9,13 @@ type Game = "hub" | "fishing" | "rhythm" | "farming";
 export default function MiniGamesModal({
   onReward,
   onClose,
+  initialGame,
 }: {
   onReward: (hearts: number) => void; // 획득 하트 지급(부모가 서버 반영, 최대 30 클램프)
   onClose: () => void;
+  initialGame?: Game;
 }) {
-  const [game, setGame] = useState<Game>("hub");
+  const [game, setGame] = useState<Game>(initialGame ?? "hub");
   return (
     <Modal title="🎮 미니게임" onClose={onClose}>
       {game === "hub" && (

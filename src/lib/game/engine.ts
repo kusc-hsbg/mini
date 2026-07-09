@@ -88,6 +88,7 @@ export interface EngineCallbacks {
   onBossHit?: (amount: number) => void; // 부스트 상태로 보스를 들이받아 데미지
   onPlayerRightClick?: (id: string) => void; // 우클릭 — 탈것 탑승 요청 등
   onDetach?: () => void; // 탈것에서 내림(승객 해제)
+  onFishingSpot?: (near: boolean) => void; // 물가 근접 여부 변화 (낚시)
 }
 
 export type RaceItemKind = "turbo" | "boost" | "slow" | "oil" | "rocket" | "ink" | "meteor";
@@ -161,6 +162,7 @@ export class GameEngine {
   private portalArmed = true; // 포털 재발동 방지
   private hintObj: MapObject | null = null;
   private touchedId: string | null = null; // 근접(닿음)한 상대 — 하트 표시 대상
+  private nearWater = false; // 물가 근접 (낚시)
 
   private bikeCooldown = 0;
   private ghostUntil = 0; // 고스트 모드 만료 시각(performance.now 기준)
@@ -541,6 +543,18 @@ export class GameEngine {
 
   getTouchedId() {
     return this.touchedId;
+  }
+
+  // 플레이어 주변(8방향)에 물(~) 타일이 있으면 낚시 가능.
+  isNearWater(): boolean {
+    const col = Math.floor(this.self.x / TILE);
+    const row = Math.floor(this.self.y / TILE);
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (this.map.tiles[row + dr]?.[col + dc] === "~") return true;
+      }
+    }
+    return false;
   }
 
   screenToTile(sx: number, sy: number): { x: number; y: number } {
@@ -1208,6 +1222,13 @@ export class GameEngine {
     if (hint?.id !== this.hintObj?.id) {
       this.hintObj = hint;
       this.cb.onInteractHint?.(hint);
+    }
+
+    // 물가 근접(낚시) 감지
+    const nw = this.isNearWater();
+    if (nw !== this.nearWater) {
+      this.nearWater = nw;
+      this.cb.onFishingSpot?.(nw);
     }
 
     // 근접(닿음) 감지 — 가장 가까운 상대. 하트/소개 팝업 대상.

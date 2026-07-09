@@ -41,11 +41,24 @@ export default function StoreModal({
   const owned = new Set(wallet.inventory);
 
   function doBuy(item: ShopItem) {
-    if (!loggedIn) {
-      setMsg("상점 이용은 로그인이 필요해요.");
+    setMsg(null);
+    if (owned.has(item.key)) return;
+    const bal = item.currency === "heart" ? wallet.hearts : wallet.coins;
+    if (bal < item.price) {
+      setMsg(item.currency === "heart" ? "❌ 하트가 부족합니다." : "❌ 코인이 부족합니다.");
       return;
     }
-    setMsg(null);
+    if (!loggedIn) {
+      // 게스트: 로컬 구매
+      const inv = [...wallet.inventory, item.key];
+      onChange(
+        item.currency === "heart"
+          ? { hearts: wallet.hearts - item.price, inventory: inv }
+          : { coins: wallet.coins - item.price, inventory: inv }
+      );
+      setMsg(`✅ ${item.name} 구매 완료!`);
+      return;
+    }
     startTransition(async () => {
       const res = await buyItem(item.key);
       if ("error" in res) {
@@ -58,6 +71,13 @@ export default function StoreModal({
   }
 
   function doEquip(slot: string, key: string | null) {
+    if (!loggedIn) {
+      const eq = { ...wallet.equipped };
+      if (key === null) delete eq[slot];
+      else eq[slot] = key;
+      onChange({ equipped: eq });
+      return;
+    }
     startTransition(async () => {
       const res = await equipItem(slot, key);
       if ("error" in res) {
@@ -70,6 +90,16 @@ export default function StoreModal({
 
   function doExchange(n: number) {
     setMsg(null);
+    const cost = n * HEARTS_PER_COIN;
+    if (wallet.hearts < cost) {
+      setMsg("❌ 하트가 부족합니다.");
+      return;
+    }
+    if (!loggedIn) {
+      onChange({ hearts: wallet.hearts - cost, coins: wallet.coins + n });
+      setMsg(`✅ ${n}코인으로 환전했어요!`);
+      return;
+    }
     startTransition(async () => {
       const res = await exchangeToCoins(n);
       if ("error" in res) {
