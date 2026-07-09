@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PixelTown — 게더타운 클론",
-  description: "캐릭터가 돌아다니고 이모지로 소통하는 실시간 가상 공간",
+  title: "AFFINITY — 실시간 메타버스",
+  description: "아바타로 만나 닿고, 달리고, 겨루는 세련된 실시간 가상 세계. 레이싱·PK·상점·소셜.",
 };
 
 export const viewport: Viewport = {

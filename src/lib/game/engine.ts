@@ -1461,13 +1461,31 @@ export class GameEngine {
       const py = p.y * TILE;
       const d = Math.hypot(px - this.self.x, py - this.self.y);
       if (d < TILE * 4 && p.label) {
-        ctx.font = "10px ui-sans-serif, system-ui";
+        ctx.font = "600 10px ui-sans-serif, system-ui";
         ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
         const tw = ctx.measureText(p.label).width;
-        ctx.fillStyle = "rgba(10,14,25,0.8)";
-        ctx.fillRect(px - tw / 2 - 4, py - 22, tw + 8, 13);
-        ctx.fillStyle = "#93c5fd";
-        ctx.fillText(p.label, px, py - 12);
+        const bx = px - tw / 2 - 8;
+        const by = py - 26;
+        const bw = tw + 16;
+        const bh = 16;
+        // 발광 그림자
+        ctx.shadowColor = "rgba(124,140,255,0.7)";
+        ctx.shadowBlur = 10;
+        const grd = ctx.createLinearGradient(bx, by, bx, by + bh);
+        grd.addColorStop(0, "rgba(40,52,96,0.95)");
+        grd.addColorStop(1, "rgba(20,26,52,0.95)");
+        ctx.fillStyle = grd;
+        roundRectPath(ctx, bx, by, bw, bh, 8);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = "rgba(147,197,253,0.6)";
+        ctx.lineWidth = 1;
+        roundRectPath(ctx, bx, by, bw, bh, 8);
+        ctx.stroke();
+        ctx.fillStyle = "#cde0ff";
+        ctx.fillText(p.label, px, by + bh / 2 + 0.5);
+        ctx.textBaseline = "alphabetic";
       }
     }
 

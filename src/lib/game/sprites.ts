@@ -765,21 +765,59 @@ export function drawObject(
       break;
     }
     case "door": {
-      ctx.fillStyle = "rgba(124,140,255,0.18)";
-      roundRect(ctx, x + 2, y + 2, TILE - 4, TILE - 4, 6);
+      // 세련된 차원문 포탈 — 타원형 소용돌이 + 발광 림 + 룬 입자
+      const cx = x + TILE / 2;
+      const cy = y + TILE / 2;
+      const rx = TILE / 2 - 3;
+      const ry = TILE / 2 - 1;
+      ctx.save();
+      // 바닥 발광
+      ctx.fillStyle = `rgba(124,140,255,${0.1 + Math.sin(t / 500) * 0.03})`;
+      ctx.beginPath();
+      ctx.ellipse(cx, y + TILE - 3, rx + 4, 5, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = "rgba(124,140,255,0.8)";
-      ctx.setLineDash([5, 4]);
-      roundRect(ctx, x + 2.5, y + 2.5, TILE - 5, TILE - 5, 6);
+      // 포탈 내부 그라데이션
+      const grd = ctx.createRadialGradient(cx, cy, 1, cx, cy, rx);
+      grd.addColorStop(0, "rgba(240,245,255,0.95)");
+      grd.addColorStop(0.4, "rgba(124,140,255,0.85)");
+      grd.addColorStop(0.8, "rgba(80,60,180,0.65)");
+      grd.addColorStop(1, "rgba(30,20,70,0.2)");
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 소용돌이 아크
+      ctx.strokeStyle = "rgba(255,255,255,0.55)";
+      ctx.lineWidth = 1.4;
+      for (let a = 0; a < 3; a++) {
+        const off = (t / 320) + (a * Math.PI * 2) / 3;
+        ctx.beginPath();
+        for (let s = 0; s < 1; s += 0.08) {
+          const ang = off + s * Math.PI * 2;
+          const rr = s * rx * 0.9;
+          const px = cx + Math.cos(ang) * rr;
+          const py = cy + Math.sin(ang) * rr * (ry / rx);
+          if (s === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+      }
+      // 발광 림
+      ctx.strokeStyle = `rgba(160,180,255,${0.7 + Math.sin(t / 300) * 0.25})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.setLineDash([]);
-      const pulse = 0.6 + Math.sin(t / 350) * 0.3;
-      ctx.globalAlpha = pulse;
-      ctx.font = "14px serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("🌀", x + TILE / 2, y + TILE / 2);
-      ctx.globalAlpha = 1;
+      // 떠다니는 입자
+      for (let p = 0; p < 3; p++) {
+        const pa = t / 400 + p * 2.1;
+        const pr = rx * (0.5 + 0.4 * Math.sin(t / 500 + p));
+        ctx.fillStyle = "rgba(220,230,255,0.9)";
+        ctx.beginPath();
+        ctx.arc(cx + Math.cos(pa) * pr, cy + Math.sin(pa) * pr * 0.7, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
       break;
     }
     case "cone": {

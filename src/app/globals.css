@@ -21,14 +21,70 @@ body {
     radial-gradient(900px 500px at 100% 100%, rgba(52, 211, 153, 0.08), transparent);
 }
 
+/* ---------- 브랜드 / 랜딩 ---------- */
+.brand-title {
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 0.95;
+  background: linear-gradient(100deg, #a8b6ff 0%, #6c8cff 25%, #7dd3fc 50%, #34d399 75%, #a8b6ff 100%);
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: sheen 8s linear infinite;
+  text-shadow: 0 0 60px rgba(108, 140, 255, 0.25);
+}
+@keyframes sheen {
+  to {
+    background-position: 220% center;
+  }
+}
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.glass {
+  background: rgba(22, 30, 49, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+/* 은은한 격자 배경 (레이어) */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, #000 40%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, #000 40%, transparent 100%);
+}
+.orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(60px);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 font-medium transition;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 font-medium transition;
 }
 .btn-primary {
-  @apply btn bg-accent text-white hover:brightness-110 active:scale-[0.98];
+  @apply btn text-white active:scale-[0.98];
+  background: linear-gradient(135deg, #6c8cff, #7c5cff);
+  box-shadow: 0 8px 24px -8px rgba(108, 140, 255, 0.7);
+}
+.btn-primary:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 10px 30px -8px rgba(108, 140, 255, 0.85);
 }
 .btn-ghost {
-  @apply btn bg-panel2 text-slate-200 hover:bg-panel2/70;
+  @apply btn border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10;
 }
 .card {
   @apply rounded-2xl border border-white/5 bg-panel/80 p-5 shadow-xl backdrop-blur;
