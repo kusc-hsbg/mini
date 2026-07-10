@@ -29,7 +29,7 @@ export default function CreateSpaceForm() {
     <div className="card">
       <h2 className="font-semibold text-white">🏗️ 스페이스 만들기</h2>
       <p className="mb-4 mt-1 text-sm text-slate-400">
-        광장·오피스·파크 3개 맵이 자동 생성됩니다. 생성 후 설정에서 방 추가, 비밀번호,
+        광장·오피스·파크·서킷·비치·스타홀 등 프리셋 맵이 자동 생성됩니다. 생성 후 설정에서 방 추가, 비밀번호,
         멤버 역할, 게스트 체크인 등을 관리할 수 있어요.
       </p>
       <div className="space-y-3">

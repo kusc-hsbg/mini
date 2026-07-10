@@ -1321,6 +1321,10 @@ export default function GameClient({
       return;
     }
     if (obj.type === "npc") {
+      if (obj.props?.text || obj.props?.interaction) {
+        setModal({ kind: "object", obj });
+        return;
+      }
       setModal({ kind: "quest" });
       return;
     }

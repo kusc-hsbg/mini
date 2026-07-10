@@ -1092,42 +1092,57 @@ export function drawObject(
       break;
     }
     case "npc": {
-      // 안내 NPC — 로브를 입은 가이드 + 말풍선
+      // 안내/전시 NPC — head props가 있으면 캐릭터 머리 이미지를 사용한다.
       const cx = x + w / 2;
       const footY = y + h;
+      const robe = o.props?.color ?? "#6d28d9";
+      const head = o.props?.head;
+      const headImg = head ? getImage(headImgUrl(head)) : null;
       ctx.fillStyle = "rgba(0,0,0,0.25)";
       ctx.beginPath();
       ctx.ellipse(cx, footY - 2, 9, 3, 0, 0, Math.PI * 2);
       ctx.fill();
       // 로브
-      ctx.fillStyle = "#6d28d9";
-      roundRect(ctx, cx - 9, y + 16, 18, h - 18, 5);
+      ctx.fillStyle = robe;
+      roundRect(ctx, cx - 10, y + 24, 20, h - 26, 5);
       ctx.fill();
-      ctx.fillStyle = "#7c3aed";
-      roundRect(ctx, cx - 9, y + 16, 18, 6, 5);
+      ctx.fillStyle = lighten(robe, 0.18);
+      roundRect(ctx, cx - 10, y + 24, 20, 6, 5);
       ctx.fill();
-      // 얼굴
+      // 팔
+      ctx.fillStyle = darken(robe, 0.12);
+      ctx.fillRect(cx - 13, y + 28, 4, 17);
+      ctx.fillRect(cx + 9, y + 28, 4, 17);
       ctx.fillStyle = "#f1c27d";
-      ctx.beginPath();
-      ctx.arc(cx, y + 12, 8, 0, Math.PI * 2);
-      ctx.fill();
-      // 모자(고깔)
-      ctx.fillStyle = "#4c1d95";
-      ctx.beginPath();
-      ctx.moveTo(cx - 9, y + 8);
-      ctx.lineTo(cx + 9, y + 8);
-      ctx.lineTo(cx, y - 8);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = "#fbbf24";
-      ctx.beginPath();
-      ctx.arc(cx, y - 8, 2, 0, Math.PI * 2);
-      ctx.fill();
-      // 눈
-      ctx.fillStyle = "#111827";
-      ctx.fillRect(cx - 3, y + 11, 1.6, 2);
-      ctx.fillRect(cx + 1.5, y + 11, 1.6, 2);
-      // 말풍선 "!"
+      ctx.fillRect(cx - 13, y + 43, 4, 4);
+      ctx.fillRect(cx + 9, y + 43, 4, 4);
+      if (headImg) {
+        const s = 40;
+        ctx.drawImage(headImg, cx - s / 2, y - 5, s, s);
+      } else {
+        // 얼굴
+        ctx.fillStyle = "#f1c27d";
+        ctx.beginPath();
+        ctx.arc(cx, y + 14, 8, 0, Math.PI * 2);
+        ctx.fill();
+        // 모자(고깔)
+        ctx.fillStyle = "#4c1d95";
+        ctx.beginPath();
+        ctx.moveTo(cx - 9, y + 10);
+        ctx.lineTo(cx + 9, y + 10);
+        ctx.lineTo(cx, y - 6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#fbbf24";
+        ctx.beginPath();
+        ctx.arc(cx, y - 6, 2, 0, Math.PI * 2);
+        ctx.fill();
+        // 눈
+        ctx.fillStyle = "#111827";
+        ctx.fillRect(cx - 3, y + 13, 1.6, 2);
+        ctx.fillRect(cx + 1.5, y + 13, 1.6, 2);
+      }
+      // 말풍선
       const by = y - 18 + Math.sin(t / 300) * 2;
       ctx.fillStyle = "#fde68a";
       roundRect(ctx, cx + 6, by, 14, 13, 4);
@@ -1136,7 +1151,7 @@ export function drawObject(
       ctx.font = "bold 11px ui-sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("!", cx + 13, by + 7);
+      ctx.fillText(o.props?.text ? "i" : "!", cx + 13, by + 7);
       ctx.textBaseline = "alphabetic";
       break;
     }

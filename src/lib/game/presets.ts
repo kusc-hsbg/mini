@@ -1,4 +1,4 @@
-// 대형 프리셋 맵 5종 (광장/오피스/파크/그랑프리 서킷/비치 리조트).
+// 프리셋 맵 모음 (광장/오피스/파크/서킷/비치/스타홀/카페/아레나/테마 서킷).
 // 코드로 조립해 실수 없이 큰 맵을 만든다. (기존 24x18 → 80x50급, 면적 약 9배)
 import type {
   MapData,
@@ -928,101 +928,170 @@ function buildBeach(): MapData {
   };
 }
 
-// ==================== 6. 스타홀 갤러리 (46 x 30) ====================
-// 명예의전당 컨셉 — 그림책 캐릭터 5인을 전시대(exhibit)에 전시. X 키로 정보 팝업.
+// ==================== 6. 스타홀 갤러리 (52 x 34) ====================
+// 명예의전당 컨셉 — 그림책 캐릭터 NPC를 전시관처럼 배치. X 키로 정보 팝업.
 
 function buildStarhall(): MapData {
-  const W = 46;
-  const H = 30;
+  const W = 52;
+  const H = 34;
   const g = new Grid(W, H, "k"); // 어두운 마루
   const c = ctx("sh");
 
   // 벽 + 바닥 마감
   g.border(0, 0, W, H, "#");
-  // 중앙 레드카펫 러너 (입구 → 안쪽)
-  g.rect(21, 6, 4, H - 7, "m");
-  // 앞쪽 대리석 통로
-  g.rect(4, 5, W - 8, 3, "-");
+  // 중앙 레드카펫 러너 (입구 → 안쪽) + 밝은 대리석 관람 동선
+  g.rect(24, 7, 4, H - 9, "m");
+  g.rect(5, 4, W - 10, 5, "-");
+  g.rect(6, 13, 15, 14, ".");
+  g.rect(31, 13, 15, 14, ".");
+  g.rect(6, 28, W - 12, 3, "-");
+  g.rect(24, 29, 4, 4, "m");
 
-  // ---- 전시대 5인 (뒷벽 라인) ----
-  const stars: { head: string; name: string; title: string; text: string }[] = [
+  // ---- 캐릭터 NPC 전시 ----
+  const stars: { head: string; name: string; title: string; text: string; x: number; y: number; color: string }[] = [
     {
       head: "b-lucian",
       name: "루시안",
       title: "빛의 기사",
       text: "어둠이 가장 짙은 밤, 스스로 등불이 되기를 택한 소년.\n두려움 앞에서도 한 걸음 더 나아가는 용기의 상징입니다.",
+      x: 7,
+      y: 6,
+      color: "#2563eb",
     },
     {
       head: "g-lucia",
       name: "루시아",
       title: "여명의 성녀",
       text: "새벽의 첫 빛과 함께 나타난다는 소녀.\n지친 이들의 마음에 가장 먼저 아침을 가져다줍니다.",
+      x: 16,
+      y: 6,
+      color: "#db2777",
     },
     {
       head: "b-moses",
       name: "모세",
       title: "물길을 가르는 자",
       text: "지팡이 하나로 바다를 갈랐다는 전설의 인도자.\n막다른 길에서도 새로운 길을 여는 지혜를 지녔습니다.",
+      x: 25,
+      y: 5,
+      color: "#0f766e",
     },
     {
       head: "g-ariel",
       name: "아리엘",
       title: "바람의 노래",
       text: "하늘과 바다를 잇는 노래를 부르는 음유시인.\n그 선율을 들은 이는 누구나 다시 꿈을 꾼다고 합니다.",
+      x: 34,
+      y: 6,
+      color: "#7c3aed",
     },
     {
       head: "b-cross",
       name: "크로스",
       title: "맹세의 수호자",
       text: "마지막 순간까지 약속을 지켜낸 방패의 기사.\n한 번 맺은 언약은 결코 저버리지 않습니다.",
+      x: 43,
+      y: 6,
+      color: "#334155",
+    },
+    {
+      head: "g-hana",
+      name: "하나",
+      title: "별빛 기록관",
+      text: "잊힌 이름과 작은 승리를 별자리처럼 기록하는 소녀.\n그녀의 수첩에는 모두가 주인공이 되는 순간이 적혀 있습니다.",
+      x: 8,
+      y: 16,
+      color: "#ca8a04",
+    },
+    {
+      head: "g-sarah",
+      name: "사라",
+      title: "정원의 예언자",
+      text: "시들어가는 꽃에서도 다음 계절을 읽는 예언자.\n조용한 말 한마디로 불안한 마음을 단단히 붙잡아 줍니다.",
+      x: 17,
+      y: 21,
+      color: "#16a34a",
+    },
+    {
+      head: "b-eden",
+      name: "에덴",
+      title: "푸른 문지기",
+      text: "새로운 세계로 이어지는 문을 지키는 소년.\n준비된 사람에게는 언제나 다음 방으로 가는 길을 열어줍니다.",
+      x: 25,
+      y: 23,
+      color: "#0284c7",
+    },
+    {
+      head: "g-deborah",
+      name: "데보라",
+      title: "심판의 종소리",
+      text: "혼란 속에서도 무엇이 옳은지 분명히 말하는 지도자.\n그녀의 종소리는 망설이던 사람들을 다시 움직이게 합니다.",
+      x: 34,
+      y: 21,
+      color: "#be123c",
+    },
+    {
+      head: "b-uriel",
+      name: "우리엘",
+      title: "별의 해설자",
+      text: "밤하늘의 빛을 읽어 여행자에게 방향을 알려주는 해설자.\n길을 잃은 사람에게 가장 먼저 말을 걸어줍니다.",
+      x: 43,
+      y: 16,
+      color: "#9333ea",
     },
   ];
-  const startX = 5;
-  const gap = 8;
-  stars.forEach((s, i) => {
-    const ex = startX + i * gap;
-    add(c, "exhibit", ex, 2, {
+  stars.forEach((s) => {
+    c.spotlights.push({ x: s.x, y: s.y + 2 });
+    add(c, "npc", s.x, s.y, {
       name: s.name,
-      props: { head: s.head, title: s.title, text: s.text },
+      props: {
+        interaction: "note",
+        head: s.head,
+        title: s.title,
+        color: s.color,
+        text: s.text,
+      },
     });
-    // 전시대 사이 장식 램프
-    if (i < stars.length - 1) add(c, "lamp", ex + gap - 3, 3);
   });
-  add(c, "lamp", 3, 3);
-  add(c, "lamp", W - 4, 3);
+  for (const [lx, ly] of [[4, 4], [12, 4], [21, 4], [30, 4], [39, 4], [47, 4], [5, 14], [46, 14], [5, 26], [46, 26]] as [number, number][]) {
+    add(c, "lamp", lx, ly);
+  }
 
-  // ---- 관람 벤치 + 중앙 트로피(분수 대용) ----
-  add(c, "bench", 10, 18);
-  add(c, "bench", 16, 18);
-  add(c, "bench", 30, 18);
-  add(c, "bench", 36, 18);
-  add(c, "fountain", 21, 12);
-  add(c, "flowerbed", 8, 24);
-  add(c, "flowerbed", 12, 24);
-  add(c, "flowerbed", 33, 24);
-  add(c, "flowerbed", 37, 24);
-  add(c, "plant", 2, 26);
-  add(c, "plant", W - 3, 26);
+  // ---- 관람 벤치 + 중앙 조형물 ----
+  add(c, "rug", 24, 12, { props: { color: "#7c2d12" } });
+  add(c, "statue", 25, 13, { name: "별의 조형물" });
+  add(c, "bench", 10, 27);
+  add(c, "bench", 18, 27);
+  add(c, "bench", 32, 27);
+  add(c, "bench", 40, 27);
+  add(c, "flowerbed", 7, 29);
+  add(c, "flowerbed", 12, 29);
+  add(c, "flowerbed", 39, 29);
+  add(c, "flowerbed", 44, 29);
+  add(c, "plant", 2, 30);
+  add(c, "plant", W - 3, 30);
+  c.areas.push({ id: "starhall-main", name: "⭐ 스타홀 메인 갤러리", x: 4, y: 4, w: W - 8, h: H - 6 });
 
   // ---- 안내판 + 스폰 + 포털 ----
-  add(c, "sign", 18, 25, {
+  add(c, "sign", 18, 30, {
     name: "스타홀 안내",
     props: {
-      text: "⭐ 스타홀 갤러리\n\n그림책 속 전설의 인물 다섯을 전시한 명예의 전당입니다.\n전시대 앞에서 X 키를 누르면 그 인물의 이야기를 볼 수 있어요.",
+      text: "⭐ 스타홀 갤러리\n\n그림책 속 전설의 인물을 NPC처럼 전시한 명예의 전당입니다.\n캐릭터 앞에서 X 키를 누르면 인물 정보를 볼 수 있어요.",
     },
   });
-  c.spawns.push({ x: 22, y: 24 }, { x: 23, y: 24 }, { x: 21, y: 23 }, { x: 24, y: 23 });
-  add(c, "door", 22, 28, { name: "갤러리 출구" });
-  c.portals.push({ id: "sh-po-plaza", x: 22, y: 28, kind: "room", roomTemplate: "plaza", label: "⛲ 광장으로" });
-  add(c, "door", 23, 28, { name: "갤러리 출구" });
-  c.portals.push({ id: "sh-po-plaza2", x: 23, y: 28, kind: "room", roomTemplate: "plaza", label: "⛲ 광장으로" });
-  add(c, "portalhub", 29, 20, { name: "워프 포탈" });
-  c.labels.push({ x: 4, y: 1, text: "⭐ 스타홀 갤러리 — 명예의 전당" });
+  c.spawns.push({ x: 25, y: 30 }, { x: 26, y: 30 }, { x: 24, y: 29 }, { x: 27, y: 29 });
+  add(c, "door", 25, 32, { name: "갤러리 출구" });
+  c.portals.push({ id: "sh-po-plaza", x: 25, y: 32, kind: "room", roomTemplate: "plaza", label: "⛲ 광장으로" });
+  add(c, "door", 26, 32, { name: "갤러리 출구" });
+  c.portals.push({ id: "sh-po-plaza2", x: 26, y: 32, kind: "room", roomTemplate: "plaza", label: "⛲ 광장으로" });
+  add(c, "portalhub", 31, 29, { name: "워프 포탈" });
+  c.labels.push({ x: 4, y: 1, text: "⭐ 스타홀 갤러리 — NPC 전시관" });
+  c.labels.push({ x: 19, y: 10, text: "캐릭터 앞에서 X" });
 
   return {
     key: "starhall",
     name: "스타홀 갤러리",
-    description: "그림책 캐릭터 5인을 전시한 명예의 전당. 전시대에서 X 키로 인물 정보를 볼 수 있어요.",
+    description: "그림책 캐릭터 NPC를 전시한 명예의 전당. 캐릭터 앞에서 X 키로 인물 정보를 볼 수 있어요.",
     tiles: g.rows(),
     objects: c.objects,
     areas: c.areas,

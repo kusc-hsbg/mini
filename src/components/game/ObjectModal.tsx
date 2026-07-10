@@ -16,6 +16,7 @@ export default function ObjectModal({
   const kind: InteractionKind = objectInteraction(obj);
   const url = obj.props?.url ?? "";
   const title = obj.name ?? "오브젝트";
+  const subtitle = obj.props?.title;
 
   let body: React.ReactNode = null;
   let wide = true;
@@ -98,6 +99,12 @@ export default function ObjectModal({
       wide = false;
       body = (
         <div className="whitespace-pre-wrap rounded-lg bg-panel2 p-4 text-sm leading-relaxed text-slate-200">
+          {subtitle && (
+            <div className="mb-3 border-b border-white/10 pb-3">
+              <div className="text-xs text-accent2">전시 프로필</div>
+              <div className="mt-1 text-base font-semibold text-white">{subtitle}</div>
+            </div>
+          )}
           {obj.props?.text || "내용이 없습니다."}
         </div>
       );

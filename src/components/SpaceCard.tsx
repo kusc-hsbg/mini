@@ -37,7 +37,7 @@ export default function SpaceCard({
           {!space.is_public && <span title="비공개">🔒</span>}
         </div>
         <p className="mt-1 line-clamp-2 text-sm text-slate-400">
-          {space.description || "광장 · 오피스 · 파크 3개 맵"}
+          {space.description || "광장 · 오피스 · 파크 · 스타홀 등 프리셋 맵"}
         </p>
         <p className="mt-1 text-xs text-slate-600">/s/{space.slug}</p>
       </div>

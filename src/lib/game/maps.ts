@@ -68,11 +68,11 @@ export type InteractionKind =
 
 export interface ObjectProps {
   url?: string; // website/image/video/external/sound/spotify/game/커스텀 이미지
-  text?: string; // note 내용 / 전시대 설명
+  text?: string; // note 내용 / 전시대·NPC 설명
   color?: string; // 색 변형(러그/소파 등)
   interaction?: InteractionKind; // 기본 상호작용 덮어쓰기
-  title?: string; // 전시대: 캐릭터 칭호/부제
-  head?: string; // 전시대: 그림책 캐릭터 헤어 키 (headImgUrl 용)
+  title?: string; // 전시대/NPC: 캐릭터 칭호/부제
+  head?: string; // 전시대/NPC: 그림책 캐릭터 헤어 키 (headImgUrl 용)
 }
 
 export interface MapObject {
