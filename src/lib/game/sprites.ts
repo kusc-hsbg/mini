@@ -1012,26 +1012,26 @@ export function drawObject(
       ctx.fillStyle = "#8f6840";
       ctx.fillRect(cx - 27, pedTop + 18, 54, 4);
       // 민트 발광 액자
-      const frTop = y + 4;
-      const frH = h - 34;
-      const frW = Math.min(w - 14, 78);
+      const frSize = Math.min(w - 16, h - 42, 80);
+      const frTop = y + 8;
+      const frLeft = cx - frSize / 2;
       ctx.shadowColor = "rgba(125,255,212,0.65)";
       ctx.shadowBlur = 10;
       ctx.fillStyle = "#dffdf2";
-      roundRect(ctx, cx - frW / 2 - 3, frTop - 3, frW + 6, frH + 6, 5);
+      roundRect(ctx, frLeft - 3, frTop - 3, frSize + 6, frSize + 6, 5);
       ctx.fill();
       ctx.shadowBlur = 0;
       ctx.fillStyle = "#42c99a";
-      roundRect(ctx, cx - frW / 2, frTop, frW, frH, 4);
+      roundRect(ctx, frLeft, frTop, frSize, frSize, 4);
       ctx.fill();
       ctx.fillStyle = "#f8fff9";
-      roundRect(ctx, cx - frW / 2 + 2, frTop + 2, frW - 4, 5, 2);
+      roundRect(ctx, frLeft + 2, frTop + 2, frSize - 4, 5, 2);
       ctx.fill();
       // 작품 이미지 영역
-      const inX = cx - frW / 2 + 5;
+      const inX = frLeft + 5;
       const inY = frTop + 5;
-      const inW = frW - 10;
-      const inH = frH - 10;
+      const inW = frSize - 10;
+      const inH = frSize - 10;
       ctx.fillStyle = "#16312e";
       ctx.fillRect(inX, inY, inW, inH);
       const art = o.props?.image ? getImage(o.props.image) : null;

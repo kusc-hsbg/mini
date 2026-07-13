@@ -1041,8 +1041,8 @@ function buildStarhall(): MapData {
       author: "최아영",
       sourceUrl: "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=328981869&srsltid=AfmBOoptfkCjv3RHjJvBpDgnNsjjG5smDVv-75qwGJMFe8WtWB3uDt_f",
       text: "작가는 쓰디쓴 아픔과 고뇌에 시달리기도 하지만, '다시' 일어나 한 걸음 걸어갈 수 있는 삶의 회복 탄력성을 말한다. 설령 슬픔이 몰려오더라도 기쁨으로 벅차오르는 순간이 찾아오고, 허무함이 깊숙이 파고들더라도 쉼을 가지며 평안함을 회복할 수 있다는 메시지를 통해 삶을 바라보는 긍정성을 담아냈다. '오늘도 참 좋은 하루'였다는 문장을 통해 모든 삶에 위로와 격려를 보낸다.",
-      x: 7,
-      y: 12,
+      x: 8,
+      y: 14,
       color: "#2563eb",
     },
     {
@@ -1050,8 +1050,8 @@ function buildStarhall(): MapData {
       author: "추아이비",
       sourceUrl: "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=397730691",
       text: "현무비는 별빛이 자신의 구멍을 채우는 순간 중요한 깨달음을 얻는다. 부족해 보였던 자리가 바람과 파도, 빛과 이야기가 머무는 공간이라는 사실을 알게 된 것이다. 《수상한 돌멩이 현무비》는 결핍을 부정하지 않고 품어낼 때 비로소 자신만의 가치를 발견할 수 있다는 깊은 메시지를 전하며 잔잔한 울림을 남긴다.",
-      x: 17,
-      y: 10,
+      x: 18,
+      y: 12,
       color: "#db2777",
     },
     {
@@ -1060,7 +1060,7 @@ function buildStarhall(): MapData {
       sourceUrl: "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=397730462",
       text: "깊은 밤 펼쳐지는 탈출 작전과 각자의 개성이 드러나는 동물 캐릭터들은 이야기에 생동감을 더한다. 강아지는 망을 보고, 고양이는 틈을 찾고, 젖소는 뿔로 울타리를 부수는 장면들은 마치 한 편의 애니메이션처럼 흥미롭게 펼쳐진다. 밝고 유쾌한 분위기 속에서도 자유와 행복에 대한 메시지를 자연스럽게 담아낸 그림책이다.",
       x: 28,
-      y: 7,
+      y: 9,
       color: "#0f766e",
     },
     {
@@ -1068,8 +1068,8 @@ function buildStarhall(): MapData {
       author: "안지우",
       sourceUrl: "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=317045992",
       text: "어느 날, 망고는 휴가를 간다는 팻말만 덩그러니 남긴 채 떠난다. 해변가에 도착한 망고는 시원한 파도 소리를 들으며 가장 좋아하는 책 '효녀 심청'을 읽는다. 책을 다 읽은 망고가 여느 때처럼 한 장 한 장 책장을 찢어 꿀꺽 삼키자 책 속으로 빨려 들어가게 된다. 심봉사 집 앞에 도착한 망고, 심청이를 기다리다 개울까지 마중 나가는 심봉사를 뒤따른다. 그때, 다리를 건너던 심봉사가 그만 발을 헛디디는데...",
-      x: 39,
-      y: 10,
+      x: 38,
+      y: 12,
       color: "#7c3aed",
     },
     {
@@ -1077,8 +1077,8 @@ function buildStarhall(): MapData {
       author: "정기주",
       sourceUrl: "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=337285021",
       text: "친구들에게 상처 주는 말과 행동을 함으로써 결국 혼자가 된 자람이의 상황을 통해, 자신의 행동이 어떠한 결과를 가져오는지 보여준다. 반면 자람이는 자신에게 닥친 위기의 순간에 도움을 받게 된다. 도와 달라는 말 한마디에 무서운 동물을 용감하게 물리치며 자신을 구해준 선한 동물들에게 고마움을 느끼며 타인을 향한 배려와 존중의 중요성을 깨닫게 된다.",
-      x: 49,
-      y: 12,
+      x: 48,
+      y: 14,
       color: "#334155",
     },
     {
@@ -1086,8 +1086,8 @@ function buildStarhall(): MapData {
       author: "이지윤",
       sourceUrl: "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=340711637",
       text: "길고양이가 안쓰러웠던 하루는 친구 연두와 함께 매일 밥과 물을 주며 돌보기 시작한다. 길고양이에게 마루라는 이름을 붙어주고, 깨끗하게 씻겨주고, 리본을 달아주며 더욱 가까워진다. 하루는 마루와 함께 보내는 시간이 너무 행복해 집에서 키울 수 있도록 마루와 작전을 세운다. 엄마가 좋아하는 꽃다발을 준비한 마루, 하루네 집으로 들어갈 수 있을까?",
-      x: 7,
-      y: 24,
+      x: 8,
+      y: 23,
       color: "#ca8a04",
     },
     {
@@ -1105,7 +1105,7 @@ function buildStarhall(): MapData {
       sourceUrl: "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=333666988",
       text: "주인공 의리 토끼와 의지 거북이 성경 말씀을 교훈으로 삼아 철인 3종 경기를 펼치는 이야기다. '부지런한 자가 받는 축복의 메시지'를 새기며 매일을 부지런히 살아가던 어느 날, 철인 3종 경기가 열린다. 의리 토끼와 의지 거북 모두 자신감을 가지고 경기에 임하지만, 중간중간 맞닥뜨리는 심리적 갈등을 '겸손한 자가 받는 축복의 메시지'를 통해 이겨낸다. 그런데 결승점에 다다른 막상막하의 순간, 주변의 시선으로 인해 집중력이 흐트러진 의지 거북이 그만 넘어지고 만다.",
       x: 28,
-      y: 28,
+      y: 27,
       color: "#0284c7",
     },
     {
@@ -1113,7 +1113,7 @@ function buildStarhall(): MapData {
       author: "박선주",
       sourceUrl: "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=343609371",
       text: "서아와 하동이가 이모의 편지를 받고 '은혜 동산'으로 여정을 떠나는 이야기다. 언제 어디서나 서아와 하동이를 지켜보는 새 친구 알로스와 함께 모험을 시작한다. 좁은 문을 통과하기 위해 자신을 낮추는 법을 배우고, 중보 돌다리를 건너기 위해 분별력과 결단력을 발휘하며, 은혜 동산에 도착하기 위해 믿음으로 기도하는 과정을 거친다. 모험 중에 받게 된 알파와 오메가 조각이 만나 특별한 열쇠가 되는데, 서아와 하동이는 특별한 열쇠로 어떤 믿음의 여정을 마치고 돌아올까?",
-      x: 39,
+      x: 38,
       y: 27,
       color: "#be123c",
     },
@@ -1122,8 +1122,8 @@ function buildStarhall(): MapData {
       author: "최선혜",
       sourceUrl: "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=336676228",
       text: "주인공 딸과 한쪽 눈을 잃은 '문방구 주인장' 아빠가 12년째 운영 중인 문방구에서 일어나는 따듯한 이야기다. 아빠는 동네 사람들에게 매일 사연을 받으며, 딸과 함께 사연에 맞는 선물과 쪽지를 준비한다. 고민 끝에 준비한 선물과 쪽지는, 사연의 주인공들에게 큰 위로와 격려가 되어 희망과 용기를 갖게 한다.",
-      x: 49,
-      y: 24,
+      x: 48,
+      y: 23,
       color: "#9333ea",
     },
   ];
@@ -1161,7 +1161,7 @@ function buildStarhall(): MapData {
   for (const [x, y] of [[3, 33], [55, 33], [6, 8], [52, 8], [6, 35], [52, 35]] as [number, number][]) add(c, "plant", x, y);
   for (const [x, y] of [[12, 19], [47, 19], [14, 31], [45, 31], [28, 33], [31, 33]] as [number, number][]) add(c, "lamp", x, y);
 
-  c.areas.push({ id: "starhall-main", name: "스타홀 메인 갤러리", x: 4, y: 7, w: W - 8, h: H - 10 });
+  c.areas.push({ id: "starhall-main", name: "스타홀 메인 갤러리", x: 5, y: 8, w: W - 10, h: H - 12 });
   c.spawns.push({ x: 29, y: 35 }, { x: 30, y: 35 }, { x: 28, y: 34 }, { x: 31, y: 34 });
   add(c, "door", 29, 37, { name: "갤러리 출구" });
   c.portals.push({ id: "sh-po-plaza", x: 29, y: 37, kind: "room", roomTemplate: "plaza", label: "광장으로" });

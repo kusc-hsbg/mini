@@ -305,7 +305,12 @@ export default function GameClient({
   const [blocked, setBlocked] = useState<Set<string>>(() => new Set(initialBlocks));
   const [followId, setFollowId] = useState<string | null>(null);
   const [hintObj, setHintObj] = useState<MapObject | null>(null);
-  const [exhibitCardPos, setExhibitCardPos] = useState<{ left: number; top: number } | null>(null);
+  const [exhibitCardPos, setExhibitCardPos] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    maxHeight: number;
+  } | null>(null);
   const [nearWater, setNearWater] = useState(false);
   const resolvedRoomMap = useMemo(() => resolveMap(room.template_key, room.map_data), [room.id, room.template_key, room.map_data]);
   const [liveMap, setLiveMap] = useState<MapData>(() => resolvedRoomMap);
@@ -2123,11 +2128,24 @@ export default function GameClient({
     const update = () => {
       const rect = engineRef.current?.objectScreenRect(starhallExhibit);
       if (!rect) return;
-      const panelW = 320;
-      const panelH = 300;
-      const left = Math.max(12, Math.min(window.innerWidth - panelW - 12, rect.right + 14));
-      const top = Math.max(76, Math.min(window.innerHeight - panelH - 12, rect.top + 4));
-      setExhibitCardPos({ left, top });
+      const margin = 12;
+      const topMargin = 76;
+      const panelW = Math.min(320, Math.max(240, window.innerWidth - margin * 2));
+      const availableHeight = Math.max(120, window.innerHeight - topMargin - margin);
+      const maxHeight = Math.min(440, availableHeight);
+      const rightLeft = rect.right + 14;
+      const leftLeft = rect.left - panelW - 14;
+      const centeredLeft = rect.left + rect.width / 2 - panelW / 2;
+      const left =
+        rightLeft + panelW + margin <= window.innerWidth
+          ? rightLeft
+          : leftLeft >= margin
+            ? leftLeft
+            : Math.max(margin, Math.min(window.innerWidth - panelW - margin, centeredLeft));
+      const desiredTop = rect.top + rect.height / 2 - maxHeight / 3;
+      const maxTop = Math.max(topMargin, window.innerHeight - maxHeight - margin);
+      const top = Math.min(maxTop, Math.max(topMargin, desiredTop));
+      setExhibitCardPos({ left, top, width: panelW, maxHeight });
     };
     update();
     const timer = setInterval(update, 80);
@@ -2448,8 +2466,13 @@ export default function GameClient({
 
       {starhallExhibit && exhibitCardPos && (
         <div
-          className="absolute z-20 max-h-[64vh] w-80 overflow-y-auto rounded-xl border border-amber-200/25 bg-[#101720]/94 shadow-2xl backdrop-blur-xl"
-          style={{ left: exhibitCardPos.left, top: exhibitCardPos.top }}
+          className="absolute z-20 overflow-y-auto rounded-xl border border-amber-200/25 bg-[#101720]/94 shadow-2xl backdrop-blur-xl"
+          style={{
+            left: exhibitCardPos.left,
+            top: exhibitCardPos.top,
+            width: exhibitCardPos.width,
+            maxHeight: exhibitCardPos.maxHeight,
+          }}
         >
           <div
             className="h-1.5"
@@ -2459,7 +2482,7 @@ export default function GameClient({
             <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-amber-100/70">STAR HALL</div>
             <div className="mt-3 flex gap-3">
               {starhallExhibit.props?.image && (
-                <div className="h-28 w-20 shrink-0 overflow-hidden rounded-lg border border-white/15 bg-slate-950">
+                <div className="h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-white/15 bg-slate-950">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={starhallExhibit.props.image}
@@ -3352,7 +3375,7 @@ function ExhibitModal({ obj, onClose }: { obj: MapObject; onClose: () => void })
     <Modal title={`⭐ ${obj.name ?? "전시 작품"}`} onClose={onClose}>
       <div className="space-y-3">
         <div className="flex gap-4">
-          <div className="relative h-36 w-28 shrink-0 overflow-hidden rounded-xl border-4 border-amber-500/70 bg-gradient-to-b from-slate-700 to-slate-900 shadow-lg">
+          <div className="relative h-36 w-36 shrink-0 overflow-hidden rounded-xl border-4 border-amber-500/70 bg-gradient-to-b from-slate-700 to-slate-900 shadow-lg">
             {image ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
