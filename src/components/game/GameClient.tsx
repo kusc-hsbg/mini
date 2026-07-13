@@ -302,6 +302,7 @@ export default function GameClient({
   const [blocked, setBlocked] = useState<Set<string>>(() => new Set(initialBlocks));
   const [followId, setFollowId] = useState<string | null>(null);
   const [hintObj, setHintObj] = useState<MapObject | null>(null);
+  const [exhibitCardPos, setExhibitCardPos] = useState<{ left: number; top: number } | null>(null);
   const [nearWater, setNearWater] = useState(false);
   const resolvedRoomMap = useMemo(() => resolveMap(room.template_key, room.map_data), [room.id, room.template_key, room.map_data]);
   const [liveMap, setLiveMap] = useState<MapData>(() => resolvedRoomMap);
@@ -1901,6 +1902,29 @@ export default function GameClient({
     null;
   const starhallExhibit = liveMap.key === "starhall" && hintObj?.type === "exhibit" ? hintObj : null;
 
+  useEffect(() => {
+    if (!starhallExhibit) {
+      setExhibitCardPos(null);
+      return;
+    }
+    const update = () => {
+      const rect = engineRef.current?.objectScreenRect(starhallExhibit);
+      if (!rect) return;
+      const panelW = 320;
+      const panelH = 300;
+      const left = Math.max(12, Math.min(window.innerWidth - panelW - 12, rect.right + 14));
+      const top = Math.max(76, Math.min(window.innerHeight - panelH - 12, rect.top + 4));
+      setExhibitCardPos({ left, top });
+    };
+    update();
+    const timer = setInterval(update, 80);
+    window.addEventListener("resize", update);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("resize", update);
+    };
+  }, [starhallExhibit, engineReady]);
+
   const areaOccupancy = currentArea
     ? players.filter((p) => p.areaId === currentArea.id).length
     : 0;
@@ -2209,18 +2233,38 @@ export default function GameClient({
         );
       })()}
 
-      {starhallExhibit && (
-        <div className="pointer-events-none absolute left-3 top-24 z-20 w-72 overflow-hidden rounded-xl border border-amber-200/25 bg-[#101720]/92 shadow-2xl backdrop-blur-xl">
+      {starhallExhibit && exhibitCardPos && (
+        <div
+          className="absolute z-20 max-h-[64vh] w-80 overflow-y-auto rounded-xl border border-amber-200/25 bg-[#101720]/94 shadow-2xl backdrop-blur-xl"
+          style={{ left: exhibitCardPos.left, top: exhibitCardPos.top }}
+        >
           <div
             className="h-1.5"
             style={{ background: starhallExhibit.props?.color ?? "linear-gradient(90deg,#facc15,#67e8f9)" }}
           />
           <div className="p-3">
             <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-amber-100/70">STAR HALL</div>
-            <div className="mt-1 text-lg font-semibold text-white">{starhallExhibit.name}</div>
-            {starhallExhibit.props?.title && <div className="text-sm text-cyan-100">{starhallExhibit.props.title}</div>}
+            <div className="mt-3 flex gap-3">
+              {starhallExhibit.props?.image && (
+                <div className="h-28 w-20 shrink-0 overflow-hidden rounded-lg border border-white/15 bg-slate-950">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={starhallExhibit.props.image}
+                    alt={starhallExhibit.props.filename ?? starhallExhibit.name ?? "스타홀 작품"}
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+              )}
+              <div className="min-w-0">
+                <div className="text-[11px] font-medium text-cyan-100">{starhallExhibit.props?.filename}</div>
+                <div className="mt-1 text-lg font-semibold text-white">{starhallExhibit.name}</div>
+                {starhallExhibit.props?.sourceUrl && (
+                  <div className="mt-1 truncate text-[11px] text-slate-400">{starhallExhibit.props.sourceUrl}</div>
+                )}
+              </div>
+            </div>
             {starhallExhibit.props?.text && (
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{starhallExhibit.props.text}</p>
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{starhallExhibit.props.text}</p>
             )}
           </div>
         </div>
@@ -3084,13 +3128,21 @@ function WarpModal({
 
 // ---------- 스타홀 전시대 정보 ----------
 function ExhibitModal({ obj, onClose }: { obj: MapObject; onClose: () => void }) {
+  const image = obj.props?.image;
   const head = obj.props?.head;
   return (
-    <Modal title={`⭐ ${obj.name ?? "전시 인물"}`} onClose={onClose}>
+    <Modal title={`⭐ ${obj.name ?? "전시 작품"}`} onClose={onClose}>
       <div className="space-y-3">
         <div className="flex gap-4">
-          <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-xl border-4 border-amber-500/70 bg-gradient-to-b from-slate-700 to-slate-900 shadow-lg">
-            {head ? (
+          <div className="relative h-36 w-28 shrink-0 overflow-hidden rounded-xl border-4 border-amber-500/70 bg-gradient-to-b from-slate-700 to-slate-900 shadow-lg">
+            {image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={image}
+                alt={obj.props?.filename ?? obj.name ?? ""}
+                className="h-full w-full object-contain"
+              />
+            ) : head ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={headImgUrl(head)}
@@ -3103,7 +3155,10 @@ function ExhibitModal({ obj, onClose }: { obj: MapObject; onClose: () => void })
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-lg font-bold text-white">{obj.name}</div>
-            {obj.props?.title && (
+            {obj.props?.filename && (
+              <div className="mt-0.5 text-xs text-cyan-100">{obj.props.filename}</div>
+            )}
+            {obj.props?.title && !obj.props?.filename && (
               <div className="mt-0.5 inline-block rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-300">
                 {obj.props.title}
               </div>

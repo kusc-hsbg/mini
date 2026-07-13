@@ -628,6 +628,25 @@ export class GameEngine {
     return { x: Math.floor(x / TILE), y: Math.floor(y / TILE) };
   }
 
+  objectScreenRect(o: MapObject) {
+    const rect = this.canvas.getBoundingClientRect();
+    const def = OBJECT_DEFS[o.type];
+    const x = o.x * TILE;
+    const y = o.y * TILE;
+    const w = (def?.w ?? 1) * TILE;
+    const h = (def?.h ?? 1) * TILE;
+    const left = (x - this.cam.x) * this.zoom + rect.left;
+    const top = (y - this.cam.y) * this.zoom + rect.top;
+    return {
+      left,
+      top,
+      right: left + w * this.zoom,
+      bottom: top + h * this.zoom,
+      width: w * this.zoom,
+      height: h * this.zoom,
+    };
+  }
+
   // ---------- 입력 ----------
 
   private onKeyDown = (e: KeyboardEvent) => {

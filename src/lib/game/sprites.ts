@@ -953,12 +953,12 @@ export function drawObject(
       break;
     }
     case "exhibit": {
-      // 명예의전당 전시대 — 민트 발광 프레임 + 따뜻한 석재 받침
+      // 명예의전당 전시대 — 작품 이미지 + 민트 발광 프레임.
       const cx = x + w / 2;
       // 바닥 그림자
       ctx.fillStyle = "rgba(0,0,0,0.28)";
       ctx.beginPath();
-      ctx.ellipse(cx, y + h - 4, 22, 6, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx, y + h - 4, w * 0.28, 7, 0, 0, Math.PI * 2);
       ctx.fill();
       // 스포트라이트 콘 (위에서 내리쬐는 빛)
       const glow = 0.10 + Math.sin(t / 600 + o.x) * 0.03;
@@ -976,16 +976,16 @@ export function drawObject(
       // 석재 받침
       const pedTop = y + h - 26;
       ctx.fillStyle = "#c9a46d";
-      roundRect(ctx, cx - 20, pedTop, 40, 22, 3);
+      roundRect(ctx, cx - 27, pedTop, 54, 22, 3);
       ctx.fill();
       ctx.fillStyle = "#ead7aa";
-      ctx.fillRect(cx - 20, pedTop, 40, 5);
+      ctx.fillRect(cx - 27, pedTop, 54, 5);
       ctx.fillStyle = "#8f6840";
-      ctx.fillRect(cx - 20, pedTop + 18, 40, 4);
+      ctx.fillRect(cx - 27, pedTop + 18, 54, 4);
       // 민트 발광 액자
-      const frTop = y + 2;
-      const frH = h - 30;
-      const frW = 50;
+      const frTop = y + 4;
+      const frH = h - 34;
+      const frW = Math.min(w - 14, 78);
       ctx.shadowColor = "rgba(125,255,212,0.65)";
       ctx.shadowBlur = 10;
       ctx.fillStyle = "#dffdf2";
@@ -998,18 +998,25 @@ export function drawObject(
       ctx.fillStyle = "#f8fff9";
       roundRect(ctx, cx - frW / 2 + 2, frTop + 2, frW - 4, 5, 2);
       ctx.fill();
-      // 초상 배경 + 캐릭터 헤어 이미지
+      // 작품 이미지 영역
       const inX = cx - frW / 2 + 5;
       const inY = frTop + 5;
       const inW = frW - 10;
       const inH = frH - 10;
       ctx.fillStyle = "#16312e";
       ctx.fillRect(inX, inY, inW, inH);
+      const art = o.props?.image ? getImage(o.props.image) : null;
       const head = o.props?.head;
-      const img = head ? getImage(headImgUrl(head)) : null;
+      const img = art ?? (head ? getImage(headImgUrl(head)) : null);
       if (img) {
-        const s = Math.min(inW, inH);
-        ctx.drawImage(img, inX + (inW - s) / 2, inY + 2, s, s);
+        const iw = img.naturalWidth || img.width || 1;
+        const ih = img.naturalHeight || img.height || 1;
+        const scale = Math.min(inW / iw, inH / ih);
+        const dw = iw * scale;
+        const dh = ih * scale;
+        ctx.fillStyle = "#0b1f1d";
+        ctx.fillRect(inX, inY, inW, inH);
+        ctx.drawImage(img, inX + (inW - dw) / 2, inY + (inH - dh) / 2, dw, dh);
       } else {
         ctx.fillStyle = "#475569";
         ctx.font = "20px serif";

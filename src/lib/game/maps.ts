@@ -76,6 +76,10 @@ export interface ObjectProps {
   interaction?: InteractionKind; // 기본 상호작용 덮어쓰기
   title?: string; // 전시대/NPC: 캐릭터 칭호/부제
   head?: string; // 전시대/NPC: 그림책 캐릭터 헤어 키 (headImgUrl 용)
+  image?: string; // 전시대/커스텀 오브젝트: 작품 이미지 경로
+  author?: string; // 전시대: 작가명
+  sourceUrl?: string; // 전시대: 원본/상세 링크
+  filename?: string; // 전시대: 원본 파일명
   itemKey?: string; // 상점 진열대: 구매/장착할 상점 아이템 키
   icon?: string; // 상점 진열대: 카탈로그 외 아이콘 표시용
   tour?: boolean; // 스타홀 열기구 투어 지점
