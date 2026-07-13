@@ -35,7 +35,7 @@ import AuctionModal from "./AuctionModal";
 import { SHOP_MAP } from "@/lib/game/shop";
 import { KILL_TITLES, WEAPON_MAP } from "@/lib/game/weapons";
 import type { PlayerCosmetics } from "@/lib/game/types";
-import type { RtEventName, RtEvents, WbOp } from "@/lib/realtime/protocol";
+import type { GuidedMoveTarget, RoomJob, RtEventName, RtEvents, WbOp } from "@/lib/realtime/protocol";
 import type {
   CharacterAppearance,
   ChatMessage,
@@ -291,6 +291,9 @@ export default function GameClient({
   const [panel, setPanel] = useState<PanelState>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [roomJobs, setRoomJobs] = useState<Record<string, RoomJob>>({});
+  const [studentInstructors, setStudentInstructors] = useState<Record<string, string | null>>({});
+  const [instructorParties, setInstructorParties] = useState<Record<string, string[]>>({});
   const [currentArea, setCurrentArea] = useState<PrivateArea | null>(null);
   const [lockedAreas, setLockedAreas] = useState<Set<string>>(new Set());
   const [status, setStatusState] = useState<UserStatus>(profile?.status ?? "available");
@@ -371,6 +374,12 @@ export default function GameClient({
   const knockGraceRef = useRef<Map<string, number>>(new Map());
   const blockedRef = useRef(blocked);
   blockedRef.current = blocked;
+  const roomJobsRef = useRef(roomJobs);
+  roomJobsRef.current = roomJobs;
+  const studentInstructorsRef = useRef(studentInstructors);
+  studentInstructorsRef.current = studentInstructors;
+  const instructorPartiesRef = useRef(instructorParties);
+  instructorPartiesRef.current = instructorParties;
   const walletRef = useRef(wallet);
   walletRef.current = wallet;
   const ridersRef = useRef<Set<string>>(new Set()); // 내 양탄자에 탑승한 파티원
@@ -434,6 +443,148 @@ export default function GameClient({
     const self = engineRef.current?.getSelf();
     if (self && multiplayer) channelRef.current.track(self);
   }, [multiplayer]);
+
+  const jobOf = useCallback(
+    (id: string | null | undefined): RoomJob => {
+      if (!id) return "user";
+      return roomJobsRef.current[id] ?? "user";
+    },
+    []
+  );
+
+  const canManageRoomJobs = useCallback(() => {
+    const myId = identity?.id;
+    return isOwner || role === "admin" || role === "moderator" || jobOf(myId) === "room-admin";
+  }, [identity?.id, isOwner, role, jobOf]);
+
+  function publishJobState(
+    roles = roomJobsRef.current,
+    instructors = studentInstructorsRef.current,
+    parties = instructorPartiesRef.current
+  ) {
+    if (!identity || !multiplayer) return;
+    channelRef.current.send("job-update", {
+      by: identity.id,
+      byName: identity.name,
+      roles,
+      instructors,
+      parties,
+    });
+  }
+
+  function setRoomJob(targetId: string, nextJob: RoomJob) {
+    if (!identity || !canManageRoomJobs()) return;
+    const roles = { ...roomJobsRef.current };
+    if (nextJob === "user") delete roles[targetId];
+    else roles[targetId] = nextJob;
+
+    const instructors = { ...studentInstructorsRef.current };
+    const parties: Record<string, string[]> = {};
+    for (const [iid, members] of Object.entries(instructorPartiesRef.current)) {
+      parties[iid] = members.filter((id) => id !== targetId);
+    }
+    if (nextJob !== "instructor") {
+      delete parties[targetId];
+      for (const [sid, iid] of Object.entries(instructors)) {
+        if (iid === targetId) delete instructors[sid];
+      }
+    }
+    if (nextJob === "instructor") parties[targetId] = parties[targetId] ?? [];
+
+    setRoomJobs(roles);
+    setStudentInstructors(instructors);
+    setInstructorParties(parties);
+    publishJobState(roles, instructors, parties);
+    addToast("직업 배정이 적용되었습니다.");
+  }
+
+  function toggleInstructorPartyMember(targetId: string) {
+    if (!identity || jobOf(identity.id) !== "instructor") return;
+    const current = instructorPartiesRef.current[identity.id] ?? [];
+    const exists = current.includes(targetId);
+    if (!exists && current.length >= 6) {
+      addToast("강사 파티는 최대 6명까지입니다.");
+      return;
+    }
+    const members = exists ? current.filter((id) => id !== targetId) : [...current, targetId];
+    const roles = roomJobsRef.current;
+    const instructors = { ...studentInstructorsRef.current };
+    if (exists) {
+      if (instructors[targetId] === identity.id) delete instructors[targetId];
+    } else {
+      instructors[targetId] = identity.id;
+    }
+    const parties = { ...instructorPartiesRef.current, [identity.id]: members };
+    setStudentInstructors(instructors);
+    setInstructorParties(parties);
+    publishJobState(roles, instructors, parties);
+    addToast(exists ? "강사 파티에서 제외했습니다." : "강사 파티에 추가했습니다.");
+  }
+
+  function shouldRequestMoveApproval() {
+    if (!identity) return false;
+    if (jobOf(identity.id) !== "user") return false;
+    const instructor = studentInstructorsRef.current[identity.id];
+    if (!instructor) return false;
+    return players.some((p) => p.id === instructor);
+  }
+
+  function executeGuidedTarget(target: GuidedMoveTarget, broadcastParty = true) {
+    const engine = engineRef.current;
+    if (target.kind === "same") {
+      engine?.teleport(target.tx, target.ty);
+    } else if (target.kind === "room") {
+      if (target.roomId !== room.id) router.push(`/s/${space.id}/${target.roomId}`);
+    } else if (target.kind === "space") {
+      router.push(`/s/${target.spaceSlug}`);
+    } else if (target.kind === "player") {
+      engine?.walkToPlayer(target.playerId);
+    }
+    if (!identity || !broadcastParty || jobOf(identity.id) !== "instructor") return;
+    const members = instructorPartiesRef.current[identity.id] ?? [];
+    if (members.length > 0 && multiplayer) {
+      channelRef.current.send("guided-move", {
+        by: identity.id,
+        byName: identity.name,
+        members,
+        target,
+      });
+    }
+  }
+
+  function requestOrExecuteMove(target: GuidedMoveTarget) {
+    if (!identity) return;
+    const instructor = studentInstructorsRef.current[identity.id];
+    if (shouldRequestMoveApproval() && instructor) {
+      channelRef.current.send("move-req", {
+        id: randomId(),
+        from: identity.id,
+        fromName: identity.name,
+        instructor,
+        target,
+      });
+      addToast("담당 강사에게 이동 승인을 요청했습니다.");
+      return;
+    }
+    executeGuidedTarget(target);
+  }
+
+  function targetFromPortal(portal: Portal): GuidedMoveTarget | null {
+    if (portal.kind === "same" && portal.tx != null && portal.ty != null) {
+      return { kind: "same", tx: portal.tx, ty: portal.ty, label: portal.label };
+    }
+    if (portal.kind === "room") {
+      const target =
+        (portal.roomId && rooms.find((r) => r.id === portal.roomId)) ||
+        (portal.roomTemplate && rooms.find((r) => r.template_key === portal.roomTemplate));
+      if (!target) return null;
+      return { kind: "room", roomId: target.id, label: portal.label ?? target.name };
+    }
+    if (portal.kind === "space" && portal.spaceSlug) {
+      return { kind: "space", spaceSlug: portal.spaceSlug, label: portal.label };
+    }
+    return null;
+  }
 
   // ----- 이벤트 핸들러 -----
   function handleEvent<K extends RtEventName>(event: K, payload: RtEvents[K]) {
@@ -651,6 +802,60 @@ export default function GameClient({
         }
         break;
       }
+      case "job-update": {
+        const j = payload as RtEvents["job-update"];
+        setRoomJobs(j.roles ?? {});
+        setStudentInstructors(j.instructors ?? {});
+        setInstructorParties(j.parties ?? {});
+        const myJob = j.roles?.[myId ?? ""] ?? "user";
+        const myInstructor = j.instructors?.[myId ?? ""] ?? null;
+        if (myJob === "instructor") addToast("강사 권한이 배정되었습니다.");
+        else if (myJob === "room-admin") addToast("방 관리자 권한이 배정되었습니다.");
+        else if (myInstructor) {
+          const name = engine?.getOthers().find((p) => p.id === myInstructor)?.name ?? "담당 강사";
+          addToast(`${name}님의 강사 파티에 배정되었습니다.`);
+          engine?.setPassengerOf(myInstructor);
+        } else {
+          if (engine?.getPassengerOf()) engine.setPassengerOf(null);
+        }
+        break;
+      }
+      case "job-sync-req": {
+        const currentRoles = roomJobsRef.current;
+        if (Object.keys(currentRoles).length > 0 && identity) {
+          publishJobState(currentRoles, studentInstructorsRef.current, instructorPartiesRef.current);
+        }
+        break;
+      }
+      case "move-req": {
+        const req = payload as RtEvents["move-req"];
+        if (req.instructor !== myId || blockedRef.current.has(req.from)) break;
+        addToast(`${req.fromName}님의 이동 승인 요청`, "승인", () => {
+          channelRef.current.send("move-ok", {
+            id: req.id,
+            to: req.from,
+            by: myId ?? "",
+            target: req.target,
+          });
+        });
+        break;
+      }
+      case "move-ok": {
+        const ok = payload as RtEvents["move-ok"];
+        if (ok.to !== myId) break;
+        addToast("담당 강사가 이동을 승인했습니다.");
+        executeGuidedTarget(ok.target, false);
+        break;
+      }
+      case "guided-move": {
+        const gm = payload as RtEvents["guided-move"];
+        if (!gm.members.includes(myId ?? "")) break;
+        ridingOwnerRef.current = null;
+        engine?.setPassengerOf(null);
+        addToast(`${gm.byName} 강사의 파티 이동`);
+        executeGuidedTarget(gm.target, false);
+        break;
+      }
       case "quiz": {
         const q = payload as RtEvents["quiz"];
         if (q.kind === "start") {
@@ -674,6 +879,8 @@ export default function GameClient({
         if (r.kind === "finish" && r.totalMs != null) {
           applyRaceRecord(r.from, r.name, r.totalMs);
           addToast(`🏁 ${r.name}님이 ${r.laps}랩 완주! ${fmtMs(r.totalMs)}`);
+        } else if (r.kind === "countdown") {
+          addToast(`🚦 ${r.name}님의 보스전이 10초 뒤 시작됩니다`);
         } else if (r.kind === "start") {
           addToast(`🚦 ${r.name}님이 레이스를 시작했어요!`);
         }
@@ -771,7 +978,17 @@ export default function GameClient({
           addToast("🚶 탈것에서 내렸어요");
         },
         onRace: (ev) => {
-          if (ev.kind === "start") {
+          if (ev.kind === "countdown") {
+            addToast("🚦 보스전 시작까지 10초 — 출발선에서 대기하세요");
+            if (multiplayer)
+              channelRef.current.send("race", {
+                from: identity.id,
+                name: identity.name,
+                kind: "countdown",
+                lap: ev.lap,
+                laps: ev.laps,
+              });
+          } else if (ev.kind === "start") {
             addToast(`🚦 레이스 시작! 시계방향으로 ${ev.laps}랩 완주하세요`);
             if (multiplayer)
               channelRef.current.send("race", {
@@ -947,8 +1164,6 @@ export default function GameClient({
 
   // ----- 포털 -----
   function handlePortal(portal: Portal) {
-    const engine = engineRef.current;
-    if (!engine) return;
     if (portal.membersOnly && !isMember && !isOwner) {
       addToast("🔐 멤버 전용 문입니다. 스페이스 멤버만 통과할 수 있어요.");
       return;
@@ -957,26 +1172,16 @@ export default function GameClient({
       setModal({ kind: "portal-pw", portal });
       return;
     }
-    executePortal(portal);
+    requestOrExecutePortal(portal);
   }
 
-  function executePortal(portal: Portal) {
-    const engine = engineRef.current;
-    if (!engine) return;
-    if (portal.kind === "same" && portal.tx != null && portal.ty != null) {
-      engine.teleport(portal.tx, portal.ty);
-    } else if (portal.kind === "room") {
-      const target =
-        (portal.roomId && rooms.find((r) => r.id === portal.roomId)) ||
-        (portal.roomTemplate && rooms.find((r) => r.template_key === portal.roomTemplate));
-      if (target && target.id !== room.id) {
-        router.push(`/s/${space.id}/${target.id}`);
-      } else if (!target) {
-        addToast("🌀 연결된 방을 찾을 수 없어요");
-      }
-    } else if (portal.kind === "space" && portal.spaceSlug) {
-      router.push(`/s/${portal.spaceSlug}`);
+  function requestOrExecutePortal(portal: Portal) {
+    const target = targetFromPortal(portal);
+    if (!target) {
+      addToast("🌀 연결된 방을 찾을 수 없어요");
+      return;
     }
+    requestOrExecuteMove(target);
   }
 
   function moveToQuizStart() {
@@ -1110,6 +1315,11 @@ export default function GameClient({
     const t = setInterval(pushPresence, 3000);
     return () => clearInterval(t);
   }, [multiplayer, channel.ready, pushPresence]);
+
+  useEffect(() => {
+    if (!multiplayer || !channel.ready || !identity) return;
+    channelRef.current.send("job-sync-req", { by: identity.id });
+  }, [multiplayer, channel.ready, identity?.id]);
 
   // ----- 참가자 목록 주기 갱신 -----
   useEffect(() => {
@@ -1901,6 +2111,9 @@ export default function GameClient({
         engineRef.current?.getOthers().find((p) => p.id === touchedId))) ||
     null;
   const starhallExhibit = liveMap.key === "starhall" && hintObj?.type === "exhibit" ? hintObj : null;
+  const myRoomJob = identity ? jobOf(identity.id) : "user";
+  const canManageJobsNow = canManageRoomJobs();
+  const myInstructorParty = identity ? instructorParties[identity.id] ?? [] : [];
 
   useEffect(() => {
     if (!starhallExhibit) {
@@ -2427,8 +2640,7 @@ export default function GameClient({
               followId={followId}
               onWave={doWave}
               onWalkTo={(id) => {
-                engineRef.current?.walkToPlayer(id);
-                addToast("🚶 상대에게 이동 중...");
+                requestOrExecuteMove({ kind: "player", playerId: id, label: `${nameOf(id)}님에게 이동` });
               }}
               onFollow={(id) => {
                 setFollowId(id);
@@ -2449,6 +2661,13 @@ export default function GameClient({
               canFriend={!!profile}
               onKick={doKick}
               onBan={doBan}
+              roomJobs={roomJobs}
+              instructorOf={studentInstructors}
+              instructorParty={myInstructorParty}
+              canManageJobs={canManageJobsNow}
+              isInstructor={myRoomJob === "instructor"}
+              onSetJob={setRoomJob}
+              onToggleInstructorParty={toggleInstructorPartyMember}
               onClose={() => setPanel(null)}
             />
           )}
@@ -2465,8 +2684,7 @@ export default function GameClient({
                 });
               }}
               onWalkTo={(id, name) => {
-                engineRef.current?.walkToPlayer(id);
-                addToast(`📍 ${name}님에게 이동합니다`);
+                requestOrExecuteMove({ kind: "player", playerId: id, label: `${name}님에게 이동` });
               }}
               onClose={() => setPanel(null)}
             />
@@ -2616,7 +2834,7 @@ export default function GameClient({
           onSuccess={() => {
             const p = modal.portal;
             setModal(null);
-            executePortal(p);
+            requestOrExecutePortal(p);
           }}
           onClose={() => setModal(null)}
         />
@@ -2726,7 +2944,7 @@ export default function GameClient({
                 });
                 ridersRef.current.clear();
               }
-              router.push(`/s/${space.id}/${rid}`);
+              requestOrExecuteMove({ kind: "room", roomId: rid, label: rooms.find((r) => r.id === rid)?.name });
             }
           }}
           onClose={() => setModal(null)}

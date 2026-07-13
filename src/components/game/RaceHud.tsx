@@ -28,12 +28,19 @@ export default function RaceHud({
 }) {
   if (!state) return null;
   const sorted = [...leaderboard].sort((a, b) => a.bestTotalMs - b.bestTotalMs).slice(0, 5);
+  const countdownSec = Math.ceil((state.countdownMs ?? 0) / 1000);
 
   return (
     <div className="pointer-events-none absolute right-3 top-48 z-10 flex w-52 flex-col gap-2">
       {/* 레이스 타이머 */}
       <div className="rounded-xl border border-white/10 bg-panel/85 p-3 backdrop-blur">
-        {state.active ? (
+        {countdownSec > 0 ? (
+          <div className="text-center">
+            <div className="text-xs font-semibold text-amber-300">보스전 카운트다운</div>
+            <div className="mt-1 font-mono text-4xl font-black tabular-nums text-white">{countdownSec}</div>
+            <div className="mt-1 text-[10px] text-slate-400">출발선 유지 · 시계방향 주행</div>
+          </div>
+        ) : state.active ? (
           <>
             <div className="flex items-baseline justify-between">
               <span className="text-xs font-medium text-amber-300">

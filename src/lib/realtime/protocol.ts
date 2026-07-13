@@ -1,6 +1,14 @@
 // Supabase Realtime 브로드캐스트 이벤트 정의.
 import type { ChatMessage, EmoteMessage, PlayerState } from "@/lib/game/types";
 
+export type RoomJob = "user" | "room-admin" | "instructor";
+
+export type GuidedMoveTarget =
+  | { kind: "same"; tx: number; ty: number; label?: string }
+  | { kind: "room"; roomId: string; label?: string }
+  | { kind: "space"; spaceSlug: string; label?: string }
+  | { kind: "player"; playerId: string; label?: string };
+
 export interface RtEvents {
   move: PlayerState;
   emote: { id: string; emote: EmoteMessage };
@@ -17,7 +25,7 @@ export interface RtEvents {
   race: {
     from: string;
     name: string;
-    kind: "start" | "lap" | "finish";
+    kind: "countdown" | "start" | "lap" | "finish";
     lap: number;
     laps: number;
     lapMs?: number;
@@ -58,6 +66,24 @@ export interface RtEvents {
   "ride-ok": { owner: string; ownerName: string; rider: string };
   "ride-end": { rider: string; owner: string };
   "party-warp": { by: string; roomId: string; riders: string[] };
+  // 방 안 직업/강사 이동 승인
+  "job-update": {
+    by: string;
+    byName: string;
+    roles: Record<string, RoomJob>;
+    instructors: Record<string, string | null>;
+    parties: Record<string, string[]>;
+  };
+  "job-sync-req": { by: string };
+  "move-req": {
+    id: string;
+    from: string;
+    fromName: string;
+    instructor: string;
+    target: GuidedMoveTarget;
+  };
+  "move-ok": { id: string; to: string; by: string; target: GuidedMoveTarget };
+  "guided-move": { by: string; byName: string; members: string[]; target: GuidedMoveTarget };
 }
 
 export type RtEventName = keyof RtEvents;

@@ -671,6 +671,14 @@ function buildCircuit(): MapData {
   g.scatter(";", 120, 16, 16, 56, 24, 43, ",");
   addRaceBarrierLoop(c, 7, 7, 74, 42);
   addRaceBarrierLoop(c, 14, 14, 60, 28);
+  for (const [x, y, dir] of [
+    [24, 10, "right"], [36, 10, "right"], [58, 10, "right"], [70, 12, "right"],
+    [77, 18, "down"], [77, 28, "down"], [75, 38, "down"],
+    [62, 45, "left"], [48, 45, "left"], [34, 45, "left"], [20, 43, "left"],
+    [10, 36, "up"], [10, 26, "up"], [12, 16, "up"],
+  ] as [number, number, "up" | "down" | "left" | "right"][]) {
+    add(c, "trackarrow", x, y, { dir });
+  }
 
   // 결승선 (체커, 상단 직선)
   for (let r = 8; r < 15; r++) {
@@ -1293,6 +1301,14 @@ function buildRingRace(theme: "sea" | "sky"): MapData {
   g.rect(15, 15, W - 30, H - 30, island); // 안쪽 섬
   addRaceBarrierLoop(c, 7, 7, W - 14, H - 14);
   addRaceBarrierLoop(c, 14, 14, W - 28, H - 28);
+  for (const [x, y, dir] of [
+    [22, 10, "right"], [36, 10, "right"], [54, 10, "right"],
+    [W - 11, 18, "down"], [W - 11, 29, "down"],
+    [56, H - 11, "left"], [40, H - 11, "left"], [24, H - 11, "left"],
+    [10, 32, "up"], [10, 20, "up"],
+  ] as [number, number, "up" | "down" | "left" | "right"][]) {
+    add(c, "trackarrow", x, y, { dir });
+  }
 
   // 결승선(상단 직선 세로 체커)
   for (let r = 8; r < 14; r++) {

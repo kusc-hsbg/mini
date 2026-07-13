@@ -375,6 +375,35 @@ export function drawObject(
       ctx.fill();
       return;
     }
+    case "trackarrow": {
+      const cx = x + TILE / 2;
+      const cy = y + TILE / 2;
+      const angle =
+        o.dir === "down" ? Math.PI / 2 : o.dir === "left" ? Math.PI : o.dir === "up" ? -Math.PI / 2 : 0;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+      ctx.fillStyle = "rgba(250,204,21,0.22)";
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 15, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#facc15";
+      ctx.strokeStyle = "rgba(17,24,39,0.65)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(13, 0);
+      ctx.lineTo(-2, -11);
+      ctx.lineTo(-2, -5);
+      ctx.lineTo(-14, -5);
+      ctx.lineTo(-14, 5);
+      ctx.lineTo(-2, 5);
+      ctx.lineTo(-2, 11);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
     case "desk": {
       ctx.fillStyle = "rgba(0,0,0,0.2)";
       ctx.fillRect(x + 2, y + h - 4, w - 4, 4);

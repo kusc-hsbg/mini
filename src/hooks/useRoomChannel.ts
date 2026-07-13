@@ -43,6 +43,11 @@ const EVENTS: RtEventName[] = [
   "ride-ok",
   "ride-end",
   "party-warp",
+  "job-update",
+  "job-sync-req",
+  "move-req",
+  "move-ok",
+  "guided-move",
 ];
 
 // 한 방의 실시간 채널 (Supabase Realtime presence + broadcast).

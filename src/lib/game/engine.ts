@@ -50,7 +50,7 @@ const TOUCH_PX = TILE * 1.15;
 
 // 레이스 이벤트 (그랑프리)
 export interface RaceEvent {
-  kind: "start" | "lap" | "finish" | "reset";
+  kind: "countdown" | "start" | "lap" | "finish" | "reset";
   lap: number;
   laps: number;
   lapMs?: number;
@@ -67,6 +67,7 @@ export interface RaceState {
   elapsedMs: number;
   lapElapsedMs: number;
   bestLapMs: number | null;
+  countdownMs: number;
 }
 
 export interface EngineCallbacks {
@@ -237,6 +238,7 @@ export class GameEngine {
   private raceCpIndex = 0;
   private raceStart = 0;
   private lapStart = 0;
+  private raceCountdownUntil = 0;
   private bestLapMs: number | null = null;
   private wasInStartRect = false;
   private cam = { x: 0, y: 0 };
@@ -778,6 +780,7 @@ export class GameEngine {
     }
     this.raceLap = 0;
     this.raceCpIndex = 0;
+    this.raceCountdownUntil = 0;
     this.wasInStartRect = false;
   }
 
@@ -794,6 +797,7 @@ export class GameEngine {
       elapsedMs: this.raceActive ? now - this.raceStart : 0,
       lapElapsedMs: this.raceActive ? now - this.lapStart : 0,
       bestLapMs: this.bestLapMs,
+      countdownMs: Math.max(0, this.raceCountdownUntil - now),
     };
   }
 
@@ -802,6 +806,7 @@ export class GameEngine {
     if (!race) return;
     if (!this.self.onBike) {
       this.wasInStartRect = false;
+      this.raceCountdownUntil = 0;
       return;
     }
 
@@ -814,15 +819,27 @@ export class GameEngine {
 
     // 출발/결승선 진입 에지 감지
     const inStart = inRaceRect(race.start, this.self.x, this.self.y);
-    if (inStart && !this.wasInStartRect) {
-      if (!this.raceActive) {
-        // 레이스 시작
+    if (!this.raceActive && this.raceCountdownUntil > 0) {
+      if (!inStart) {
+        this.raceCountdownUntil = 0;
+      } else if (now >= this.raceCountdownUntil) {
+        this.raceCountdownUntil = 0;
         this.raceActive = true;
         this.raceLap = 1;
         this.raceCpIndex = 0;
         this.raceStart = now;
         this.lapStart = now;
         this.cb.onRace?.({ kind: "start", lap: 1, laps: race.laps });
+      }
+      this.wasInStartRect = inStart;
+      return;
+    }
+    if (inStart && !this.wasInStartRect) {
+      if (!this.raceActive) {
+        this.raceCountdownUntil = now + 10_000;
+        this.raceLap = 1;
+        this.raceCpIndex = 0;
+        this.cb.onRace?.({ kind: "countdown", lap: 1, laps: race.laps });
       } else if (this.raceCpIndex >= race.checkpoints.length) {
         // 랩 완료 (모든 CP 통과 후 결승선)
         const lapMs = now - this.lapStart;

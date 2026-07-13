@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { STATUS_META } from "@/lib/game/constants";
 import type { PlayerState } from "@/lib/game/types";
+import type { RoomJob } from "@/lib/realtime/protocol";
 
 export default function ParticipantsPanel({
   players,
@@ -20,6 +21,13 @@ export default function ParticipantsPanel({
   canFriend,
   onKick,
   onBan,
+  roomJobs,
+  instructorOf,
+  instructorParty,
+  canManageJobs,
+  isInstructor,
+  onSetJob,
+  onToggleInstructorParty,
   onClose,
 }: {
   players: PlayerState[];
@@ -36,6 +44,13 @@ export default function ParticipantsPanel({
   canFriend: boolean;
   onKick: (id: string) => void;
   onBan: (id: string, name: string) => void;
+  roomJobs: Record<string, RoomJob>;
+  instructorOf: Record<string, string | null>;
+  instructorParty: string[];
+  canManageJobs: boolean;
+  isInstructor: boolean;
+  onSetJob: (id: string, job: RoomJob) => void;
+  onToggleInstructorParty: (id: string) => void;
   onClose: () => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
@@ -54,6 +69,11 @@ export default function ParticipantsPanel({
           const isSelf = p.id === selfId;
           const meta = STATUS_META[p.status] ?? STATUS_META.available;
           const expanded = open === p.id;
+          const job = roomJobs[p.id] ?? "user";
+          const instructorName = instructorOf[p.id]
+            ? players.find((x) => x.id === instructorOf[p.id])?.name
+            : null;
+          const inMyParty = instructorParty.includes(p.id);
           return (
             <div key={p.id} className="mb-1 rounded-xl bg-panel2/60">
               <button
@@ -75,6 +95,9 @@ export default function ParticipantsPanel({
                     {p.statusMsg || meta.label}
                     {p.areaId && ` · 📍영역`}
                     {p.spotlight && " · 🎤"}
+                    {job === "room-admin" && " · 방관리자"}
+                    {job === "instructor" && " · 강사"}
+                    {instructorName && ` · 담당 ${instructorName}`}
                   </span>
                 </span>
                 <span className="flex shrink-0 gap-1 text-xs">
@@ -98,9 +121,30 @@ export default function ParticipantsPanel({
                   {canFriend && !p.guest && (
                     <Btn onClick={() => onAddFriend(p.id, p.name)}>➕ 친구</Btn>
                   )}
+                  {isInstructor && (
+                    <Btn
+                      onClick={() => onToggleInstructorParty(p.id)}
+                      active={inMyParty}
+                    >
+                      {inMyParty ? "파티 해제" : "강사 파티"}
+                    </Btn>
+                  )}
                   <Btn onClick={() => onBlockToggle(p.id, p.name)} danger={!blocked.has(p.id)}>
                     {blocked.has(p.id) ? "차단 해제" : "🚫 차단"}
                   </Btn>
+                  {canManageJobs && (
+                    <>
+                      <Btn onClick={() => onSetJob(p.id, "room-admin")} active={job === "room-admin"}>
+                        방관리자
+                      </Btn>
+                      <Btn onClick={() => onSetJob(p.id, "instructor")} active={job === "instructor"}>
+                        강사
+                      </Btn>
+                      <Btn onClick={() => onSetJob(p.id, "user")} active={job === "user"}>
+                        일반
+                      </Btn>
+                    </>
+                  )}
                   {isMod && (
                     <>
                       <Btn onClick={() => onKick(p.id)} danger>👢 킥</Btn>
