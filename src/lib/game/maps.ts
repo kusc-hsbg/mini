@@ -6,6 +6,7 @@
 //   -  보도블럭      =  도로           ~  물(통과불가)
 //   .  실내 타일     w  원목 마루      k  어두운 마루
 //   c  카펫(파랑)    m  카펫(레드)     g  카펫(그린)
+//   p  따뜻한 석재     e  민트 조명석
 //   #  벽(통과불가)  x  공백(통과불가) B  오토바이 거치대
 import { TILE } from "./constants";
 import { OBJECT_DEFS, type ObjectKind } from "./objects";
@@ -34,6 +35,8 @@ export const TILE_INFO: Record<string, TileInfo> = {
   c: { color: "#5b74a8", solid: false, accent: "#546c9d" },
   m: { color: "#a85b5b", solid: false, accent: "#9d5454" },
   g: { color: "#5b9a6e", solid: false, accent: "#549064" },
+  p: { color: "#d6b982", solid: false, accent: "#ead7aa" },
+  e: { color: "#7dd7b4", solid: false, accent: "#d7fff0" },
   "#": { color: "#5b6273", solid: true, accent: "#787f92" },
   x: { color: "#12161f", solid: true },
   B: { color: "#4a5058", solid: false, bike: true, accent: "#fbbf24" },
@@ -73,6 +76,9 @@ export interface ObjectProps {
   interaction?: InteractionKind; // 기본 상호작용 덮어쓰기
   title?: string; // 전시대/NPC: 캐릭터 칭호/부제
   head?: string; // 전시대/NPC: 그림책 캐릭터 헤어 키 (headImgUrl 용)
+  itemKey?: string; // 상점 진열대: 구매/장착할 상점 아이템 키
+  icon?: string; // 상점 진열대: 카탈로그 외 아이콘 표시용
+  tour?: boolean; // 스타홀 열기구 투어 지점
 }
 
 export interface MapObject {
@@ -237,7 +243,7 @@ export function portalAtPx(map: MapData, px: number, py: number): Portal | null 
 }
 
 // interaction 필드 없이도 타입 자체로 상호작용되는 오브젝트.
-export const TYPE_INTERACTIVE = new Set(["desk", "chair", "sofa", "bench", "coffee", "vending", "exhibit", "bed", "portalhub", "npc", "minigame", "atm"]);
+export const TYPE_INTERACTIVE = new Set(["desk", "chair", "sofa", "bench", "coffee", "vending", "exhibit", "bed", "portalhub", "npc", "minigame", "atm", "shopdisplay", "balloon"]);
 
 // 상호작용 가능한 가장 가까운 오브젝트 (중심 기준 거리, 픽셀).
 export function nearestInteractive(
@@ -303,6 +309,9 @@ export function resolveMap(templateKey: string, mapData: unknown | null): MapDat
       spawns: m.spawns?.length ? m.spawns : [{ x: 2, y: 2 }],
       spotlights: m.spotlights ?? [],
       labels: m.labels ?? [],
+      vehicle: m.vehicle,
+      race: m.race,
+      pk: m.pk,
     };
   }
   return getPreset(templateKey);

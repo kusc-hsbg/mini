@@ -40,6 +40,8 @@ export type ObjectKind =
   | "npc"
   | "minigame"
   | "atm"
+  | "shopdisplay"
+  | "balloon"
   | "crate"
   | "barrel"
   | "sandbag"
@@ -98,6 +100,8 @@ export const OBJECT_DEFS: Record<ObjectKind, ObjectDef> = {
   npc: { label: "안내 NPC(퀘스트)", w: 1, h: 2, solid: true, tall: true, category: "기타" },
   minigame: { label: "미니게임 기기(낚시/리듬/농사)", w: 2, h: 1, solid: true, tall: true, category: "놀이" },
   atm: { label: "ATM(예치/이자/송금)", w: 1, h: 2, solid: true, tall: true, category: "기타" },
+  shopdisplay: { label: "상점 진열대", w: 2, h: 2, solid: true, tall: true, category: "기타" },
+  balloon: { label: "투어 열기구", w: 2, h: 3, solid: false, tall: true, category: "놀이" },
   crate: { label: "나무 상자(엄폐물)", w: 1, h: 1, solid: true, category: "레이싱" },
   barrel: { label: "드럼통(엄폐물)", w: 1, h: 1, solid: true, category: "레이싱" },
   sandbag: { label: "모래주머니(엄폐물)", w: 2, h: 1, solid: true, category: "레이싱" },

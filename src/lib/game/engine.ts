@@ -106,6 +106,45 @@ interface Projectile {
   maxDist: number;
   mine: boolean;
 }
+interface BossMissile {
+  id: string;
+  kind: "homing" | "spike" | "egg" | "wave" | "energy";
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  born: number;
+}
+interface BossChild {
+  id: string;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  born: number;
+  until: number;
+  nextShotAt: number;
+}
+interface BossLaser {
+  id: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  born: number;
+  warnUntil: number;
+  until: number;
+  hitDone?: boolean;
+}
+interface BossHazard {
+  id: string;
+  kind: "lava";
+  x: number;
+  y: number;
+  r: number;
+  born: number;
+  until: number;
+}
 interface Effect {
   kind: "explosion" | "smoke";
   x: number;
@@ -175,6 +214,15 @@ export class GameEngine {
   private respawnAt = 0;
   // 보스 레이드
   private boss: { x: number; y: number; hp: number; maxHp: number; kind: string; alive: boolean } | null = null;
+  private bossMissiles: BossMissile[] = [];
+  private nextBossMissileAt = 0;
+  private nextBossPatternAt = 0;
+  private raceMissileHits = 0;
+  private lavaHitAt = 0;
+  private racePrisoned = false;
+  private bossHazards: BossHazard[] = [];
+  private bossChildren: BossChild[] = [];
+  private bossLasers: BossLaser[] = [];
   // 레이스 아이템 (아이템 박스/기름 웅덩이)
   private raceItems: MapObject[] = [];
   private itemCooldowns = new Map<string, number>(); // object id -> 다시 활성화되는 시각
@@ -281,6 +329,15 @@ export class GameEngine {
     this.renderGround();
     this.raceItems = map.objects.filter((o) => o.type === "itembox" || o.type === "oil");
     this.itemCooldowns.clear();
+    this.bossMissiles = [];
+    this.nextBossMissileAt = 0;
+    this.nextBossPatternAt = 0;
+    this.raceMissileHits = 0;
+    this.lavaHitAt = 0;
+    this.racePrisoned = false;
+    this.bossHazards = [];
+    this.bossChildren = [];
+    this.bossLasers = [];
     if (this.seat) this.standUp(); // 좌석 오브젝트가 사라졌을 수 있음
     if (!keepPosition) {
       const sp = spawnPoint(map);
@@ -785,6 +842,13 @@ export class GameEngine {
 
   setBoss(b: { x: number; y: number; hp: number; maxHp: number; kind: string; alive: boolean } | null) {
     this.boss = b;
+    if (!b || !b.alive) {
+      this.bossMissiles = [];
+      this.bossHazards = [];
+      this.bossChildren = [];
+      this.bossLasers = [];
+      this.releaseRacePrison();
+    }
   }
   getBoss() {
     return this.boss;
@@ -793,42 +857,69 @@ export class GameEngine {
   private updateBoss(now: number) {
     const b = this.boss;
     if (!b || !b.alive) return;
-    const d = Math.hypot(b.x - this.self.x, b.y - this.self.y);
-    if (d < 34) {
-      if (now > this.stunUntil) {
-        // 보스에게 부딪힘 — 스턴 + 넉백
-        this.stunUntil = now + 900;
-        const ang = Math.atan2(this.self.y - b.y, this.self.x - b.x);
-        this.self.x += Math.cos(ang) * 26;
-        this.self.y += Math.sin(ang) * 26;
-        this.addEmote(this.self.id, { id: `bs${now}`, kind: "emoji", value: "💫", at: Date.now() });
-      }
+    if (this.racePrisoned && this.self.dead) {
+      const someoneAlive = Array.from(this.others.values()).some((p) => !p.dead);
+      if (!someoneAlive) this.releaseRacePrison();
     }
+  }
+
+  private mountedSpeed() {
+    if (!this.self.mounted) return WALK_SPEED;
+    const key = this.self.cosmetics?.mount;
+    if (!key) return WALK_SPEED;
+    if (key === "mount-sportscar" || key.includes("cruiser")) return WALK_SPEED * 2.45;
+    if (key === "mount-carpet") return WALK_SPEED * 2.05;
+    if (key === "mount-balloon") return WALK_SPEED * 1.9;
+    if (key === "mount-phoenix" || key === "mount-tiger" || key === "mount-robot") return WALK_SPEED * 2.25;
+    if (key === "mount-bear") return WALK_SPEED * 1.8;
+    return WALK_SPEED * 2.0;
   }
 
   private renderBoss(ctx: CanvasRenderingContext2D) {
     const b = this.boss;
     if (!b || !b.alive) return;
     const icon = b.kind === "kraken" ? "🦑" : b.kind === "chicken" ? "🐔" : "🦔";
+    const huge = !!this.map.race;
+    const stage2 = huge && b.hp / b.maxHp <= 0.5;
+    const iconSize = huge ? 720 : 42;
+    const shadowW = huge ? 430 : 22;
+    const shadowH = huge ? 82 : 7;
     // 그림자
     ctx.fillStyle = "rgba(0,0,0,0.3)";
     ctx.beginPath();
-    ctx.ellipse(b.x, b.y + 16, 22, 7, 0, 0, Math.PI * 2);
+    ctx.ellipse(b.x, b.y + (huge ? 238 : 16), shadowW, shadowH, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.font = "42px serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(icon, b.x, b.y);
+    if (huge) {
+      ctx.save();
+      const aura = stage2 ? "rgba(248,113,113,0.75)" : "rgba(250,204,21,0.55)";
+      ctx.shadowColor = aura;
+      ctx.shadowBlur = stage2 ? 42 : 26;
+      ctx.font = `${iconSize}px serif`;
+      ctx.fillText(icon, b.x, b.y + 120);
+      ctx.shadowBlur = 0;
+      ctx.restore();
+      if (stage2) {
+        ctx.font = "bold 28px ui-sans-serif";
+        ctx.fillStyle = "#fecaca";
+        ctx.fillText("STAGE 2", b.x, b.y - 385);
+      }
+    } else {
+      ctx.font = "42px serif";
+      ctx.fillText(icon, b.x, b.y);
+    }
     // HP 바
-    const bw = 64;
+    const bw = huge ? 520 : 64;
+    const by = b.y - (huge ? 420 : 40);
     const ratio = Math.max(0, b.hp / b.maxHp);
     ctx.fillStyle = "rgba(0,0,0,0.55)";
-    ctx.fillRect(b.x - bw / 2 - 1, b.y - 40, bw + 2, 8);
+    ctx.fillRect(b.x - bw / 2 - 1, by, bw + 2, huge ? 14 : 8);
     ctx.fillStyle = "#ef4444";
-    ctx.fillRect(b.x - bw / 2, b.y - 39, bw * ratio, 6);
+    ctx.fillRect(b.x - bw / 2, by + 1, bw * ratio, huge ? 12 : 6);
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 10px ui-sans-serif";
-    ctx.fillText(`BOSS ${Math.max(0, Math.round(b.hp))}/${b.maxHp}`, b.x, b.y - 48);
+    ctx.font = `bold ${huge ? 18 : 10}px ui-sans-serif`;
+    ctx.fillText(`BOSS ${Math.max(0, Math.round(b.hp))}/${b.maxHp}`, b.x, by - (huge ? 10 : 8));
     ctx.textBaseline = "alphabetic";
   }
 
@@ -862,7 +953,7 @@ export class GameEngine {
   // 발사 (angle 라디안). 무기의 pellet/spread 만큼 투사체 생성 + 브로드캐스트.
   fire(angle: number) {
     if (!this.canShoot()) return;
-    const w = WEAPON_MAP[this.self.weapon ?? "pistol"];
+    const w = this.map.race ? WEAPON_MAP.arrow : WEAPON_MAP[this.self.weapon ?? "pistol"];
     if (!w) return;
     const now = performance.now();
     if (now < this.lastFire + w.cooldownMs) return;
@@ -931,13 +1022,269 @@ export class GameEngine {
     return Math.max(4, Math.round(w.damage * 0.6));
   }
 
+  private racePrisonPoint() {
+    const a = this.map.areas.find((area) => area.id === "race-prison");
+    if (a) return { x: a.x + Math.floor(a.w / 2), y: a.y + Math.floor(a.h / 2) };
+    const sp = this.map.spawns[0] ?? { x: 2, y: 2 };
+    return { x: sp.x, y: sp.y };
+  }
+
+  private releaseRacePrison() {
+    if (!this.map.race || !this.racePrisoned) return;
+    const sp = this.map.spawns[0] ?? { x: 2, y: 2 };
+    this.self.x = sp.x * TILE + TILE / 2;
+    this.self.y = sp.y * TILE + TILE / 2;
+    this.self.hp = MAX_HP;
+    this.self.dead = false;
+    this.self.onBike = false;
+    this.raceMissileHits = 0;
+    this.racePrisoned = false;
+    this.lastHitFrom = null;
+    this.cb.onRespawn?.();
+    this.pushState();
+  }
+
+  private launchBossRocket(now: number) {
+    const b = this.boss;
+    if (!this.map.race || !b?.alive) return false;
+    const a = Math.atan2(b.y - this.self.y, b.x - this.self.x);
+    const id = `br${now.toFixed(0)}_${Math.random().toString(36).slice(2, 5)}`;
+    const payload: ShotPayload = { id, from: this.self.id, x: this.self.x, y: this.self.y - 18, angle: a, weapon: "boss-rocket" };
+    this.spawnProjectile(payload, true);
+    this.cb.onShot?.(payload);
+    this.effects.push({ kind: "explosion", x: this.self.x, y: this.self.y - 22, r: 24, until: now + 240, born: now });
+    return true;
+  }
+
+  private pushBossMissile(kind: BossMissile["kind"], x: number, y: number, angle: number, speed: number, now: number) {
+    this.bossMissiles.push({
+      id: `bm${now.toFixed(0)}_${this.bossMissiles.length}_${Math.random().toString(36).slice(2, 5)}`,
+      kind,
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      born: now,
+    });
+  }
+
+  private spawnLavaPatch(x: number, y: number, now: number) {
+    this.bossHazards.push({
+      id: `lv${now.toFixed(0)}_${this.bossHazards.length}`,
+      kind: "lava",
+      x,
+      y,
+      r: 58,
+      born: now,
+      until: now + 7000,
+    });
+  }
+
+  private spawnBossChild(now: number, angle: number) {
+    const b = this.boss;
+    if (!b) return;
+    const dist = 120;
+    this.bossChildren.push({
+      id: `bc${now.toFixed(0)}_${this.bossChildren.length}_${Math.random().toString(36).slice(2, 4)}`,
+      x: b.x + Math.cos(angle) * dist,
+      y: b.y + Math.sin(angle) * dist,
+      vx: Math.cos(angle) * 180,
+      vy: Math.sin(angle) * 180,
+      born: now,
+      until: now + 7600,
+      nextShotAt: now + 700 + Math.random() * 500,
+    });
+  }
+
+  private spawnBossLaser(now: number) {
+    const b = this.boss;
+    if (!b || this.self.dead) return;
+    const a = Math.atan2(this.self.y - b.y, this.self.x - b.x);
+    const len = Math.max(this.map.tiles.length, this.map.tiles[0]?.length ?? 0) * TILE;
+    this.bossLasers.push({
+      id: `lz${now.toFixed(0)}_${this.bossLasers.length}`,
+      x1: b.x,
+      y1: b.y,
+      x2: b.x + Math.cos(a) * len,
+      y2: b.y + Math.sin(a) * len,
+      born: now,
+      warnUntil: now + 760,
+      until: now + 1240,
+    });
+  }
+
+  private distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const l2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / l2));
+    const x = x1 + t * dx;
+    const y = y1 + t * dy;
+    return Math.hypot(px - x, py - y);
+  }
+
+  private runBossPattern(now: number, stage2: boolean) {
+    const b = this.boss;
+    if (!b) return;
+    if (stage2) {
+      const childCount = b.kind === "mole" ? 3 : 2;
+      for (let i = 0; i < childCount; i++) this.spawnBossChild(now, now / 700 + (Math.PI * 2 * i) / childCount);
+      this.spawnBossLaser(now);
+    }
+    if (b.kind === "mole") {
+      const count = stage2 ? 20 : 12;
+      const offset = now / 900;
+      for (let i = 0; i < count; i++) {
+        const a = offset + (Math.PI * 2 * i) / count;
+        this.pushBossMissile("spike", b.x, b.y, a, stage2 ? 360 : 300, now);
+      }
+      if (stage2) {
+        const pts = [
+          [this.self.x, this.self.y],
+          [b.x - TILE * 7, b.y - TILE * 4],
+          [b.x + TILE * 7, b.y - TILE * 4],
+          [b.x - TILE * 6, b.y + TILE * 5],
+          [b.x + TILE * 6, b.y + TILE * 5],
+        ] as [number, number][];
+        for (const [x, y] of pts) this.spawnLavaPatch(x, y, now);
+      }
+    } else if (b.kind === "kraken") {
+      const count = stage2 ? 14 : 8;
+      for (let i = 0; i < count; i++) {
+        const a = Math.atan2(this.self.y - b.y, this.self.x - b.x) + ((i - count / 2) * Math.PI) / (stage2 ? 15 : 11);
+        this.pushBossMissile("wave", b.x, b.y, a, stage2 ? 285 : 240, now);
+      }
+      if (stage2) this.inkUntil = Math.max(this.inkUntil, now + 1600);
+    } else {
+      const count = stage2 ? 12 : 7;
+      for (let i = 0; i < count; i++) {
+        const a = Math.atan2(this.self.y - b.y, this.self.x - b.x) + ((i - (count - 1) / 2) * Math.PI) / (stage2 ? 18 : 13);
+        this.pushBossMissile("egg", b.x, b.y, a, stage2 ? 330 : 270, now);
+      }
+    }
+  }
+
+  private updateBossMissiles(dt: number, now: number) {
+    if (!this.map.race || !this.boss?.alive) {
+      this.bossMissiles = [];
+      this.bossHazards = [];
+      this.bossChildren = [];
+      this.bossLasers = [];
+      return;
+    }
+    const stage2 = this.boss.hp / this.boss.maxHp <= 0.5;
+    if (!this.self.dead && now >= this.nextBossMissileAt) {
+      const b = this.boss;
+      const a = Math.atan2(this.self.y - b.y, this.self.x - b.x);
+      this.pushBossMissile("homing", b.x, b.y, a, stage2 ? 205 : 155, now);
+      this.nextBossMissileAt = now + (stage2 ? 1350 : 1900);
+    }
+    if (!this.self.dead && now >= this.nextBossPatternAt) {
+      this.runBossPattern(now, stage2);
+      this.nextBossPatternAt = now + (stage2 ? 3600 : 5200);
+    }
+
+    const remain: BossMissile[] = [];
+    for (const m of this.bossMissiles) {
+      const age = now - m.born;
+      if (age > 10000) continue;
+      if (!this.self.dead && m.kind === "homing") {
+        const target = Math.atan2(this.self.y - m.y, this.self.x - m.x);
+        const speed = Math.min(stage2 ? 390 : 310, (stage2 ? 205 : 150) + age * 0.018);
+        m.vx = m.vx * 0.88 + Math.cos(target) * speed * 0.12;
+        m.vy = m.vy * 0.88 + Math.sin(target) * speed * 0.12;
+        const len = Math.hypot(m.vx, m.vy) || 1;
+        m.vx = (m.vx / len) * speed;
+        m.vy = (m.vy / len) * speed;
+      }
+      m.x += m.vx * dt;
+      m.y += m.vy * dt;
+      if (!this.self.dead && Math.hypot(m.x - this.self.x, m.y - this.self.y) < PLAYER_RADIUS + 12) {
+        this.raceMissileHits++;
+        this.effects.push({ kind: "explosion", x: m.x, y: m.y, r: 44, until: now + 360, born: now });
+        this.addEmote(this.self.id, { id: `hmhit${now}`, kind: "emoji", value: `${this.raceMissileHits}/3`, at: Date.now() });
+        if (this.raceMissileHits >= 3) this.die();
+        continue;
+      }
+      remain.push(m);
+    }
+    this.bossMissiles = remain;
+
+    const liveChildren: BossChild[] = [];
+    for (const c of this.bossChildren) {
+      if (c.until <= now) continue;
+      if (!this.self.dead) {
+        const a = Math.atan2(this.self.y - c.y, this.self.x - c.x);
+        const speed = stage2 ? 235 : 190;
+        c.vx = c.vx * 0.9 + Math.cos(a) * speed * 0.1;
+        c.vy = c.vy * 0.9 + Math.sin(a) * speed * 0.1;
+        const len = Math.hypot(c.vx, c.vy) || 1;
+        c.vx = (c.vx / len) * speed;
+        c.vy = (c.vy / len) * speed;
+      }
+      c.x += c.vx * dt;
+      c.y += c.vy * dt;
+      if (!this.self.dead && now >= c.nextShotAt) {
+        const a = Math.atan2(this.self.y - c.y, this.self.x - c.x);
+        this.pushBossMissile("energy", c.x, c.y, a, stage2 ? 420 : 360, now);
+        c.nextShotAt = now + (stage2 ? 760 : 980);
+      }
+      if (!this.self.dead && Math.hypot(c.x - this.self.x, c.y - this.self.y) < PLAYER_RADIUS + 16 && now > this.lavaHitAt) {
+        this.lavaHitAt = now + 700;
+        this.raceMissileHits++;
+        if (this.raceMissileHits >= 3) this.die();
+      }
+      liveChildren.push(c);
+    }
+    this.bossChildren = liveChildren;
+
+    const liveLasers: BossLaser[] = [];
+    for (const l of this.bossLasers) {
+      if (l.until <= now) continue;
+      if (!this.self.dead && now >= l.warnUntil && !l.hitDone) {
+        const d = this.distToSegment(this.self.x, this.self.y, l.x1, l.y1, l.x2, l.y2);
+        if (d <= 34) {
+          l.hitDone = true;
+          this.raceMissileHits++;
+          this.addEmote(this.self.id, { id: `laser${now}`, kind: "emoji", value: `${this.raceMissileHits}/3`, at: Date.now() });
+          if (this.raceMissileHits >= 3) this.die();
+        }
+      }
+      liveLasers.push(l);
+    }
+    this.bossLasers = liveLasers;
+
+    this.bossHazards = this.bossHazards.filter((h) => h.until > now);
+    if (!this.self.dead) {
+      for (const h of this.bossHazards) {
+        if (h.kind !== "lava") continue;
+        const d = Math.hypot(h.x - this.self.x, h.y - this.self.y);
+        if (d <= h.r && now > this.lavaHitAt) {
+          this.lavaHitAt = now + 900;
+          this.raceMissileHits++;
+          this.addEmote(this.self.id, { id: `lava${now}`, kind: "emoji", value: `${this.raceMissileHits}/3`, at: Date.now() });
+          if (this.raceMissileHits >= 3) this.die();
+        }
+      }
+    }
+  }
+
   private die() {
     if (this.self.dead) return;
     this.self.dead = true;
     this.self.hp = 0;
     this.self.moving = false;
     this.path = [];
-    this.respawnAt = performance.now() + RESPAWN_MS;
+    this.respawnAt = this.map.race ? Number.POSITIVE_INFINITY : performance.now() + RESPAWN_MS;
+    if (this.map.race) {
+      const p = this.racePrisonPoint();
+      this.self.x = p.x * TILE + TILE / 2;
+      this.self.y = p.y * TILE + TILE / 2;
+      this.self.onBike = false;
+      this.raceActive = false;
+      this.racePrisoned = true;
+      this.bossMissiles = [];
+    }
     const killer = this.lastHitFrom;
     const kName = killer ? this.others.get(killer)?.name ?? "" : "";
     this.cb.onDeath?.(kName);
@@ -985,8 +1332,21 @@ export class GameEngine {
       pr.y += pr.vy * dt;
       pr.traveled += step;
       let consumed = false;
+      // 레이스 화살은 보스를 때리지 않고 유도 미사일만 요격한다.
+      if (this.map.race && pr.mine && pr.weapon === "arrow") {
+        for (let i = 0; i < this.bossMissiles.length; i++) {
+          const m = this.bossMissiles[i];
+          if (Math.hypot(pr.x - m.x, pr.y - m.y) <= 28) {
+            this.bossMissiles.splice(i, 1);
+            this.effects.push({ kind: "explosion", x: m.x, y: m.y, r: 34, until: now + 300, born: now });
+            this.addEmote(this.self.id, { id: `ar${now}`, kind: "emoji", value: "➶", at: Date.now() });
+            consumed = true;
+            break;
+          }
+        }
+      }
       // 벽/엄폐물 충돌
-      if (isSolidPx(this.solid, pr.x, pr.y)) {
+      if (!consumed && !this.map.race && isSolidPx(this.solid, pr.x, pr.y)) {
         if (w.radiusPx) this.explode(pr.x, pr.y, w, pr.from);
         consumed = true;
       }
@@ -995,14 +1355,14 @@ export class GameEngine {
         if (w.radiusPx) this.explode(pr.x, pr.y, w, pr.from);
         consumed = true;
       }
-      // 레이스 보스 피격 판정: 내 투사체만 피해를 보고한다.
-      if (!consumed && pr.mine && this.canAttackBoss() && w.damage > 0) {
+      // 레이스 보스 피격 판정: 아이템 박스에서 나온 폭죽 로켓만 피해를 보고한다.
+      if (!consumed && pr.mine && this.canAttackBoss() && pr.weapon === "boss-rocket") {
         const b = this.boss!;
         const d = Math.hypot(pr.x - b.x, pr.y - b.y);
-        const hitRadius = (w.radiusPx ?? 0) > 0 ? (w.radiusPx ?? 40) : 24;
-        if (d <= hitRadius + 18) {
+        const hitRadius = (w.radiusPx ?? 80) + 170;
+        if (d <= hitRadius) {
           if (w.radiusPx) this.explode(pr.x, pr.y, w, pr.from);
-          this.cb.onBossHit?.(this.bossDamage(w));
+          this.cb.onBossHit?.(1);
           this.addEmote(this.self.id, { id: `bh${now}`, kind: "emoji", value: "💥", at: Date.now() });
           consumed = true;
         }
@@ -1019,6 +1379,8 @@ export class GameEngine {
       if (!consumed) remain.push(pr);
     }
     this.projectiles = remain;
+
+    if (this.map.race) this.updateBossMissiles(dt, now);
 
     // 이펙트 만료
     this.effects = this.effects.filter((e) => e.until > now);
@@ -1127,7 +1489,7 @@ export class GameEngine {
       else this.self.dir = dx < 0 ? "left" : "right";
 
       const len = Math.hypot(dx, dy) || 1;
-      let speed = this.self.onBike ? BIKE_SPEED : WALK_SPEED;
+      let speed = this.self.onBike ? BIKE_SPEED : this.mountedSpeed();
       if (this.self.onBike) {
         // 부스트 패드 밟기
         if (boostAt(this.map, this.self.x, this.self.y)) {
@@ -1186,8 +1548,7 @@ export class GameEngine {
             this.effectMult = 1.5;
             this.effectUntil = now + 1500;
           } else if (kind === "rocket") {
-            this.effectMult = 2.0;
-            this.effectUntil = now + 5000; // 로켓 5초간 2배
+            this.launchBossRocket(now);
           } else if (kind === "slow") {
             this.effectMult = 0.55;
             this.effectUntil = now + 1800;
@@ -1559,7 +1920,16 @@ export class GameEngine {
     }
 
     // PK 전투 렌더 (투사체/이펙트/체력바)
-    if (this.isPk() || this.projectiles.length > 0 || this.effects.length > 0) this.renderPk(ctx, now);
+    if (
+      this.isPk() ||
+      this.projectiles.length > 0 ||
+      this.effects.length > 0 ||
+      this.bossMissiles.length > 0 ||
+      this.bossHazards.length > 0 ||
+      this.bossChildren.length > 0 ||
+      this.bossLasers.length > 0
+    )
+      this.renderPk(ctx, now);
 
     // 보스 레이드 렌더
     if (this.map.race && this.boss?.alive) this.renderBoss(ctx);
@@ -1616,16 +1986,84 @@ export class GameEngine {
   }
 
   private renderPk(ctx: CanvasRenderingContext2D, now: number) {
+    for (const l of this.bossLasers) {
+      const charging = now < l.warnUntil;
+      ctx.save();
+      ctx.strokeStyle = charging ? "rgba(248,113,113,0.42)" : "rgba(248,250,252,0.95)";
+      ctx.lineWidth = charging ? 4 : 18;
+      ctx.setLineDash(charging ? [14, 10] : []);
+      ctx.beginPath();
+      ctx.moveTo(l.x1, l.y1);
+      ctx.lineTo(l.x2, l.y2);
+      ctx.stroke();
+      if (!charging) {
+        ctx.strokeStyle = "rgba(239,68,68,0.85)";
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.moveTo(l.x1, l.y1);
+        ctx.lineTo(l.x2, l.y2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    for (const h of this.bossHazards) {
+      if (h.kind !== "lava") continue;
+      const t = Math.min(1, Math.max(0, (now - h.born) / (h.until - h.born)));
+      const pulse = 0.72 + Math.sin(now / 140 + h.x) * 0.16;
+      const grd = ctx.createRadialGradient(h.x, h.y, 4, h.x, h.y, h.r);
+      grd.addColorStop(0, `rgba(254,240,138,${pulse})`);
+      grd.addColorStop(0.42, "rgba(249,115,22,0.72)");
+      grd.addColorStop(1, `rgba(127,29,29,${0.18 * (1 - t * 0.6)})`);
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(h.x, h.y, h.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(254,202,202,0.45)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    for (const c of this.bossChildren) {
+      const pulse = 0.75 + Math.sin(now / 180 + c.x) * 0.2;
+      const icon = this.boss?.kind === "kraken" ? "🦑" : this.boss?.kind === "chicken" ? "🐔" : "🦔";
+      ctx.save();
+      ctx.translate(c.x, c.y);
+      ctx.shadowColor = `rgba(129,140,248,${pulse})`;
+      ctx.shadowBlur = 18;
+      ctx.font = "44px serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(icon, 0, 0);
+      ctx.shadowBlur = 0;
+      ctx.textBaseline = "alphabetic";
+      ctx.restore();
+    }
     // 투사체
     for (const pr of this.projectiles) {
       const w = WEAPON_MAP[pr.weapon];
       if (!w) continue;
-      if (w.kind === "throw" || w.kind === "smoke" || w.kind === "cannon" || w.kind === "tank") {
+      if (w.kind === "throw" || w.kind === "smoke" || w.kind === "cannon" || w.kind === "tank" || w.kind === "rocket") {
         ctx.font = "14px serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(w.icon, pr.x, pr.y);
         ctx.textBaseline = "alphabetic";
+      } else if (w.kind === "arrow") {
+        const m = Math.hypot(pr.vx, pr.vy) || 1;
+        const ax = pr.vx / m;
+        const ay = pr.vy / m;
+        ctx.strokeStyle = "#f8e7b0";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(pr.x - ax * 17, pr.y - ay * 17);
+        ctx.lineTo(pr.x + ax * 10, pr.y + ay * 10);
+        ctx.stroke();
+        ctx.fillStyle = "#f8e7b0";
+        ctx.beginPath();
+        ctx.moveTo(pr.x + ax * 14, pr.y + ay * 14);
+        ctx.lineTo(pr.x + ay * 5 - ax * 2, pr.y - ax * 5 - ay * 2);
+        ctx.lineTo(pr.x - ay * 5 - ax * 2, pr.y + ax * 5 - ay * 2);
+        ctx.closePath();
+        ctx.fill();
       } else {
         // 총알 — 진행 방향 짧은 선
         const len = w.kind === "sniper" ? 14 : 8;
@@ -1637,6 +2075,71 @@ export class GameEngine {
         ctx.lineTo(pr.x - (pr.vx / m) * len, pr.y - (pr.vy / m) * len);
         ctx.stroke();
       }
+    }
+    for (const m of this.bossMissiles) {
+      const pulse = 0.7 + Math.sin(now / 120) * 0.25;
+      const len = Math.hypot(m.vx, m.vy) || 1;
+      const ax = m.vx / len;
+      const ay = m.vy / len;
+      ctx.save();
+      ctx.translate(m.x, m.y);
+      ctx.rotate(Math.atan2(m.vy, m.vx));
+      if (m.kind === "spike") {
+        ctx.fillStyle = `rgba(254,226,226,${pulse})`;
+        ctx.beginPath();
+        ctx.moveTo(18, 0);
+        ctx.lineTo(-10, -8);
+        ctx.lineTo(-5, 0);
+        ctx.lineTo(-10, 8);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "rgba(127,29,29,0.9)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      } else if (m.kind === "egg") {
+        ctx.fillStyle = `rgba(254,243,199,${pulse})`;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 12, 15, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(180,83,9,0.9)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      } else if (m.kind === "wave") {
+        ctx.strokeStyle = `rgba(125,211,252,${pulse})`;
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.moveTo(-18, 0);
+        ctx.quadraticCurveTo(-6, -12, 6, 0);
+        ctx.quadraticCurveTo(14, 8, 22, 0);
+        ctx.stroke();
+      } else if (m.kind === "energy") {
+        const grd = ctx.createRadialGradient(-4, -4, 2, 0, 0, 17);
+        grd.addColorStop(0, "rgba(255,255,255,0.95)");
+        grd.addColorStop(0.45, `rgba(96,165,250,${pulse})`);
+        grd.addColorStop(1, "rgba(67,56,202,0.18)");
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.arc(0, 0, 17, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(191,219,254,0.9)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = `rgba(248,113,113,${pulse})`;
+        ctx.beginPath();
+        ctx.arc(0, 0, 13, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(254,202,202,0.9)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.font = "18px serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("✦", 0, 0.5);
+      }
+      ctx.restore();
+      void ax;
+      void ay;
     }
     // 이펙트
     for (const e of this.effects) {

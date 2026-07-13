@@ -88,6 +88,38 @@ function add(c: Ctx, type: ObjectKind, x: number, y: number, extra?: Partial<Map
   return o;
 }
 
+function addRaceBarrierLoop(c: Ctx, x: number, y: number, w: number, h: number) {
+  const seen = new Set<string>();
+  const put = (tx: number, ty: number) => {
+    const key = `${tx},${ty}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    add(c, "tires", tx, ty);
+  };
+  for (let tx = x; tx < x + w; tx++) {
+    put(tx, y);
+    put(tx, y + h - 1);
+  }
+  for (let ty = y + 1; ty < y + h - 1; ty++) {
+    put(x, ty);
+    put(x + w - 1, ty);
+  }
+}
+
+function addRacePrison(g: Grid, c: Ctx, x: number, y: number) {
+  g.rect(x, y, 8, 5, "k");
+  for (let tx = x; tx < x + 8; tx++) {
+    add(c, "crate", tx, y);
+    add(c, "crate", tx, y + 4);
+  }
+  for (let ty = y + 1; ty < y + 4; ty++) {
+    add(c, "crate", x, ty);
+    add(c, "crate", x + 7, ty);
+  }
+  c.areas.push({ id: "race-prison", name: "레이스 감옥", x: x + 1, y: y + 1, w: 6, h: 3 });
+  c.labels.push({ x: x + 1, y, text: "PRISON" });
+}
+
 // 회의실: 벽 + 카펫 + 테이블/의자 + 화이트보드 + 프라이빗 영역.
 // 문(출입구)은 아래쪽 벽 중앙 2칸.
 function meetingRoom(
@@ -230,6 +262,21 @@ function buildPlaza(): MapData {
   c.areas.push({ id: "game-corner", name: "🕹️ 게임 코너", x: 60, y: 33, w: 14, h: 6 });
   c.labels.push({ x: 61, y: 33, text: "🕹️ 게임 코너" });
 
+  // 월드 상점 (모달이 아닌 실제 진열대 구매)
+  g.rect(58, 20, 16, 10, "p");
+  g.rect(60, 22, 12, 6, "e");
+  add(c, "lamp", 59, 20);
+  add(c, "lamp", 72, 20);
+  add(c, "shopdisplay", 60, 22, { name: "네온 액자", props: { itemKey: "frame-neon" } });
+  add(c, "shopdisplay", 63, 22, { name: "오로라 카드", props: { itemKey: "card-aurora" } });
+  add(c, "shopdisplay", 66, 22, { name: "검은 고양이", props: { itemKey: "pet-cat-black" } });
+  add(c, "shopdisplay", 69, 22, { name: "천사 날개", props: { itemKey: "wings-angel" } });
+  add(c, "shopdisplay", 61, 26, { name: "휴대용 피아노", props: { itemKey: "portable-piano" } });
+  add(c, "shopdisplay", 65, 26, { name: "늑대", props: { itemKey: "mount-wolf" } });
+  add(c, "shopdisplay", 69, 26, { name: "마법 양탄자", props: { itemKey: "mount-carpet" } });
+  c.areas.push({ id: "world-shop", name: "AFFINITY 상점", x: 58, y: 20, w: 16, h: 10 });
+  c.labels.push({ x: 59, y: 19, text: "AFFINITY 상점" });
+
   // 연못 + 피크닉 (좌하단)
   g.blob(16, 30, 7, 4, "s");
   g.blob(16, 30, 5.4, 2.8, "~");
@@ -292,8 +339,10 @@ function buildPlaza(): MapData {
   c.portals.push({ id: "pz-po-arena", x: 39, y: 33, kind: "room", roomTemplate: "arena", label: "🔫 배틀 아레나(PK)로" });
 
   // OX 파티 퀴즈 존 (O = 초록 / X = 빨강 플랫폼)
+  g.rect(37, 18, 5, 4, "c");
   g.rect(30, 18, 5, 4, "g");
   g.rect(45, 18, 5, 4, "m");
+  c.areas.push({ id: "quiz-start", name: "OX 대기 구역", x: 37, y: 18, w: 5, h: 4 });
   c.areas.push({ id: "quiz-o", name: "🅾️ O 존", x: 30, y: 18, w: 5, h: 4 });
   c.areas.push({ id: "quiz-x", name: "❌ X 존", x: 45, y: 18, w: 5, h: 4 });
   c.labels.push({ x: 31, y: 17, text: "🅾️ O" });
@@ -620,12 +669,15 @@ function buildCircuit(): MapData {
   g.rect(14, 14, 60, 28, "r"); // 안쪽 연석
   g.rect(15, 15, 58, 26, ","); // 잔디 아일랜드
   g.scatter(";", 120, 16, 16, 56, 24, 43, ",");
+  addRaceBarrierLoop(c, 7, 7, 74, 42);
+  addRaceBarrierLoop(c, 14, 14, 60, 28);
 
   // 결승선 (체커, 상단 직선)
   for (let r = 8; r < 15; r++) {
     g.set(44, r, "F");
     g.set(45, r, "F");
   }
+  g.rect(39, 11, 10, 1, "b");
 
   // ---- 부스트 패드 ----
   const boosts: [number, number][] = [
@@ -649,7 +701,7 @@ function buildCircuit(): MapData {
       text: "🏁 그랑프리 서킷에 오신 걸 환영합니다!\n\n1) 노란 칸에서 F 키로 카트 탑승\n2) 체커 라인을 지나면 랩 타이머 시작\n3) 시계 방향으로 3랩 완주!\n\n⚡ 노란 화살표 = 스피드 부스트\n🎁 ? 박스 = 랜덤 아이템 (터보/부스트/슬로우)\n🛢️ 기름 웅덩이 = 밟으면 미끄러져요\n🚧 라바콘은 완전히 막혀요 — 피하세요\n🌿 잔디/모래에선 카트가 느려집니다",
     },
   });
-  c.spawns.push({ x: 34, y: 21 }, { x: 37, y: 21 }, { x: 40, y: 21 }, { x: 43, y: 21 });
+  c.spawns.push({ x: 40, y: 11 }, { x: 42, y: 11 }, { x: 47, y: 11 }, { x: 49, y: 11 });
   c.labels.push({ x: 29, y: 16, text: "🔧 피트레인 (F로 카트 탑승)" });
 
   // ---- 포디움 + 깃발 (아일랜드 중앙) ----
@@ -668,6 +720,7 @@ function buildCircuit(): MapData {
   add(c, "bench", 34, 33);
   for (let i = 0; i < 4; i++) add(c, "flowerbed", 28 + i * 2, 25);
   c.areas.push({ id: "infield", name: "🌿 인필드 라운지", x: 28, y: 31, w: 10, h: 6 });
+  addRacePrison(g, c, 18, 20);
 
   // ---- 관중석 + 중계석 (트랙 위쪽 외곽) ----
   g.rect(14, 2, 60, 5, "-");
@@ -732,6 +785,7 @@ function buildCircuit(): MapData {
   // ---- 포털: 광장/테마 서킷 + 중앙 워프 포탈 ----
   add(c, "door", 4, 27, { name: "서킷 출구" });
   c.portals.push({ id: "cc-po-plaza", x: 4, y: 27, kind: "room", roomTemplate: "plaza", label: "⛲ 광장으로" });
+  add(c, "portalhub", 10, 10, { name: "트랙 워프 포탈" });
   add(c, "portalhub", 50, 19, { name: "워프 포탈" });
   // 테마 전환 게이트 (요트/비행기)
   add(c, "sign", 44, 18, { name: "테마 서킷", props: { text: "🏁 테마 서킷\n\n오른쪽 문으로 바다 요트/하늘 비행기 서킷으로 이동!" } });
@@ -928,34 +982,51 @@ function buildBeach(): MapData {
   };
 }
 
-// ==================== 6. 스타홀 갤러리 (52 x 34) ====================
-// 명예의전당 컨셉 — 그림책 캐릭터 NPC를 전시관처럼 배치. X 키로 정보 팝업.
+// ==================== 6. 스타홀 갤러리 (60 x 40) ====================
+// 극장형 명예의전당 — 둥근 홀, 민트 발광 전시대, 따뜻한 석재, 식재.
 
 function buildStarhall(): MapData {
-  const W = 52;
-  const H = 34;
-  const g = new Grid(W, H, "k"); // 어두운 마루
+  const W = 60;
+  const H = 40;
+  const g = new Grid(W, H, "p");
   const c = ctx("sh");
 
-  // 벽 + 바닥 마감
   g.border(0, 0, W, H, "#");
-  // 중앙 레드카펫 러너 (입구 → 안쪽) + 밝은 대리석 관람 동선
-  g.rect(24, 7, 4, H - 9, "m");
-  g.rect(5, 4, W - 10, 5, "-");
-  g.rect(6, 13, 15, 14, ".");
-  g.rect(31, 13, 15, 14, ".");
-  g.rect(6, 28, W - 12, 3, "-");
-  g.rect(24, 29, 4, 4, "m");
+  g.rect(2, 1, W - 4, 6, "#");
+  g.rect(5, 6, W - 10, 5, ".");
+  g.rect(7, 11, W - 14, 2, "w");
+  g.blob(30, 26, 18, 11, "-");
+  g.blob(30, 26, 13, 8, "p");
+  g.blob(30, 26, 6, 4, "e");
+  g.rect(28, 12, 4, 25, "m");
+  g.rect(26, 33, 8, 4, "m");
+  g.rect(4, 7, 52, 2, "p");
+  g.rect(5, 9, 50, 1, "e");
+  g.rect(4, 31, 52, 2, "p");
+  g.rect(9, 15, 4, 14, "w");
+  g.rect(47, 15, 4, 14, "w");
+  for (const [x, y] of [[30, 24], [29, 25], [31, 25], [28, 26], [32, 26], [29, 27], [31, 27], [30, 28]] as [number, number][]) {
+    g.set(x, y, "e");
+  }
 
-  // ---- 캐릭터 NPC 전시 ----
+  // 돔/아치와 발코니
+  for (const x of [9, 16, 23, 30, 37, 44, 51]) add(c, "window", x, 3, { name: "유리 돔" });
+  for (const x of [7, 13, 19, 25, 35, 41, 47, 53]) add(c, "statue", x, 6, { name: "대리석 열주" });
+  for (const x of [8, 15, 22, 36, 43, 50]) add(c, "lamp", x, 8);
+  for (const x of [10, 18, 38, 46]) add(c, "plant", x, 10);
+  for (const [x, y] of [[6, 13], [52, 13], [6, 27], [52, 27]] as [number, number][]) add(c, "chess", x, y, { name: "박물관 수호 조형물" });
+  for (const [x, y] of [[14, 14], [43, 14], [14, 28], [43, 28]] as [number, number][]) add(c, "rug", x, y, { props: { color: "#2f4f64" } });
+  add(c, "stairs", 27, 13, { name: "중앙 계단" });
+  add(c, "stairs", 31, 13, { name: "중앙 계단" });
+
   const stars: { head: string; name: string; title: string; text: string; x: number; y: number; color: string }[] = [
     {
       head: "b-lucian",
       name: "루시안",
       title: "빛의 기사",
       text: "어둠이 가장 짙은 밤, 스스로 등불이 되기를 택한 소년.\n두려움 앞에서도 한 걸음 더 나아가는 용기의 상징입니다.",
-      x: 7,
-      y: 6,
+      x: 8,
+      y: 13,
       color: "#2563eb",
     },
     {
@@ -963,8 +1034,8 @@ function buildStarhall(): MapData {
       name: "루시아",
       title: "여명의 성녀",
       text: "새벽의 첫 빛과 함께 나타난다는 소녀.\n지친 이들의 마음에 가장 먼저 아침을 가져다줍니다.",
-      x: 16,
-      y: 6,
+      x: 18,
+      y: 11,
       color: "#db2777",
     },
     {
@@ -972,8 +1043,8 @@ function buildStarhall(): MapData {
       name: "모세",
       title: "물길을 가르는 자",
       text: "지팡이 하나로 바다를 갈랐다는 전설의 인도자.\n막다른 길에서도 새로운 길을 여는 지혜를 지녔습니다.",
-      x: 25,
-      y: 5,
+      x: 29,
+      y: 8,
       color: "#0f766e",
     },
     {
@@ -981,8 +1052,8 @@ function buildStarhall(): MapData {
       name: "아리엘",
       title: "바람의 노래",
       text: "하늘과 바다를 잇는 노래를 부르는 음유시인.\n그 선율을 들은 이는 누구나 다시 꿈을 꾼다고 합니다.",
-      x: 34,
-      y: 6,
+      x: 40,
+      y: 11,
       color: "#7c3aed",
     },
     {
@@ -990,8 +1061,8 @@ function buildStarhall(): MapData {
       name: "크로스",
       title: "맹세의 수호자",
       text: "마지막 순간까지 약속을 지켜낸 방패의 기사.\n한 번 맺은 언약은 결코 저버리지 않습니다.",
-      x: 43,
-      y: 6,
+      x: 50,
+      y: 13,
       color: "#334155",
     },
     {
@@ -1000,7 +1071,7 @@ function buildStarhall(): MapData {
       title: "별빛 기록관",
       text: "잊힌 이름과 작은 승리를 별자리처럼 기록하는 소녀.\n그녀의 수첩에는 모두가 주인공이 되는 순간이 적혀 있습니다.",
       x: 8,
-      y: 16,
+      y: 25,
       color: "#ca8a04",
     },
     {
@@ -1008,8 +1079,8 @@ function buildStarhall(): MapData {
       name: "사라",
       title: "정원의 예언자",
       text: "시들어가는 꽃에서도 다음 계절을 읽는 예언자.\n조용한 말 한마디로 불안한 마음을 단단히 붙잡아 줍니다.",
-      x: 17,
-      y: 21,
+      x: 19,
+      y: 28,
       color: "#16a34a",
     },
     {
@@ -1017,8 +1088,8 @@ function buildStarhall(): MapData {
       name: "에덴",
       title: "푸른 문지기",
       text: "새로운 세계로 이어지는 문을 지키는 소년.\n준비된 사람에게는 언제나 다음 방으로 가는 길을 열어줍니다.",
-      x: 25,
-      y: 23,
+      x: 29,
+      y: 29,
       color: "#0284c7",
     },
     {
@@ -1026,8 +1097,8 @@ function buildStarhall(): MapData {
       name: "데보라",
       title: "심판의 종소리",
       text: "혼란 속에서도 무엇이 옳은지 분명히 말하는 지도자.\n그녀의 종소리는 망설이던 사람들을 다시 움직이게 합니다.",
-      x: 34,
-      y: 21,
+      x: 40,
+      y: 28,
       color: "#be123c",
     },
     {
@@ -1035,14 +1106,14 @@ function buildStarhall(): MapData {
       name: "우리엘",
       title: "별의 해설자",
       text: "밤하늘의 빛을 읽어 여행자에게 방향을 알려주는 해설자.\n길을 잃은 사람에게 가장 먼저 말을 걸어줍니다.",
-      x: 43,
-      y: 16,
+      x: 50,
+      y: 25,
       color: "#9333ea",
     },
   ];
   stars.forEach((s) => {
-    c.spotlights.push({ x: s.x, y: s.y + 2 });
-    add(c, "npc", s.x, s.y, {
+    c.spotlights.push({ x: s.x + 1, y: s.y + 2 });
+    add(c, "exhibit", s.x, s.y, {
       name: s.name,
       props: {
         interaction: "note",
@@ -1053,45 +1124,37 @@ function buildStarhall(): MapData {
       },
     });
   });
-  for (const [lx, ly] of [[4, 4], [12, 4], [21, 4], [30, 4], [39, 4], [47, 4], [5, 14], [46, 14], [5, 26], [46, 26]] as [number, number][]) {
-    add(c, "lamp", lx, ly);
-  }
 
-  // ---- 관람 벤치 + 중앙 조형물 ----
-  add(c, "rug", 24, 12, { props: { color: "#7c2d12" } });
-  add(c, "statue", 25, 13, { name: "별의 조형물" });
-  add(c, "bench", 10, 27);
-  add(c, "bench", 18, 27);
-  add(c, "bench", 32, 27);
-  add(c, "bench", 40, 27);
-  add(c, "flowerbed", 7, 29);
-  add(c, "flowerbed", 12, 29);
-  add(c, "flowerbed", 39, 29);
-  add(c, "flowerbed", 44, 29);
-  add(c, "plant", 2, 30);
-  add(c, "plant", W - 3, 30);
-  c.areas.push({ id: "starhall-main", name: "⭐ 스타홀 메인 갤러리", x: 4, y: 4, w: W - 8, h: H - 6 });
-
-  // ---- 안내판 + 스폰 + 포털 ----
-  add(c, "sign", 18, 30, {
-    name: "스타홀 안내",
+  // 중앙 조형물, 도슨트, 좌석, 식재
+  add(c, "rug", 27, 23, { props: { color: "#b05a4b" } });
+  add(c, "statue", 29, 20, { name: "별의 문장" });
+  add(c, "npc", 25, 31, {
+    name: "스타홀 도슨트",
     props: {
-      text: "⭐ 스타홀 갤러리\n\n그림책 속 전설의 인물을 NPC처럼 전시한 명예의 전당입니다.\n캐릭터 앞에서 X 키를 누르면 인물 정보를 볼 수 있어요.",
+      color: "#264653",
+      text: "스타홀은 그림책 속 인물과 장면을 극장처럼 전시한 명예의 전당입니다.\n민트빛 액자 앞에 서면 작품 설명이 자연스럽게 표시됩니다.",
     },
   });
-  c.spawns.push({ x: 25, y: 30 }, { x: 26, y: 30 }, { x: 24, y: 29 }, { x: 27, y: 29 });
-  add(c, "door", 25, 32, { name: "갤러리 출구" });
-  c.portals.push({ id: "sh-po-plaza", x: 25, y: 32, kind: "room", roomTemplate: "plaza", label: "⛲ 광장으로" });
-  add(c, "door", 26, 32, { name: "갤러리 출구" });
-  c.portals.push({ id: "sh-po-plaza2", x: 26, y: 32, kind: "room", roomTemplate: "plaza", label: "⛲ 광장으로" });
-  add(c, "portalhub", 31, 29, { name: "워프 포탈" });
-  c.labels.push({ x: 4, y: 1, text: "⭐ 스타홀 갤러리 — NPC 전시관" });
-  c.labels.push({ x: 19, y: 10, text: "캐릭터 앞에서 X" });
+  add(c, "npc", 34, 31, { name: "전시 큐레이터", props: { color: "#2f3a4a" } });
+  add(c, "balloon", 52, 30, { name: "투어 열기구", props: { tour: true } });
+  for (const x of [12, 18, 40, 46]) add(c, "bench", x, 34);
+  for (const [x, y] of [[5, 17], [5, 29], [53, 17], [53, 29], [11, 32], [47, 32]] as [number, number][]) add(c, "flowerbed", x, y);
+  for (const [x, y] of [[3, 33], [55, 33], [6, 8], [52, 8], [6, 35], [52, 35]] as [number, number][]) add(c, "plant", x, y);
+  for (const [x, y] of [[12, 19], [47, 19], [14, 31], [45, 31], [28, 33], [31, 33]] as [number, number][]) add(c, "lamp", x, y);
+
+  c.areas.push({ id: "starhall-main", name: "스타홀 메인 갤러리", x: 4, y: 7, w: W - 8, h: H - 10 });
+  c.spawns.push({ x: 29, y: 35 }, { x: 30, y: 35 }, { x: 28, y: 34 }, { x: 31, y: 34 });
+  add(c, "door", 29, 37, { name: "갤러리 출구" });
+  c.portals.push({ id: "sh-po-plaza", x: 29, y: 37, kind: "room", roomTemplate: "plaza", label: "광장으로" });
+  add(c, "portalhub", 34, 34, { name: "워프 포탈" });
+  c.labels.push({ x: 24, y: 7, text: "STAR HALL" });
+  c.labels.push({ x: 25, y: 18, text: "별의 극장" });
+  c.labels.push({ x: 50, y: 29, text: "🎈 TOUR" });
 
   return {
     key: "starhall",
-    name: "스타홀 갤러리",
-    description: "그림책 캐릭터 NPC를 전시한 명예의 전당. 캐릭터 앞에서 X 키로 인물 정보를 볼 수 있어요.",
+    name: "스타홀",
+    description: "극장형 명예의 전당. 민트빛 액자, 둥근 중앙 홀, 따뜻한 석재와 식재가 어우러진 전시 공간.",
     tiles: g.rows(),
     objects: c.objects,
     areas: c.areas,
@@ -1217,6 +1280,8 @@ function buildRingRace(theme: "sea" | "sky"): MapData {
   g.rect(8, 8, W - 16, H - 16, "a"); // 아스팔트(활주로/부두)
   g.rect(14, 14, W - 28, H - 28, "r"); // 안쪽 연석
   g.rect(15, 15, W - 30, H - 30, island); // 안쪽 섬
+  addRaceBarrierLoop(c, 7, 7, W - 14, H - 14);
+  addRaceBarrierLoop(c, 14, 14, W - 28, H - 28);
 
   // 결승선(상단 직선 세로 체커)
   for (let r = 8; r < 14; r++) {
@@ -1241,6 +1306,7 @@ function buildRingRace(theme: "sea" | "sky"): MapData {
   for (const [ox, oy] of [[W - 11, 16], [16, H - 11], [10, 34]] as [number, number][]) add(c, "oil", ox, oy);
 
   // ---- 안쪽 섬 꾸미기 + 포디움(트로피장) ----
+  addRacePrison(g, c, 22, 20);
   add(c, "podium", 38, 30);
   add(c, "flag", 36, 30);
   add(c, "flag", 41, 30);
@@ -1278,6 +1344,7 @@ function buildRingRace(theme: "sea" | "sky"): MapData {
 
   // ---- 워프 포탈(안쪽 섬) — 전체 미니맵으로 어디든 이동 ----
   // (트랙 위에 방 포털을 두면 주행 중 오발동하므로, 안쪽 섬의 워프 포탈로만 이동)
+  add(c, "portalhub", 9, 9, { name: "트랙 워프 포탈" });
   add(c, "portalhub", 44, 30, { name: "워프 포탈" });
 
   return {

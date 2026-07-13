@@ -103,6 +103,7 @@ export interface PlayerCosmetics {
   wings?: string;
   mount?: string;
   kart?: string;
+  dance?: string;
 }
 
 // 이모지 / 채팅 브로드캐스트 메시지 (머리 위 말풍선).

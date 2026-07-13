@@ -55,7 +55,7 @@ export default function RaceHud({
           <div className="text-xs text-slate-300">
             🏁 <b className="text-white">카트를 타고 체커 라인</b>을 지나면
             <br />
-            {state.laps}랩 레이스가 시작됩니다!
+            시계방향 {state.laps}랩 레이스가 시작됩니다!
             {state.bestLapMs != null && (
               <div className="mt-1 text-[10px] text-slate-400">
                 내 베스트 랩 {fmtMs(state.bestLapMs)}

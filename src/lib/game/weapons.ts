@@ -1,7 +1,7 @@
 // PK 샷건존 무기 카탈로그 (feature #12).
 // 인벤토리에는 "weapon-<key>" 형태로 저장. pistol 은 기본 무료 지급.
 
-export type WeaponKind = "gun" | "shotgun" | "sniper" | "melee" | "throw" | "smoke" | "cannon" | "tank";
+export type WeaponKind = "gun" | "shotgun" | "sniper" | "melee" | "throw" | "smoke" | "cannon" | "tank" | "arrow" | "rocket";
 
 export interface Weapon {
   key: string;
@@ -66,6 +66,16 @@ export const WEAPONS: Weapon[] = [
     key: "tank", name: "탱크", kind: "tank", icon: "🛡️",
     damage: 120, cooldownMs: 3000, speed: 620, rangePx: 640, pellets: 1, spreadDeg: 0, radiusPx: 110,
     price: 30, currency: "coin", color: "#334155", desc: "최강의 화력. 코인으로만 구매 가능.",
+  },
+  {
+    key: "arrow", name: "차지 화살", kind: "arrow", icon: "➶",
+    damage: 0, cooldownMs: 1000, speed: 920, rangePx: 760, pellets: 1, spreadDeg: 0,
+    price: 0, currency: "heart", color: "#f8e7b0", desc: "레이싱 보스전 전용. 1초 장전 후 유도 미사일을 요격합니다.",
+  },
+  {
+    key: "boss-rocket", name: "폭죽 로켓", kind: "rocket", icon: "🚀",
+    damage: 1, cooldownMs: 1000, speed: 520, rangePx: 1800, pellets: 1, spreadDeg: 0, radiusPx: 96,
+    price: 0, currency: "heart", color: "#fb7185", desc: "레이싱 아이템 박스에서 발사되어 보스에게만 피해를 줍니다.",
   },
 ];
 

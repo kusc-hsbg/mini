@@ -14,6 +14,29 @@ export interface SpaceContext {
   isBanned: boolean;
 }
 
+function dedupeRooms(rooms: RoomRecord[]): RoomRecord[] {
+  const byTemplate = new Map<string, RoomRecord>();
+  const result: RoomRecord[] = [];
+
+  for (const room of rooms) {
+    const previous = byTemplate.get(room.template_key);
+    if (!previous) {
+      byTemplate.set(room.template_key, room);
+      result.push(room);
+      continue;
+    }
+
+    // 기존 스페이스에 같은 프리셋 방이 여러 번 만들어진 경우 UI/워프에서 한 번만 노출한다.
+    if (room.map_data && !previous.map_data) {
+      const idx = result.findIndex((r) => r.id === previous.id);
+      if (idx >= 0) result[idx] = room;
+      byTemplate.set(room.template_key, room);
+    }
+  }
+
+  return result;
+}
+
 // id 또는 slug 로 스페이스 + 방 목록 + 내 멤버십 조회.
 export async function loadSpace(
   idOrSlug: string,
@@ -40,7 +63,7 @@ export async function loadSpace(
         .order("created_at", { ascending: true })
     ).data as RoomRecord[] | null;
 
-  let rooms = (await loadRooms()) ?? [];
+  let rooms = dedupeRooms((await loadRooms()) ?? []);
 
   let role: SpaceRole | null = null;
   let isBanned = false;
@@ -76,7 +99,7 @@ export async function loadSpace(
         sort_order: MAP_LIST.findIndex((x) => x.key === m.key),
       }));
       const { error } = await supabase.from("rooms").insert(rows);
-      if (!error) rooms = (await loadRooms()) ?? rooms;
+      if (!error) rooms = dedupeRooms((await loadRooms()) ?? rooms);
     }
   }
 

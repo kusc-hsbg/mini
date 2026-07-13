@@ -25,7 +25,7 @@ import { useRoomChannel } from "@/hooks/useRoomChannel";
 import { useControlChannel, type ControlChannel } from "@/hooks/useControlChannel";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { logEvent } from "@/lib/analytics";
-import { addKill, banTarget, blockTarget, buyWeapon, claimAttendance, claimQuest, grantHearts, incrementRaceWin, saveBio as saveBioAction, sendDm, sendFriendRequest, setRoomClosed as setRoomClosedAction, setStatus as setStatusAction, spendHearts, unblockTarget } from "@/app/actions";
+import { addKill, banTarget, blockTarget, buyItem, buyWeapon, claimAttendance, claimQuest, equipItem, grantHearts, incrementRaceWin, redeemSecretWallet, saveBio as saveBioAction, sendDm, sendFriendRequest, setRoomClosed as setRoomClosedAction, setStatus as setStatusAction, spendHearts, unblockTarget } from "@/app/actions";
 import StoreModal, { type WalletState } from "./StoreModal";
 import FriendsPanel from "./FriendsPanel";
 import MiniGamesModal from "./MiniGamesModal";
@@ -73,6 +73,7 @@ const BLOCK_KEY = "pixeltown:blocked";
 const GUEST_WALLET_KEY = "affinity:guest-wallet";
 const GUEST_ATT_KEY = "affinity:guest-attendance";
 const SPORTSCAR_SUMMON_KEY = "mount-sportscar";
+const BALLOON_TOUR_MOUNT_KEY = "mount-balloon";
 const CAR_SUMMON_COST = 10;
 
 function bioStorageKey(id: string) {
@@ -130,6 +131,7 @@ function equippedToCosmetics(eq: Record<string, string>): PlayerCosmetics {
     wings: eq.wings,
     mount: eq.mount,
     kart: eq.kart,
+    dance: eq.dance,
   };
 }
 
@@ -204,7 +206,7 @@ type ModalState =
   | { kind: "quiz" }
   | null;
 
-type PanelState = "participants" | "chat" | "meetings" | "friends" | null;
+type PanelState = "participants" | "chat" | "meetings" | "friends" | "store" | null;
 
 export default function GameClient({
   space,
@@ -270,17 +272,12 @@ export default function GameClient({
     }
   }, [profile]);
 
-  // 소개(bio) 초기화 + 최초 접속 시(소개 미작성) 작성 안내
-  const bioPromptedRef = useRef(false);
+  // 소개(bio) 초기화. 편집은 HUD의 정보 버튼에서 직접 연다.
   useEffect(() => {
     if (!identity) return;
     const rememberedBio = identity.bio?.trim() ? identity.bio : loadRememberedBio(identity.id);
     if (rememberedBio !== identity.bio) identity.bio = rememberedBio;
     setMyBio(rememberedBio);
-    if (!rememberedBio && !bioPromptedRef.current) {
-      bioPromptedRef.current = true;
-      setModal({ kind: "bio" });
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity]);
 
@@ -306,7 +303,8 @@ export default function GameClient({
   const [followId, setFollowId] = useState<string | null>(null);
   const [hintObj, setHintObj] = useState<MapObject | null>(null);
   const [nearWater, setNearWater] = useState(false);
-  const [liveMap, setLiveMap] = useState<MapData>(() => resolveMap(room.template_key, room.map_data));
+  const resolvedRoomMap = useMemo(() => resolveMap(room.template_key, room.map_data), [room.id, room.template_key, room.map_data]);
+  const [liveMap, setLiveMap] = useState<MapData>(() => resolvedRoomMap);
   const [mapEditorKey, setMapEditorKey] = useState(0);
   const [raceState, setRaceState] = useState<RaceState | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderEntry[]>([]);
@@ -321,8 +319,11 @@ export default function GameClient({
           inventory: profile.inventory ?? [],
           equipped: profile.equipped ?? {},
         }
-      : loadGuestWallet()
+      : { hearts: 200, coins: 0, inventory: [], equipped: {} }
   );
+  useEffect(() => {
+    if (!profile) setWallet(loadGuestWallet());
+  }, [profile]);
   // 게스트 지갑은 로컬에 영속화 (하트/아이템이 실제로 유지·증가하도록)
   useEffect(() => {
     if (!profile) {
@@ -341,6 +342,9 @@ export default function GameClient({
   const [stats, setStats] = useState({ raceWins: profile?.race_wins ?? 0, kills: profile?.kills ?? 0 });
   const [roomClosed, setRoomClosedState] = useState(!!room.closed);
   const [pianoPlaced, setPianoPlaced] = useState(false);
+  const [secretOpen, setSecretOpen] = useState(false);
+  const [secretArmed, setSecretArmed] = useState(false);
+  const [secretCode, setSecretCode] = useState("");
   const [quiz, setQuiz] = useState<{ text: string; host: string; hostName: string; correct?: "O" | "X"; myResult?: "pass" | "fail" } | null>(null);
   const [bossHud, setBossHud] = useState<{ hp: number; maxHp: number; kind: string; alive: boolean } | null>(null);
   const bossRef = useRef<{ x: number; y: number; hp: number; maxHp: number; kind: string; alive: boolean } | null>(null);
@@ -354,6 +358,11 @@ export default function GameClient({
   }, [players, identity]);
   const isHostRef = useRef(false);
   isHostRef.current = isHost;
+
+  useEffect(() => {
+    setLiveMap(resolvedRoomMap);
+    setMapEditorKey((k) => k + 1);
+  }, [resolvedRoomMap]);
 
   const autoBusyRef = useRef(false);
   const myLocksRef = useRef<Set<string>>(new Set());
@@ -379,6 +388,7 @@ export default function GameClient({
   const convSecondsRef = useRef(0);
   const dmLoadedRef = useRef(new Set<string>());
   const wbSubsRef = useRef(new Set<(board: string, op: WbOp) => void>());
+  const balloonTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ----- 토스트 -----
   const addToast = useCallback((text: string, actionLabel?: string, action?: () => void) => {
@@ -644,7 +654,8 @@ export default function GameClient({
         const q = payload as RtEvents["quiz"];
         if (q.kind === "start") {
           setQuiz({ text: q.text ?? "", host: q.host, hostName: q.hostName });
-          addToast(`🅾️❌ ${q.hostName}님의 OX 퀴즈! O/X 존으로 이동하세요`);
+          moveToQuizStart();
+          addToast(`🅾️❌ ${q.hostName}님의 OX 퀴즈`);
         } else if (q.kind === "reveal") {
           const myArea = engine?.getSelf().areaId ?? null;
           const correctZone = q.correct === "O" ? "quiz-o" : "quiz-x";
@@ -717,7 +728,7 @@ export default function GameClient({
 
     const engine = new GameEngine(
       canvas,
-      liveMap,
+      resolvedRoomMap,
       identity.id,
       identity.name,
       identity.appearance,
@@ -760,7 +771,7 @@ export default function GameClient({
         },
         onRace: (ev) => {
           if (ev.kind === "start") {
-            addToast(`🚦 레이스 시작! ${ev.laps}랩 완주하세요`);
+            addToast(`🚦 레이스 시작! 시계방향으로 ${ev.laps}랩 완주하세요`);
             if (multiplayer)
               channelRef.current.send("race", {
                 from: identity.id,
@@ -776,11 +787,12 @@ export default function GameClient({
             applyRaceRecord(identity.id, identity.name, ev.totalMs);
             // 트로피장(포디움)으로 이동 + 우승 기록
             const eng = engineRef.current;
-            const podium = liveMap.objects.find((o) => o.type === "podium");
+            const activeMap = engineRef.current?.map ?? liveMap;
+            const podium = activeMap.objects.find((o) => o.type === "podium");
             if (eng) {
               eng.patchSelf({ onBike: false });
               if (podium) eng.teleport(podium.x + 1, podium.y + 2);
-              else if (liveMap.spawns[0]) eng.teleport(liveMap.spawns[0].x, liveMap.spawns[0].y);
+              else if (activeMap.spawns[0]) eng.teleport(activeMap.spawns[0].x, activeMap.spawns[0].y);
             }
             if (profile) {
               incrementRaceWin().then((res) => {
@@ -822,7 +834,13 @@ export default function GameClient({
           if (multiplayer) channelRef.current.send("kill", p);
         },
         onDeath: (killerName) =>
-          addToast(killerName ? `💀 ${killerName}님에게 당했습니다! 곧 부활합니다` : "💀 사망! 곧 부활합니다"),
+          addToast(
+            liveMap.race
+              ? "💀 미사일 3회 피격 — 경기장 감옥으로 이동했습니다"
+              : killerName
+                ? `💀 ${killerName}님에게 당했습니다! 곧 부활합니다`
+                : "💀 사망! 곧 부활합니다"
+          ),
         onKill: (victimName) => {
           addToast(`🎯 ${victimName}님을 처치했습니다!`);
           if (profile) {
@@ -854,7 +872,7 @@ export default function GameClient({
           const meta: Record<RaceItemKind, [string, string]> = {
             turbo: ["🚀 터보! 2초간 초가속", "🚀"],
             boost: ["⚡ 부스트!", "⚡"],
-            rocket: ["🚀 로켓! 5초간 2배 속도", "🚀"],
+            rocket: ["🎆 폭죽 로켓 발사! 보스에게 피해", "🚀"],
             slow: ["🐢 꽝... 슬로우에 걸렸어요", "🐢"],
             ink: ["🖤 먹물! 시야가 가려졌어요", "🖤"],
             meteor: ["☄️ 운석/폭탄! 잠시 멈춰요", "💫"],
@@ -960,6 +978,130 @@ export default function GameClient({
     }
   }
 
+  function moveToQuizStart() {
+    const e = engineRef.current;
+    const start = liveMap.areas.find((a) => a.id === "quiz-start");
+    if (e && start) {
+      e.teleport(start.x + Math.floor(start.w / 2), start.y + Math.floor(start.h / 2));
+      return;
+    }
+    const plaza = rooms.find((r) => r.template_key === "plaza");
+    if (plaza && plaza.id !== room.id) {
+      router.push(`/s/${space.id}/${plaza.id}?area=quiz-start`);
+    }
+  }
+
+  async function redeemSecretCode() {
+    const code = secretCode.trim();
+    if (code !== "2009") {
+      setSecretCode("");
+      return;
+    }
+    if (!profile) {
+      setWallet((w) => ({ ...w, hearts: w.hearts + 10000, coins: w.coins + 10000 }));
+      setSecretOpen(false);
+      setSecretArmed(false);
+      setSecretCode("");
+      addToast("완료");
+      return;
+    }
+    const res = await redeemSecretWallet(code);
+    if ("error" in res) {
+      setSecretCode("");
+      return;
+    }
+    setWallet((w) => ({ ...w, hearts: res.hearts, coins: res.coins }));
+    setSecretOpen(false);
+    setSecretArmed(false);
+    setSecretCode("");
+    addToast("완료");
+  }
+
+  function startBalloonTour() {
+    const e = engineRef.current;
+    if (!e || !identity) return;
+    if (balloonTimerRef.current) return;
+    const cost = 10;
+    if (walletRef.current.hearts < cost) {
+      addToast("하트가 부족합니다.");
+      return;
+    }
+    const id = `balloon-tour-${identity.id}`;
+    const path = [
+      { x: 28, y: 31 },
+      { x: 18, y: 25 },
+      { x: 20, y: 15 },
+      { x: 30, y: 12 },
+      { x: 42, y: 15 },
+      { x: 44, y: 25 },
+      { x: 32, y: 31 },
+    ];
+    const previousSummonedMount = summonedMount;
+    const previousMounted = mounted;
+    const previousCosmetics = activeCosmetics;
+    const tourCosmetics: PlayerCosmetics = { ...activeCosmetics, mount: BALLOON_TOUR_MOUNT_KEY };
+    const remove = () => {
+      e.removeObject(id);
+      if (multiplayer) channelRef.current.send("obj-remove", { id });
+    };
+    const restoreRide = () => {
+      setSummonedMount(previousSummonedMount);
+      setMounted(previousMounted);
+      e.patchSelf({ cosmetics: previousCosmetics, mounted: previousMounted && !!previousCosmetics.mount });
+      pushPresence();
+    };
+    const stopTour = (restore = true) => {
+      remove();
+      if (balloonTimerRef.current) clearInterval(balloonTimerRef.current);
+      balloonTimerRef.current = null;
+      if (restore) restoreRide();
+    };
+    const place = (idx: number) => {
+      const p = path[idx];
+      e.removeObject(id);
+      e.addObject({ id, type: "balloon", x: p.x, y: p.y, name: "투어 열기구", props: { tour: true } });
+      e.teleport(p.x + 1, p.y + 2);
+      e.patchSelf({ cosmetics: tourCosmetics, mounted: true });
+      pushPresence();
+      if (multiplayer) {
+        channelRef.current.send("obj-remove", { id });
+        channelRef.current.send("obj-place", { id, otype: "balloon", x: p.x, y: p.y, name: "투어 열기구" });
+      }
+    };
+    setSummonedMount(BALLOON_TOUR_MOUNT_KEY);
+    setMounted(true);
+    setWallet((w) => ({ ...w, hearts: w.hearts - cost }));
+    if (profile) {
+      spendHearts(cost).then((res) => {
+        if ("error" in res) {
+          setWallet((w) => ({ ...w, hearts: w.hearts + cost }));
+          stopTour();
+          addToast("❌ 열기구 호출 실패: " + res.error);
+          return;
+        }
+        setWallet((w) => ({ ...w, hearts: res.hearts }));
+      });
+    }
+    let idx = 0;
+    place(idx);
+    addToast("🎈 투어 열기구가 출발했습니다");
+    balloonTimerRef.current = setInterval(() => {
+      idx++;
+      if (idx >= path.length) {
+        stopTour();
+        return;
+      }
+      place(idx);
+    }, 900);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (balloonTimerRef.current) clearInterval(balloonTimerRef.current);
+      balloonTimerRef.current = null;
+    };
+  }, []);
+
   // ----- presence 주기 갱신 -----
   useEffect(() => {
     if (!multiplayer || !channel.ready) return;
@@ -1007,26 +1149,13 @@ export default function GameClient({
       const now = Date.now();
       let b = bossRef.current;
       if (!b || (!b.alive && now > bossRespawnRef.current)) {
-        const maxHp = 120 + e.getOthers().length * 60;
+        const maxHp = 15;
         b = { x: size.w / 2, y: size.h / 2, hp: maxHp, maxHp, kind, alive: true };
         bossRef.current = b;
       }
       if (b.alive) {
-        const pts = [e.getSelf(), ...e.getOthers()];
-        let nx = b.x;
-        let ny = b.y;
-        let best = Infinity;
-        for (const p of pts) {
-          const d = Math.hypot(p.x - b.x, p.y - b.y);
-          if (d < best) {
-            best = d;
-            nx = p.x;
-            ny = p.y;
-          }
-        }
-        const ang = Math.atan2(ny - b.y, nx - b.x);
-        b.x += Math.cos(ang) * 18; // ~120px/s
-        b.y += Math.sin(ang) * 18;
+        b.x = size.w / 2;
+        b.y = size.h / 2;
       }
       e.setBoss(b);
       setBossHud({ hp: b.hp, maxHp: b.maxHp, kind: b.kind, alive: b.alive });
@@ -1320,6 +1449,14 @@ export default function GameClient({
       setModal({ kind: "warp" });
       return;
     }
+    if (obj.type === "shopdisplay") {
+      void buyOrEquipWorldItem(obj);
+      return;
+    }
+    if (obj.type === "balloon") {
+      startBalloonTour();
+      return;
+    }
     if (obj.type === "npc") {
       if (obj.props?.text || obj.props?.interaction) {
         setModal({ kind: "object", obj });
@@ -1402,6 +1539,61 @@ export default function GameClient({
       default:
         setModal({ kind: "object", obj });
     }
+  }
+
+  async function buyOrEquipWorldItem(obj: MapObject) {
+    const item = obj.props?.itemKey ? SHOP_MAP[obj.props.itemKey] : null;
+    if (!item) {
+      addToast("상점 아이템 정보가 없습니다.");
+      return;
+    }
+
+    const current = walletRef.current;
+    const owned = current.inventory.includes(item.key);
+    if (owned) {
+      if (item.slot === "none") {
+        addToast(`${item.name}은 이미 보유 중입니다.`);
+        return;
+      }
+      if (!profile) {
+        setWallet((w) => ({ ...w, equipped: { ...w.equipped, [item.slot]: item.key } }));
+        addToast(`${item.name} 장착 완료`);
+        return;
+      }
+      const res = await equipItem(item.slot, item.key);
+      if ("error" in res) {
+        addToast("❌ " + res.error);
+        return;
+      }
+      setWallet((w) => ({ ...w, equipped: res.equipped }));
+      addToast(`${item.name} 장착 완료`);
+      return;
+    }
+
+    const balance = item.currency === "heart" ? current.hearts : current.coins;
+    if (balance < item.price) {
+      addToast(item.currency === "heart" ? "하트가 부족합니다." : "코인이 부족합니다.");
+      return;
+    }
+
+    if (!profile) {
+      const nextInv = [...current.inventory, item.key];
+      setWallet((w) =>
+        item.currency === "heart"
+          ? { ...w, hearts: w.hearts - item.price, inventory: nextInv }
+          : { ...w, coins: w.coins - item.price, inventory: nextInv }
+      );
+      addToast(`${item.name} 구매 완료`);
+      return;
+    }
+
+    const res = await buyItem(item.key);
+    if ("error" in res) {
+      addToast("❌ " + res.error);
+      return;
+    }
+    setWallet((w) => ({ ...w, hearts: res.hearts, coins: res.coins, inventory: res.inventory }));
+    addToast(`${item.name} 구매 완료`);
   }
 
   // ----- 채팅 전송 -----
@@ -1707,6 +1899,7 @@ export default function GameClient({
       (players.find((p) => p.id === touchedId) ??
         engineRef.current?.getOthers().find((p) => p.id === touchedId))) ||
     null;
+  const starhallExhibit = liveMap.key === "starhall" && hintObj?.type === "exhibit" ? hintObj : null;
 
   const areaOccupancy = currentArea
     ? players.filter((p) => p.areaId === currentArea.id).length
@@ -1721,22 +1914,26 @@ export default function GameClient({
       </div>
 
       {/* ---------- 상단 HUD ---------- */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between p-3">
-        <div className="pointer-events-auto flex items-center gap-2">
-          <Link href="/spaces" className="btn-ghost bg-panel/80 px-3 py-2 text-sm backdrop-blur">
-            ← 나가기
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 p-3">
+        <div className="pointer-events-auto flex min-w-0 items-center gap-2">
+          <Link
+            href="/spaces"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/10 bg-[#101720]/80 text-lg text-slate-200 shadow-xl backdrop-blur-xl transition hover:border-white/25 hover:bg-white/10"
+            title="나가기"
+          >
+            ←
           </Link>
-          <div className="flex items-center gap-1 rounded-xl bg-panel/80 px-3 py-2 text-sm backdrop-blur">
-            <span className="font-semibold text-white">{space.name}</span>
-            <span className="mx-1 text-slate-600">/</span>
+          <div className="flex min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-[#101720]/80 px-3 py-2 shadow-xl backdrop-blur-xl">
+            <span className="max-w-[150px] truncate text-xs font-semibold text-white sm:max-w-[220px]">{space.name}</span>
+            <span className="h-4 w-px bg-white/10" />
             <select
               value={room.id}
               onChange={(e) => router.push(`/s/${space.id}/${e.target.value}`)}
-              className="cursor-pointer rounded-lg bg-transparent text-slate-300 outline-none hover:text-white"
+              className="max-w-[150px] cursor-pointer rounded-md bg-transparent text-xs text-slate-300 outline-none hover:text-white sm:max-w-[220px]"
             >
               {rooms.map((r) => (
                 <option key={r.id} value={r.id} className="bg-panel">
-                  🗺️ {r.name}
+                  {r.name}
                 </option>
               ))}
             </select>
@@ -1744,7 +1941,7 @@ export default function GameClient({
           {(isOwner || role === "admin") && (
             <Link
               href={`/s/${space.id}/settings`}
-              className="btn-ghost bg-panel/80 px-3 py-2 text-sm backdrop-blur"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/10 bg-[#101720]/80 text-slate-200 shadow-xl backdrop-blur-xl transition hover:border-white/25 hover:bg-white/10"
               title="스페이스 설정"
             >
               ⚙️
@@ -1758,7 +1955,11 @@ export default function GameClient({
                 setRoomClosedAction(room.id, next);
                 addToast(next ? "🚪 이 방의 방문을 닫았어요 (멤버/관리자만 입장)" : "🚪 이 방의 방문을 열었어요");
               }}
-              className="btn-ghost bg-panel/80 px-3 py-2 text-sm backdrop-blur"
+              className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg border shadow-xl backdrop-blur-xl transition ${
+                roomClosed
+                  ? "border-amber-300/40 bg-amber-300/15 text-amber-100"
+                  : "border-white/10 bg-[#101720]/80 text-slate-200 hover:border-white/25 hover:bg-white/10"
+              }`}
               title={roomClosed ? "방문 열기" : "방문 닫기"}
             >
               {roomClosed ? "🔒" : "🚪"}
@@ -1766,79 +1967,76 @@ export default function GameClient({
           )}
         </div>
 
-        <div className="pointer-events-auto flex items-center gap-2">
-          <div className="flex items-center gap-2 rounded-xl bg-panel/80 px-3 py-2 text-sm backdrop-blur">
-            <span className="font-semibold text-pink-400">💗 {wallet.hearts.toLocaleString()}</span>
-            <span className="font-semibold text-yellow-400">🪙 {wallet.coins.toLocaleString()}</span>
+        <div className="pointer-events-auto flex min-w-0 items-center gap-2">
+          <div className="hidden items-center overflow-hidden rounded-lg border border-white/10 bg-[#101720]/80 shadow-xl backdrop-blur-xl sm:flex">
+            <span className="border-r border-white/10 px-3 py-2 text-xs font-semibold text-pink-200">
+              💗 {wallet.hearts.toLocaleString()}
+            </span>
+            <span className="px-3 py-2 text-xs font-semibold text-amber-200">🪙 {wallet.coins.toLocaleString()}</span>
           </div>
-          <button
-            onClick={() => setModal({ kind: "store" })}
-            className="rounded-xl bg-panel/80 px-3 py-2 text-sm text-slate-300 backdrop-blur hover:text-white"
+          <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#101720]/80 p-1 shadow-xl backdrop-blur-xl">
+          <HudIconButton
+            active={panel === "store"}
+            onClick={() => setPanel((cur) => (cur === "store" ? null : "store"))}
             title="상점 & 인벤토리"
           >
-            🛍️ 상점
-          </button>
+            ◈
+          </HudIconButton>
           {profile && (
-            <button
+            <HudIconButton
               onClick={() => setModal({ kind: "auction" })}
-              className="rounded-xl bg-panel/80 px-3 py-2 text-sm text-slate-300 backdrop-blur hover:text-white"
               title="경매장"
             >
-              🏷️ 경매
-            </button>
+              🏷
+            </HudIconButton>
           )}
           {profile && (
-            <button
+            <HudIconButton
+              active={panel === "friends"}
               onClick={() => setPanel((cur) => (cur === "friends" ? null : "friends"))}
-              className="rounded-xl bg-panel/80 px-3 py-2 text-sm text-slate-300 backdrop-blur hover:text-white"
               title="친구"
             >
-              🤝 친구
-            </button>
+              👥
+            </HudIconButton>
           )}
           {profile && (
-            <button
+            <HudIconButton
               onClick={() => setModal({ kind: "collection" })}
-              className="rounded-xl bg-panel/80 px-3 py-2 text-sm text-slate-300 backdrop-blur hover:text-white"
               title="도감 — 우승/킬/칭호"
             >
-              📖 도감
-            </button>
+              ★
+            </HudIconButton>
           )}
-          <button
+          <HudIconButton
             onClick={() => setModal({ kind: "quiz" })}
-            className="rounded-xl bg-panel/80 px-3 py-2 text-sm text-slate-300 backdrop-blur hover:text-white"
             title="OX 파티 퀴즈 진행"
           >
-            🅾️❌ 퀴즈
-          </button>
+            OX
+          </HudIconButton>
           {wallet.equipped.mount && (
-            <button
+            <HudIconButton
+              active={mounted && !summonedMount}
               onClick={() => {
                 const wasMounted = mounted && !summonedMount;
                 setSummonedMount(null);
                 setMounted(!wasMounted);
                 addToast(wasMounted ? "🚶 탈것에서 내렸어요" : "🐺 탈것을 소환했어요");
               }}
-              className={`rounded-xl px-3 py-2 text-sm backdrop-blur ${mounted && !summonedMount ? "bg-accent text-white" : "bg-panel/80 text-slate-300 hover:text-white"}`}
               title="탈것 타기/내리기"
             >
-              🐴 탈것
-            </button>
+              ◆
+            </HudIconButton>
           )}
-          <button
+          <HudIconButton
+            active={mounted && summonedMount === SPORTSCAR_SUMMON_KEY}
             onClick={summonCar}
-            className={`rounded-xl px-3 py-2 text-sm backdrop-blur ${
-              mounted && summonedMount === SPORTSCAR_SUMMON_KEY
-                ? "bg-accent text-white"
-                : "bg-panel/80 text-slate-300 hover:text-white"
-            }`}
             title={`자동차 소환/내리기 — ${CAR_SUMMON_COST}하트`}
           >
-            🚗 자동차 -{CAR_SUMMON_COST}💗
-          </button>
+            ▰
+          </HudIconButton>
           {wallet.inventory.includes("portable-piano") && (
-            <button
+            <HudIconButton
+              active={pianoPlaced}
               onClick={() => {
                 const e = engineRef.current;
                 if (!e || !identity) return;
@@ -1856,39 +2054,82 @@ export default function GameClient({
                   addToast("🎹 피아노를 설치했어요 — X로 연주하세요");
                 }
               }}
-              className={`rounded-xl px-3 py-2 text-sm backdrop-blur ${pianoPlaced ? "bg-accent text-white" : "bg-panel/80 text-slate-300 hover:text-white"}`}
               title="휴대용 피아노 설치/회수"
             >
-              🎹 피아노
-            </button>
+              ♪
+            </HudIconButton>
           )}
-          <button
+          <HudIconButton
             onClick={() => setModal({ kind: "bio" })}
-            className="rounded-xl bg-panel/80 px-3 py-2 text-sm text-slate-300 backdrop-blur hover:text-white"
             title="내 소개 편집 — 근접한 상대에게 보여요"
           >
-            📝 소개
-          </button>
-          <button
+            i
+          </HudIconButton>
+          <HudIconButton
             onClick={() => {
               navigator.clipboard.writeText(`${window.location.origin}/s/${space.slug}`);
               addToast("🔗 스페이스 초대 링크를 복사했어요");
             }}
-            className="rounded-xl bg-panel/80 px-3 py-2 text-sm text-slate-300 backdrop-blur hover:text-white"
+            title="초대 링크 복사"
           >
-            🔗 초대
-          </button>
-          <div className="rounded-xl bg-panel/80 px-3 py-2 text-sm backdrop-blur">
+            ↗
+          </HudIconButton>
+          <HudIconButton
+            active={secretOpen}
+            onClick={() => {
+              setSecretOpen((v) => !v);
+              setSecretArmed(false);
+              setSecretCode("");
+            }}
+            title=" "
+          >
+            ·
+          </HudIconButton>
+          </div>
+          <div className="hidden h-10 items-center rounded-lg border border-white/10 bg-[#101720]/80 px-3 text-xs shadow-xl backdrop-blur-xl lg:flex">
             {multiplayer ? (
-              <span className="text-accent2">
-                ● {channel.ready ? `${Math.max(channel.online, players.length)}명 접속` : "연결 중..."}
+              <span className={channel.ready ? "text-emerald-200" : "text-amber-200"}>
+                ● {channel.ready ? Math.max(channel.online, players.length) : "..."}
               </span>
             ) : (
-              <span className="text-amber-300">싱글플레이 (Supabase 미설정)</span>
+              <span className="text-amber-200">● solo</span>
             )}
           </div>
         </div>
       </div>
+
+      {secretOpen && (
+        <div className="pointer-events-auto absolute right-3 top-16 z-30 w-44 rounded-lg border border-white/10 bg-[#101720]/95 p-2 shadow-2xl backdrop-blur-xl">
+          {!secretArmed ? (
+            <button
+              onClick={() => setSecretArmed(true)}
+              className="grid h-9 w-full place-items-center rounded-md border border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/10 hover:text-white"
+            >
+              ·
+            </button>
+          ) : (
+            <div className="flex gap-1.5">
+              <input
+                value={secretCode}
+                autoFocus
+                inputMode="numeric"
+                maxLength={8}
+                onChange={(e) => setSecretCode(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void redeemSecretCode();
+                }}
+                className="min-w-0 flex-1 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-200/50"
+              />
+              <button
+                onClick={() => void redeemSecretCode()}
+                className="grid h-9 w-9 place-items-center rounded-md bg-cyan-200 text-slate-950"
+              >
+                ↵
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ---------- 프라이빗 영역 배너 ---------- */}
       {currentArea && (
@@ -1968,6 +2209,23 @@ export default function GameClient({
         );
       })()}
 
+      {starhallExhibit && (
+        <div className="pointer-events-none absolute left-3 top-24 z-20 w-72 overflow-hidden rounded-xl border border-amber-200/25 bg-[#101720]/92 shadow-2xl backdrop-blur-xl">
+          <div
+            className="h-1.5"
+            style={{ background: starhallExhibit.props?.color ?? "linear-gradient(90deg,#facc15,#67e8f9)" }}
+          />
+          <div className="p-3">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-amber-100/70">STAR HALL</div>
+            <div className="mt-1 text-lg font-semibold text-white">{starhallExhibit.name}</div>
+            {starhallExhibit.props?.title && <div className="text-sm text-cyan-100">{starhallExhibit.props.title}</div>}
+            {starhallExhibit.props?.text && (
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{starhallExhibit.props.text}</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* OX 퀴즈 참가자 배너 */}
       {quiz && (
         <div className="pointer-events-none absolute left-1/2 top-16 z-20 w-[min(92vw,460px)] -translate-x-1/2 rounded-2xl border border-accent/40 bg-panel/95 p-3 text-center shadow-xl backdrop-blur">
@@ -2007,12 +2265,22 @@ export default function GameClient({
       {bossHud?.alive && (
         <div className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-2xl border border-red-500/50 bg-panel/95 px-4 py-2 text-center shadow-xl backdrop-blur">
           <div className="text-sm font-bold text-red-300">
-            {bossHud.kind === "kraken" ? "🦑 크라켄" : bossHud.kind === "chicken" ? "🐔 알 쏘는 치킨" : "🦔 두더지"} 보스 레이드!
+            {bossHud.hp / bossHud.maxHp <= 0.5 ? "STAGE 2 · " : ""}
+            {bossHud.kind === "kraken" ? "🦑 크라켄" : bossHud.kind === "chicken" ? "🐔 알 쏘는 치킨" : "🦔 고슴도치"} 보스 레이드!
           </div>
           <div className="mx-auto mt-1 h-2.5 w-56 overflow-hidden rounded-full bg-black/50">
             <div className="h-full bg-red-500" style={{ width: `${Math.max(0, (bossHud.hp / bossHud.maxHp) * 100)}%` }} />
           </div>
-          <div className="mt-1 text-xs text-slate-300">클릭/스페이스 원거리 공격으로 HP를 깎으세요! (부딪히면 스턴)</div>
+          <div className="mt-1 text-xs text-slate-300">
+            1초 차지 화살로 탄막 요격 · 아이템 로켓 15회 명중으로 처치
+          </div>
+          <div className="mt-0.5 text-[11px] text-slate-400">
+            {bossHud.kind === "kraken"
+              ? "패턴: 파도 탄막 / 2스테이지 자녀·에너지볼·레이저·먹물"
+              : bossHud.kind === "chicken"
+                ? "패턴: 알 탄막 / 2스테이지 자녀·에너지볼·레이저"
+                : "패턴: 사방 가시 / 2스테이지 자녀·에너지볼·레이저·용암"}
+          </div>
         </div>
       )}
 
@@ -2195,6 +2463,14 @@ export default function GameClient({
               onClose={() => setPanel(null)}
             />
           )}
+          {panel === "store" && (
+            <StoreModal
+              wallet={wallet}
+              loggedIn={!!profile}
+              onChange={(w) => setWallet((prev) => ({ ...prev, ...w }))}
+              onClose={() => setPanel(null)}
+            />
+          )}
         </div>
       )}
 
@@ -2325,7 +2601,10 @@ export default function GameClient({
           active={!!quiz}
           onBroadcast={(kind, text, correct) => {
             const payload = { kind, host: identity.id, hostName: identity.name, text, correct };
-            if (kind === "start") setQuiz({ text: text ?? "", host: identity.id, hostName: identity.name });
+            if (kind === "start") {
+              setQuiz({ text: text ?? "", host: identity.id, hostName: identity.name });
+              moveToQuizStart();
+            }
             else if (kind === "end") setQuiz(null);
             else if (kind === "reveal") {
               const myArea = engineRef.current?.getSelf().areaId ?? null;
@@ -2368,6 +2647,11 @@ export default function GameClient({
               router.push("/customize");
               return;
             }
+            if (target === "store") {
+              setModal(null);
+              setPanel("store");
+              return;
+            }
             setModal({ kind: target });
           }}
           onReward={async () => {
@@ -2401,14 +2685,6 @@ export default function GameClient({
               router.push(`/s/${space.id}/${rid}`);
             }
           }}
-          onClose={() => setModal(null)}
-        />
-      )}
-      {modal?.kind === "store" && (
-        <StoreModal
-          wallet={wallet}
-          loggedIn={!!profile}
-          onChange={(w) => setWallet((prev) => ({ ...prev, ...w }))}
           onClose={() => setModal(null)}
         />
       )}
@@ -2885,3 +3161,29 @@ function BioModal({
 
 // 맵 에디터는 큰 컴포넌트라 필요할 때만 로드
 const MapEditorLazy = dynamic(() => import("./MapEditor"), { ssr: false });
+
+function HudIconButton({
+  children,
+  title,
+  active,
+  onClick,
+}: {
+  children: React.ReactNode;
+  title: string;
+  active?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={`grid h-9 min-w-9 place-items-center rounded-md px-2 text-sm font-semibold transition ${
+        active
+          ? "bg-cyan-300 text-slate-950 shadow-[0_0_18px_rgba(103,232,249,0.35)]"
+          : "text-slate-300 hover:bg-white/10 hover:text-white"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}

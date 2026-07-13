@@ -292,6 +292,24 @@ export async function spendHearts(amount: number): Promise<Result<{ hearts: numb
   return { ok: true, hearts };
 }
 
+export async function redeemSecretWallet(code: string): Promise<Result<{ hearts: number; coins: number }>> {
+  const { supabase, user, error } = await requireUser();
+  if (error || !supabase || !user) return { error: error! };
+  if (code.trim() !== "2009") return { error: "코드가 올바르지 않습니다." };
+  const { data, error: loadErr } = await supabase
+    .from("profiles")
+    .select("hearts, coins")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (loadErr) return { error: loadErr.message };
+  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  const hearts = Number(data.hearts ?? 0) + 10000;
+  const coins = Number(data.coins ?? 0) + 10000;
+  const { error: err } = await supabase.from("profiles").update({ hearts, coins }).eq("id", user.id);
+  if (err) return { error: err.message };
+  return { ok: true, hearts, coins };
+}
+
 // ---- PK 무기 구매 + 킬 기록 ----
 
 export async function buyWeapon(
@@ -627,6 +645,15 @@ export async function createRoomInSpace(
 ): Promise<Result<{ id: string }>> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
+  const { data: existing, error: existingErr } = await supabase
+    .from("rooms")
+    .select("id")
+    .eq("space_id", spaceId)
+    .eq("template_key", templateKey)
+    .limit(1)
+    .maybeSingle();
+  if (existingErr) return { error: existingErr.message };
+  if (existing) return { error: "이미 같은 맵이 있습니다. 기존 방을 이름 변경하거나 편집해 주세요." };
   const { data, error: err } = await supabase
     .from("rooms")
     .insert({ space_id: spaceId, name: name.slice(0, 40) || "새 방", template_key: templateKey })
