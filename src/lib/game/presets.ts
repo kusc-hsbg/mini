@@ -751,20 +751,37 @@ function buildCircuit(): MapData {
   ];
   for (const [cx2, cy2] of cones) add(c, "cone", cx2, cy2);
 
-  // ---- 아이템 박스 (? 박스 — 밟으면 랜덤 효과, 6초 후 리스폰) ----
-  const itemBoxes: [number, number][] = [
-    [20, 9], [22, 10], [24, 11], // 홈스트레이트 초입
-    [76, 20], [77, 23], // 우측 직선
-    [44, 44], [42, 45], [40, 46], // 백스트레이트
-    [10, 30], [11, 33], // 좌측 직선
-  ];
-  for (const [ix, iy] of itemBoxes) add(c, "itembox", ix, iy);
+  // ---- 아이템 박스 (? 박스 — 밟으면 랜덤 효과, 6초 후 리스폰) : 2배·랜덤(시드 고정) ----
+  const coneSet = new Set(cones.map(([x, y]) => `${x},${y}`));
+  const irng = mulberry32(4931);
+  const iused = new Set<string>();
+  let cig = 0;
+  let cItems = 0;
+  while (cItems < 22 && cig++ < 5000) {
+    const x = 8 + Math.floor(irng() * 72);
+    const y = 8 + Math.floor(irng() * 40);
+    if (g.g[y]?.[x] !== "a") continue; // 아스팔트만
+    if (Math.abs(x - 44) <= 2 && y < 15) continue; // 결승선 근처 제외
+    const key = `${x},${y}`;
+    if (iused.has(key) || coneSet.has(key)) continue;
+    iused.add(key);
+    add(c, "itembox", x, y);
+    cItems++;
+  }
 
-  // ---- 기름 웅덩이 (밟으면 미끄러짐) ----
-  const oils: [number, number][] = [
-    [66, 12], [24, 46], [12, 25], [75, 38],
-  ];
-  for (const [ox, oy] of oils) add(c, "oil", ox, oy);
+  // ---- 기름 웅덩이 (밟으면 미끄러짐) : 랜덤 배치 ----
+  let cog = 0;
+  let cOil = 0;
+  while (cOil < 7 && cog++ < 5000) {
+    const x = 8 + Math.floor(irng() * 72);
+    const y = 8 + Math.floor(irng() * 40);
+    if (g.g[y]?.[x] !== "a") continue;
+    const key = `${x},${y}`;
+    if (iused.has(key) || coneSet.has(key)) continue;
+    iused.add(key);
+    add(c, "oil", x, y);
+    cOil++;
+  }
 
   // ---- 타이어 방벽 (코너 보호) ----
   const tireSpots: [number, number][] = [
@@ -1291,12 +1308,13 @@ function buildRingRace(theme: "sea" | "sky"): MapData {
   const H = 50;
   const barrier = theme === "sea" ? "~" : "x"; // 트랙 밖 방벽(통과불가)
   const island = theme === "sea" ? "w" : "-"; // 안쪽 섬(데크/구름 플랫폼)
+  const road = theme === "sea" ? "W" : "a"; // 주행면: 바다=얕은 물(보트 필요), 하늘=활주로
   const g = new Grid(W, H, barrier);
   const c = ctx(theme);
 
   // ---- 사각 링 트랙 ----
   g.rect(7, 7, W - 14, H - 14, "r"); // 외곽 연석
-  g.rect(8, 8, W - 16, H - 16, "a"); // 아스팔트(활주로/부두)
+  g.rect(8, 8, W - 16, H - 16, road); // 주행면(물/활주로)
   g.rect(14, 14, W - 28, H - 28, "r"); // 안쪽 연석
   g.rect(15, 15, W - 30, H - 30, island); // 안쪽 섬
   addRaceBarrierLoop(c, 7, 7, W - 14, H - 14);
@@ -1325,12 +1343,35 @@ function buildRingRace(theme: "sea" | "sky"): MapData {
   // 스폰(출발선 뒤)
   c.spawns.push({ x: 34, y: 11 }, { x: 37, y: 11 }, { x: 42, y: 11 }, { x: 45, y: 11 }, { x: 34, y: 9 }, { x: 45, y: 9 });
 
-  // ---- 아이템 박스 / 기름 ----
-  const items: [number, number][] = [
-    [20, 10], [26, 10], [W - 11, 20], [W - 11, 30], [30, H - 11], [50, H - 11], [10, 20], [10, 30], [60, 10],
-  ];
-  for (const [ix, iy] of items) add(c, "itembox", ix, iy);
-  for (const [ox, oy] of [[W - 11, 16], [16, H - 11], [10, 34]] as [number, number][]) add(c, "oil", ox, oy);
+  // ---- 아이템 박스 / 기름 (2배·랜덤 배치, 시드 고정 → 전 클라이언트 동일 레이아웃) ----
+  const rng = mulberry32(theme === "sea" ? 2027 : 7053);
+  const used = new Set<string>();
+  const onRoad = (x: number, y: number) => g.g[y]?.[x] === road;
+  let ig = 0;
+  let placedItems = 0;
+  while (placedItems < 20 && ig++ < 4000) {
+    const x = 8 + Math.floor(rng() * (W - 16));
+    const y = 8 + Math.floor(rng() * (H - 16));
+    if (!onRoad(x, y)) continue;
+    if (Math.abs(x - 39) <= 2 && y < 15) continue; // 결승선 근처 제외
+    const key = `${x},${y}`;
+    if (used.has(key)) continue;
+    used.add(key);
+    add(c, "itembox", x, y);
+    placedItems++;
+  }
+  let og = 0;
+  let placedOil = 0;
+  while (placedOil < 6 && og++ < 4000) {
+    const x = 8 + Math.floor(rng() * (W - 16));
+    const y = 8 + Math.floor(rng() * (H - 16));
+    if (!onRoad(x, y)) continue;
+    const key = `${x},${y}`;
+    if (used.has(key)) continue;
+    used.add(key);
+    add(c, "oil", x, y);
+    placedOil++;
+  }
 
   // ---- 안쪽 섬 꾸미기 + 포디움(트로피장) ----
   addRacePrison(g, c, 22, 20);
@@ -1346,7 +1387,7 @@ function buildRingRace(theme: "sea" | "sky"): MapData {
     for (const [bx, by] of [[16, 8], [63, 8], [16, H - 9], [63, H - 9]] as [number, number][]) add(c, "cone", bx, by);
     add(c, "sign", 30, 16, {
       name: "요트 레이스 안내",
-      props: { text: "🛥️ 바다 요트 레이스\n\n부두(F로 카트 탑승)에서 출발해 3바퀴!\n트랙 밖은 바다라 빠지지 않게 조심하세요.\n⚡ 부스트 · 🎁 아이템 박스 활용!" },
+      props: { text: "🛥️ 바다 요트 레이스\n\nF 키로 보트를 소환해 물 위를 달리세요!\n⚠️ 보트 없이 물 위를 걸으면 70% 느려집니다.\n트랙 밖 짙은 바다는 들어갈 수 없어요.\n⚡ 부스트 · 🎁 아이템 박스 활용!" },
     });
     c.labels.push({ x: 16, y: 6, text: "🛥️ 바다 요트 서킷" });
   } else {
@@ -1357,7 +1398,7 @@ function buildRingRace(theme: "sea" | "sky"): MapData {
     for (const [bx, by] of [[16, 8], [63, 8], [16, H - 9], [63, H - 9]] as [number, number][]) add(c, "flag", bx, by);
     add(c, "sign", 30, 16, {
       name: "하늘 레이스 안내",
-      props: { text: "✈️ 하늘 비행기 레이스\n\n활주로(F로 탑승)에서 출발해 3바퀴!\n트랙 밖은 허공이니 이탈 금지.\n⚡ 부스트 · 🎁 아이템 박스로 역전을!" },
+      props: { text: "✈️ 하늘 비행기 레이스\n\nF 키로 비행기에 탑승해 3바퀴!\n트랙 밖은 허공이니 이탈 금지.\n⚡ 부스트 · 🎁 아이템 박스로 역전을!" },
     });
     c.labels.push({ x: 16, y: 6, text: "✈️ 하늘 활주로 서킷" });
   }
@@ -1379,8 +1420,8 @@ function buildRingRace(theme: "sea" | "sky"): MapData {
     name: theme === "sea" ? "바다 요트 서킷" : "하늘 비행기 서킷",
     description:
       theme === "sea"
-        ? "바다 위 부두를 도는 요트 레이스. 트랙 밖은 바다 방벽으로 막혀 있어요."
-        : "구름 위 활주로를 도는 비행기 레이스. 트랙 밖은 허공 방벽으로 막혀 있어요.",
+        ? "바다에 잠긴 서킷을 도는 요트 레이스. F로 보트를 소환하세요. 물 위를 보트 없이 걸으면 70% 느려져요."
+        : "구름 위 활주로를 도는 비행기 레이스. F로 비행기에 탑승! 트랙 밖은 허공 방벽으로 막혀 있어요.",
     tiles: g.rows(),
     objects: c.objects,
     areas: c.areas,
@@ -1388,7 +1429,7 @@ function buildRingRace(theme: "sea" | "sky"): MapData {
     spawns: c.spawns,
     spotlights: c.spotlights,
     labels: c.labels,
-    vehicle: "kart",
+    vehicle: theme === "sea" ? "boat" : "plane",
     race: {
       laps: 3,
       start: { x: 39, y: 8, w: 2, h: 6 },

@@ -29,6 +29,7 @@ export const TILE_INFO: Record<string, TileInfo> = {
   "-": { color: "#9aa0ab", solid: false, accent: "#8a909b", outdoor: true },
   "=": { color: "#4a5058", solid: false, accent: "#5a616b", outdoor: true },
   "~": { color: "#2f6db3", solid: true, accent: "#4a86c9", outdoor: true },
+  W: { color: "#2563a8", solid: false, accent: "#3f83c9", outdoor: true }, // 얕은 물(주행 가능, 보트 없으면 감속)
   ".": { color: "#c9c3b4", solid: false, accent: "#bfb9a9" },
   w: { color: "#b08a5a", solid: false, accent: "#a37f51" },
   k: { color: "#7e5f3c", solid: false, accent: "#74572f" },
@@ -151,7 +152,7 @@ export interface MapData {
   spawns: TilePoint[];
   spotlights: TilePoint[];
   labels: MapLabel[];
-  vehicle?: "bike" | "kart"; // B 타일 탑승 시 탈것 종류 (기본 bike)
+  vehicle?: "bike" | "kart" | "boat" | "plane"; // B 타일 탑승 시 탈것 종류 (기본 bike)
   race?: RaceConfig;
   pk?: boolean; // PK(전투) 존 — 무기/HP/사망 활성화
 }
@@ -217,6 +218,12 @@ export function boostAt(map: MapData, px: number, py: number): boolean {
 export function offroadAt(map: MapData, px: number, py: number): boolean {
   const ch = tileAt(map, Math.floor(px / TILE), Math.floor(py / TILE));
   return [",", ";", "s", "d"].includes(ch);
+}
+
+// 얕은 물 타일 여부 — 보트 없이 걸으면 크게 감속(70%).
+export function waterTileAt(map: MapData, px: number, py: number): boolean {
+  const ch = tileAt(map, Math.floor(px / TILE), Math.floor(py / TILE));
+  return ch === "W";
 }
 
 export function inRaceRect(r: RaceRect, px: number, py: number): boolean {

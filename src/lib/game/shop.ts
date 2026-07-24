@@ -11,6 +11,7 @@ export type ShopSlot =
   | "wings" // 날개
   | "kart" // 레이싱 카트 색상/테마
   | "dance" // Z 키 춤 스타일
+  | "arrow" // 보스전 화살 디자인
   | "none";
 
 export type ShopCategory =
@@ -22,6 +23,7 @@ export type ShopCategory =
   | "댄스"
   | "감정표현"
   | "카트"
+  | "화살"
   | "소모품";
 
 export interface ShopItem {
@@ -91,9 +93,31 @@ const BASE_ITEMS: ShopItem[] = [
   { key: "emote-pack-love", name: "하트 감정표현 팩", category: "감정표현", slot: "none", price: 300, currency: "heart", icon: "💞" },
   { key: "emote-pack-party", name: "파티 감정표현 팩", category: "감정표현", slot: "none", price: 300, currency: "heart", icon: "🎉" },
 
+  // ---------- 화살 디자인 (보스전 차지 화살) ----------
+  { key: "arrow-gold", name: "황금 화살", category: "화살", slot: "arrow", price: 300, currency: "heart", icon: "🏹", color: "#fbbf24", desc: "보스전 차지 화살을 황금빛으로." },
+  { key: "arrow-crimson", name: "크림슨 화살", category: "화살", slot: "arrow", price: 300, currency: "heart", icon: "❤️", color: "#ef4444", desc: "붉은 불꽃 화살." },
+  { key: "arrow-azure", name: "아주르 화살", category: "화살", slot: "arrow", price: 300, currency: "heart", icon: "💙", color: "#38bdf8", desc: "시린 파랑 화살." },
+  { key: "arrow-emerald", name: "에메랄드 화살", category: "화살", slot: "arrow", price: 350, currency: "heart", icon: "💚", color: "#10b981", desc: "청록빛 화살." },
+  { key: "arrow-violet", name: "바이올렛 화살", category: "화살", slot: "arrow", price: 400, currency: "heart", icon: "💜", color: "#a855f7", desc: "보랏빛 마력 화살." },
+  { key: "arrow-rainbow", name: "레인보우 화살", category: "화살", slot: "arrow", price: 1200, currency: "heart", icon: "🌈", color: "rainbow", desc: "무지개빛으로 빛나는 화살." },
+  { key: "arrow-shadow", name: "섀도우 화살", category: "화살", slot: "arrow", price: 900, currency: "heart", icon: "🖤", color: "#111827", desc: "칠흑의 그림자 화살." },
+  { key: "arrow-plasma", name: "플라즈마 화살", category: "화살", slot: "arrow", price: 10, currency: "coin", icon: "⚡", color: "#22d3ee", desc: "전기 플라즈마가 흐르는 화살." },
+
   // ---------- 소모품 ----------
   { key: "portable-piano", name: "휴대용 피아노 (1회성)", category: "소모품", slot: "none", price: 250, currency: "heart", icon: "🎹", consumable: true, desc: "어디서든 설치/회수할 수 있어요. 사용 시 소모됩니다." },
 ];
+
+// 화살 디자인 키 → 색상 (엔진 렌더용). "rainbow" 는 시간에 따라 변하는 무지개.
+export const ARROW_SKIN_COLOR: Record<string, string> = {
+  "arrow-gold": "#fbbf24",
+  "arrow-crimson": "#ef4444",
+  "arrow-azure": "#38bdf8",
+  "arrow-emerald": "#10b981",
+  "arrow-violet": "#a855f7",
+  "arrow-rainbow": "rainbow",
+  "arrow-shadow": "#111827",
+  "arrow-plasma": "#22d3ee",
+};
 
 const PALETTES = [
   ["ruby", "루비", "#ef4444", "◆"],
@@ -234,6 +258,7 @@ export const SHOP_CATEGORIES: ShopCategory[] = [
   "날개",
   "댄스",
   "카트",
+  "화살",
   "감정표현",
   "소모품",
 ];

@@ -1627,6 +1627,144 @@ function drawKart(
   ctx.restore();
 }
 
+// 모터보트 (발 좌표 기준) — 바다 요트 서킷용. 플레이어 상의 색으로 도색.
+function drawBoat(
+  ctx: CanvasRenderingContext2D,
+  fx: number,
+  fy: number,
+  dir: Direction,
+  t: number,
+  color: string,
+  moving: boolean
+) {
+  ctx.save();
+  ctx.translate(fx, fy - 2);
+  const bobY = Math.sin(t / 260) * 1.5;
+  ctx.translate(0, bobY);
+  const sideways = dir === "left" || dir === "right";
+  if (dir === "left") ctx.scale(-1, 1);
+
+  // 물 튀김(항적) — 뒤쪽
+  if (moving) {
+    ctx.fillStyle = "rgba(224,242,254,0.7)";
+    for (let i = 0; i < 3; i++) {
+      const off = ((t / 60 + i * 30) % 90) / 90;
+      const wx = (sideways ? -18 : 0) - (sideways ? off * 10 : 0);
+      const wy = (sideways ? 2 : 14) + (sideways ? 0 : off * 8);
+      ctx.beginPath();
+      ctx.arc(wx, wy, 3 - off * 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  if (sideways) {
+    // 옆모습 선체
+    ctx.fillStyle = darken(color, 0.2);
+    ctx.beginPath();
+    ctx.moveTo(-18, -2);
+    ctx.lineTo(16, -2);
+    ctx.lineTo(20, 4);
+    ctx.lineTo(-14, 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = color;
+    roundRect(ctx, -16, -8, 24, 7, 3);
+    ctx.fill();
+    ctx.fillStyle = "#e0f2fe";
+    ctx.fillRect(-6, -13, 10, 6); // 조종석 캐빈
+    ctx.fillStyle = "#1e3a5f";
+    ctx.fillRect(14, -10, 2, 9); // 뒷선
+  } else {
+    // 정면/후면 선체
+    ctx.fillStyle = darken(color, 0.2);
+    ctx.beginPath();
+    ctx.moveTo(-13, -2);
+    ctx.lineTo(13, -2);
+    ctx.lineTo(10, 6);
+    ctx.lineTo(-10, 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = color;
+    roundRect(ctx, -12, -9, 24, 8, 4);
+    ctx.fill();
+    ctx.fillStyle = "#e0f2fe";
+    roundRect(ctx, -7, -14, 14, 7, 3);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// 프로펠러 비행기 (발 좌표 기준) — 하늘 서킷용. 플레이어 상의 색으로 도색.
+function drawPlane(
+  ctx: CanvasRenderingContext2D,
+  fx: number,
+  fy: number,
+  dir: Direction,
+  t: number,
+  color: string
+) {
+  ctx.save();
+  ctx.translate(fx, fy - 4);
+  const bobY = Math.sin(t / 220) * 2;
+  ctx.translate(0, bobY);
+  const spin = (t / 22) % (Math.PI * 2);
+  const sideways = dir === "left" || dir === "right";
+  if (dir === "left") ctx.scale(-1, 1);
+
+  if (sideways) {
+    // 날개(뒤로)
+    ctx.fillStyle = darken(color, 0.28);
+    ctx.beginPath();
+    ctx.moveTo(-6, -1);
+    ctx.lineTo(-20, 8);
+    ctx.lineTo(-2, 3);
+    ctx.closePath();
+    ctx.fill();
+    // 동체
+    ctx.fillStyle = color;
+    roundRect(ctx, -18, -6, 34, 11, 6);
+    ctx.fill();
+    // 캐노피
+    ctx.fillStyle = "#bae6fd";
+    roundRect(ctx, -2, -9, 11, 6, 3);
+    ctx.fill();
+    // 꼬리날개
+    ctx.fillStyle = darken(color, 0.28);
+    ctx.beginPath();
+    ctx.moveTo(-18, -5);
+    ctx.lineTo(-24, -12);
+    ctx.lineTo(-16, -4);
+    ctx.closePath();
+    ctx.fill();
+    // 프로펠러(앞)
+    ctx.strokeStyle = "rgba(226,232,240,0.85)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(16, -6 + Math.cos(spin) * 8);
+    ctx.lineTo(16, 4 - Math.cos(spin) * 8);
+    ctx.stroke();
+  } else {
+    // 정면/후면: 양 날개
+    ctx.fillStyle = darken(color, 0.28);
+    roundRect(ctx, -20, -2, 40, 6, 3);
+    ctx.fill();
+    ctx.fillStyle = color;
+    roundRect(ctx, -8, -12, 16, 18, 7);
+    ctx.fill();
+    ctx.fillStyle = "#bae6fd";
+    roundRect(ctx, -5, -10, 10, 7, 3);
+    ctx.fill();
+    // 프로펠러 회전
+    ctx.strokeStyle = "rgba(226,232,240,0.85)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-Math.cos(spin) * 12, -12);
+    ctx.lineTo(Math.cos(spin) * 12, -12);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 // 오토바이 (발 좌표 기준)
 function drawBike(
   ctx: CanvasRenderingContext2D,
@@ -1679,7 +1817,7 @@ export interface CharacterExtras {
   hand?: boolean;
   dancing?: boolean;
   sitting?: boolean;
-  vehicle?: "bike" | "kart";
+  vehicle?: "bike" | "kart" | "boat" | "plane";
   ghost?: boolean; // 고스트 모드 — 반투명 렌더
   cosmetics?: PlayerCosmetics; // 날개/펫/탈것 등
   mounted?: boolean; // 상점 탈것 탑승
@@ -2125,7 +2263,10 @@ export function drawCharacter(
   }
 
   if (onBike) {
-    if (extras?.vehicle === "kart") drawKart(ctx, cx, cy - 2, dir, moving ? t : 0, cos?.kart ? (SHOP_MAP[cos.kart]?.color ?? app.color) : app.color);
+    const kartColor = cos?.kart ? (SHOP_MAP[cos.kart]?.color ?? app.color) : app.color;
+    if (extras?.vehicle === "boat") drawBoat(ctx, cx, cy - 2, dir, t, kartColor, moving);
+    else if (extras?.vehicle === "plane") drawPlane(ctx, cx, cy - 2, dir, t, kartColor);
+    else if (extras?.vehicle === "kart") drawKart(ctx, cx, cy - 2, dir, moving ? t : 0, kartColor);
     else drawBike(ctx, cx, cy - 2, dir, moving ? t : 0);
   }
 

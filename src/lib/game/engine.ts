@@ -16,6 +16,7 @@ import {
   portalAtPx,
   spawnPoint,
   spotlightAtPx,
+  waterTileAt,
 } from "./maps";
 import { OBJECT_DEFS } from "./objects";
 import { drawCharacter, drawObject, drawObjectTop, drawTile } from "./sprites";
@@ -32,6 +33,7 @@ import {
 } from "./constants";
 import { findPath, type PathNode } from "./pathfinding";
 import { WEAPON_MAP, MAX_HP, RESPAWN_MS } from "./weapons";
+import { ARROW_SKIN_COLOR } from "./shop";
 import type {
   CharacterAppearance,
   Direction,
@@ -92,7 +94,21 @@ export interface EngineCallbacks {
   onFishingSpot?: (near: boolean) => void; // 물가 근접 여부 변화 (낚시)
 }
 
-export type RaceItemKind = "turbo" | "boost" | "slow" | "oil" | "rocket" | "ink" | "meteor";
+export type RaceItemKind =
+  | "turbo"
+  | "boost"
+  | "slow"
+  | "oil"
+  | "rocket"
+  | "ink"
+  | "meteor"
+  | "star"
+  | "shield"
+  | "bomb"
+  | "banana"
+  | "lightning"
+  | "mini"
+  | "magnet";
 
 // PK 투사체
 interface Projectile {
@@ -125,6 +141,18 @@ interface BossChild {
   born: number;
   until: number;
   nextShotAt: number;
+  kind?: "child" | "spinorb"; // spinorb = 고슴도치 회전 구체(가시 발사)
+  angle?: number; // spinorb 회전각
+}
+// 문어발(크라켄) — 지면을 덮는 촉수. 잡히면 화살을 쏴 탈출해야 함.
+interface BossTentacle {
+  id: string;
+  x: number;
+  y: number;
+  r: number;
+  born: number;
+  warnUntil: number; // 경고(telegraph) 종료 시각 — 이후 잡기 판정
+  until: number;
 }
 interface BossLaser {
   id: string;
@@ -224,6 +252,10 @@ export class GameEngine {
   private bossHazards: BossHazard[] = [];
   private bossChildren: BossChild[] = [];
   private bossLasers: BossLaser[] = [];
+  private bossTentacles: BossTentacle[] = [];
+  // 크라켄 문어발 붙잡힘: 화살을 needed 회 이상 쏴야 탈출, 못 하면 잡아먹힘
+  private bossGrab: { until: number; needed: number; count: number } | null = null;
+  private bossFinalDone = false; // HP 1 최종 각성 패턴 발동 여부
   // 레이스 아이템 (아이템 박스/기름 웅덩이)
   private raceItems: MapObject[] = [];
   private itemCooldowns = new Map<string, number>(); // object id -> 다시 활성화되는 시각
@@ -231,6 +263,13 @@ export class GameEngine {
   private effectUntil = 0;
   private stunUntil = 0; // 운석/폭탄 스턴 (이동 불가)
   private inkUntil = 0; // 먹물 (시야 가림)
+  private shieldUntil = 0; // 쉴드 (탄막/해저드 무효)
+  private invincUntil = 0; // 스타(무적) — 쉴드 + 가속 + 무지개
+  private miniUntil = 0; // 미니(작아짐·감속)
+  private flashUntil = 0; // 번개 섬광
+  private bananas: { x: number; y: number; until: number; mine: boolean }[] = []; // 바나나 껍질 함정
+  private splashes: { x: number; y: number; born: number; vx: number; vy: number }[] = []; // 보트 물튀김
+  private lastSplashAt = 0;
   // 레이스 상태
   private boostUntil = 0;
   private raceActive = false;
@@ -340,6 +379,11 @@ export class GameEngine {
     this.bossHazards = [];
     this.bossChildren = [];
     this.bossLasers = [];
+    this.bossTentacles = [];
+    this.bossGrab = null;
+    this.bossFinalDone = false;
+    this.bananas = [];
+    this.splashes = [];
     if (this.seat) this.standUp(); // 좌석 오브젝트가 사라졌을 수 있음
     if (!keepPosition) {
       const sp = spawnPoint(map);
@@ -883,8 +927,110 @@ export class GameEngine {
       this.bossHazards = [];
       this.bossChildren = [];
       this.bossLasers = [];
+      this.bossTentacles = [];
+      this.bossGrab = null;
+      this.bossFinalDone = false;
       this.releaseRacePrison();
     }
+  }
+  // 쉴드/스타(무적)로 보호 중인지
+  private isProtected(now: number) {
+    return now < this.shieldUntil || now < this.invincUntil;
+  }
+
+  // 보트 뒤 물튀김 파티클 생성
+  private spawnSplash() {
+    const back = this.self.dir;
+    const bx = this.self.x + (back === "left" ? 12 : back === "right" ? -12 : 0);
+    const by = this.self.y + (back === "up" ? 12 : back === "down" ? -6 : 6);
+    for (let i = 0; i < 2; i++) {
+      const a = Math.random() * Math.PI * 2;
+      this.splashes.push({
+        x: bx + (Math.random() - 0.5) * 10,
+        y: by + (Math.random() - 0.5) * 6,
+        born: performance.now(),
+        vx: Math.cos(a) * 26,
+        vy: Math.sin(a) * 26 - 20,
+      });
+    }
+    if (this.splashes.length > 60) this.splashes.splice(0, this.splashes.length - 60);
+  }
+
+  // 레이스 아이템 효과 적용 — 다양한 카트라이더식 아이템
+  private applyRaceItem(kind: RaceItemKind, now: number) {
+    switch (kind) {
+      case "turbo":
+        this.effectMult = 1.9;
+        this.effectUntil = now + 2000;
+        break;
+      case "boost":
+        this.effectMult = 1.5;
+        this.effectUntil = now + 1500;
+        break;
+      case "magnet":
+        this.effectMult = 1.4;
+        this.effectUntil = now + 2600;
+        break;
+      case "star":
+        this.invincUntil = now + 5000;
+        this.effectMult = 1.6;
+        this.effectUntil = now + 5000;
+        break;
+      case "shield":
+        this.shieldUntil = now + 5000;
+        break;
+      case "rocket":
+        this.launchBossRocket(now);
+        break;
+      case "bomb":
+        this.launchBomb(now);
+        break;
+      case "banana":
+        this.dropBanana(now);
+        break;
+      case "lightning":
+        this.flashUntil = now + 450;
+        this.stunUntil = now + 700;
+        break;
+      case "slow":
+        this.effectMult = 0.55;
+        this.effectUntil = now + 1800;
+        break;
+      case "mini":
+        this.miniUntil = now + 4500;
+        this.effectMult = 0.7;
+        this.effectUntil = now + 4500;
+        break;
+      case "ink":
+        this.inkUntil = now + 2600;
+        break;
+      case "oil":
+        this.effectMult = 0.35;
+        this.effectUntil = now + 1000;
+        break;
+      case "meteor":
+      default:
+        this.stunUntil = now + 2500;
+        break;
+    }
+    this.cb.onItem?.(kind);
+  }
+
+  // 폭탄 던지기 — 조준(진행) 방향으로 폭발 투사체. 보스에게도 피해.
+  private launchBomb(now: number) {
+    const dirAng =
+      this.self.dir === "left" ? Math.PI : this.self.dir === "right" ? 0 : this.self.dir === "up" ? -Math.PI / 2 : Math.PI / 2;
+    const id = `bomb${now.toFixed(0)}_${Math.random().toString(36).slice(2, 5)}`;
+    const payload: ShotPayload = { id, from: this.self.id, x: this.self.x, y: this.self.y, angle: dirAng, weapon: "boss-rocket" };
+    this.spawnProjectile(payload, true);
+    this.cb.onShot?.(payload);
+    this.effects.push({ kind: "explosion", x: this.self.x, y: this.self.y, r: 20, until: now + 220, born: now });
+  }
+
+  // 바나나 껍질 뿌리기 — 내 위치에 함정. 밟으면 미끄러져 스핀.
+  private dropBanana(now: number) {
+    this.bananas.push({ x: this.self.x, y: this.self.y, until: now + 15000, mine: true });
+    if (this.bananas.length > 24) this.bananas.shift();
   }
   getBoss() {
     return this.boss;
@@ -917,37 +1063,64 @@ export class GameEngine {
     const icon = b.kind === "kraken" ? "🦑" : b.kind === "chicken" ? "🐔" : "🦔";
     const huge = !!this.map.race;
     const stage2 = huge && b.hp / b.maxHp <= 0.5;
+    const finalRage = huge && b.hp <= 1;
     const iconSize = huge ? 720 : 42;
     const shadowW = huge ? 430 : 22;
     const shadowH = huge ? 82 : 7;
+    // 보스를 조금 위로 (기존보다 약 160px 위)
+    const iconY = huge ? b.y - 40 : b.y;
     // 그림자
-    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.fillStyle = "rgba(0,0,0,0.34)";
     ctx.beginPath();
-    ctx.ellipse(b.x, b.y + (huge ? 238 : 16), shadowW, shadowH, 0, 0, Math.PI * 2);
+    ctx.ellipse(b.x, b.y + (huge ? 120 : 16), shadowW, shadowH, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     if (huge) {
+      // 더 진한 존재감 — 뒤에 어두운 방사형 배경
       ctx.save();
-      const aura = stage2 ? "rgba(248,113,113,0.75)" : "rgba(250,204,21,0.55)";
-      ctx.shadowColor = aura;
-      ctx.shadowBlur = stage2 ? 42 : 26;
-      ctx.font = `${iconSize}px serif`;
-      ctx.fillText(icon, b.x, b.y + 120);
-      ctx.shadowBlur = 0;
+      const bgR = 380;
+      const bg = ctx.createRadialGradient(b.x, iconY + 40, 40, b.x, iconY + 40, bgR);
+      const tint = finalRage ? "40,4,10" : stage2 ? "50,8,12" : "24,14,40";
+      bg.addColorStop(0, `rgba(${tint},0.62)`);
+      bg.addColorStop(0.6, `rgba(${tint},0.34)`);
+      bg.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.arc(b.x, iconY + 40, bgR, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
-      if (stage2) {
+
+      ctx.save();
+      const aura = finalRage ? "rgba(239,68,68,0.95)" : stage2 ? "rgba(248,113,113,0.85)" : "rgba(250,204,21,0.7)";
+      ctx.shadowColor = aura;
+      ctx.shadowBlur = finalRage ? 64 : stage2 ? 46 : 30;
+      ctx.font = `${iconSize}px serif`;
+      // 두 번 그려 더 진하고 선명하게
+      ctx.fillText(icon, b.x, iconY);
+      ctx.shadowBlur = finalRage ? 40 : 20;
+      ctx.fillText(icon, b.x, iconY);
+      // 어둡게 눌러주는 오버레이 (실루엣 강조)
+      ctx.globalCompositeOperation = "source-atop";
+      ctx.fillStyle = finalRage ? "rgba(80,0,0,0.28)" : "rgba(10,4,20,0.22)";
+      ctx.fillText(icon, b.x, iconY);
+      ctx.restore();
+      if (finalRage) {
+        ctx.font = "bold 32px ui-sans-serif";
+        ctx.fillStyle = "#fecaca";
+        ctx.fillText("⚠ FINAL RAGE ⚠", b.x, iconY - 345);
+      } else if (stage2) {
         ctx.font = "bold 28px ui-sans-serif";
         ctx.fillStyle = "#fecaca";
-        ctx.fillText("STAGE 2", b.x, b.y - 385);
+        ctx.fillText("STAGE 2", b.x, iconY - 345);
       }
     } else {
       ctx.font = "42px serif";
-      ctx.fillText(icon, b.x, b.y);
+      ctx.fillText(icon, b.x, iconY);
     }
     // HP 바
     const bw = huge ? 520 : 64;
-    const by = b.y - (huge ? 420 : 40);
+    const by = iconY - (huge ? 320 : 40);
     const ratio = Math.max(0, b.hp / b.maxHp);
     ctx.fillStyle = "rgba(0,0,0,0.55)";
     ctx.fillRect(b.x - bw / 2 - 1, by, bw + 2, huge ? 14 : 8);
@@ -992,8 +1165,12 @@ export class GameEngine {
     const w = this.map.race ? WEAPON_MAP.arrow : WEAPON_MAP[this.self.weapon ?? "pistol"];
     if (!w) return;
     const now = performance.now();
-    if (now < this.lastFire + w.cooldownMs) return;
+    // 문어발에 붙잡히면 화살 연사로 탈출 — 쿨다운 대폭 단축
+    const cd = this.map.race && this.bossGrab ? 130 : w.cooldownMs;
+    if (now < this.lastFire + cd) return;
     this.lastFire = now;
+    // 붙잡힘 탈출 카운트 (화살 발사 1회당 +1)
+    if (this.map.race && this.bossGrab) this.bossGrab.count++;
     for (let i = 0; i < w.pellets; i++) {
       const spread = w.spreadDeg ? ((Math.random() - 0.5) * w.spreadDeg * Math.PI) / 180 : 0;
       const a = angle + spread;
@@ -1132,6 +1309,45 @@ export class GameEngine {
     });
   }
 
+  // 고슴도치 회전 구체 — 뱅글뱅글 돌며 가시(spike)를 사방으로 발사
+  private spawnBossSpinorb(now: number, angle: number) {
+    const b = this.boss;
+    if (!b) return;
+    const dist = 90;
+    this.bossChildren.push({
+      id: `so${now.toFixed(0)}_${this.bossChildren.length}_${Math.random().toString(36).slice(2, 4)}`,
+      x: b.x + Math.cos(angle) * dist,
+      y: b.y + Math.sin(angle) * dist,
+      vx: Math.cos(angle) * 90,
+      vy: Math.sin(angle) * 90,
+      born: now,
+      until: now + 9000,
+      nextShotAt: now + 500,
+      kind: "spinorb",
+      angle: 0,
+    });
+  }
+
+  // 크라켄 문어발 — 지면을 덮는 촉수 다발. 경고 후 잡기 판정.
+  private spawnTentacles(now: number, count: number) {
+    const size = mapPixelSize(this.map);
+    for (let i = 0; i < count; i++) {
+      // 대부분 랜덤 위치 + 하나는 플레이어 근처(피하도록 유도)
+      const nearPlayer = i === 0 && !this.self.dead;
+      const x = nearPlayer ? this.self.x + (Math.random() - 0.5) * 80 : 120 + Math.random() * (size.w - 240);
+      const y = nearPlayer ? this.self.y + (Math.random() - 0.5) * 80 : 120 + Math.random() * (size.h - 240);
+      this.bossTentacles.push({
+        id: `tt${now.toFixed(0)}_${i}_${Math.random().toString(36).slice(2, 4)}`,
+        x,
+        y,
+        r: 66,
+        born: now,
+        warnUntil: now + 1100, // 경고 시간 동안 벗어나면 안전
+        until: now + 5200,
+      });
+    }
+  }
+
   private spawnBossLaser(now: number) {
     const b = this.boss;
     if (!b || this.self.dead) return;
@@ -1162,6 +1378,7 @@ export class GameEngine {
   private runBossPattern(now: number, stage2: boolean) {
     const b = this.boss;
     if (!b) return;
+    const finalRage = b.hp <= 1; // HP 1 최종 각성
     if (stage2) {
       const childCount = b.kind === "mole" ? 3 : 2;
       for (let i = 0; i < childCount; i++) this.spawnBossChild(now, now / 700 + (Math.PI * 2 * i) / childCount);
@@ -1174,6 +1391,9 @@ export class GameEngine {
         const a = offset + (Math.PI * 2 * i) / count;
         this.pushBossMissile("spike", b.x, b.y, a, stage2 ? 360 : 300, now);
       }
+      // 고슴도치 회전 구체 — 구체가 뱅글뱅글 돌며 가시 발사
+      const orbs = finalRage ? 4 : stage2 ? 2 : 1;
+      for (let i = 0; i < orbs; i++) this.spawnBossSpinorb(now, (Math.PI * 2 * i) / orbs + now / 1200);
       if (stage2) {
         const pts = [
           [this.self.x, this.self.y],
@@ -1191,6 +1411,8 @@ export class GameEngine {
         this.pushBossMissile("wave", b.x, b.y, a, stage2 ? 285 : 240, now);
       }
       if (stage2) this.inkUntil = Math.max(this.inkUntil, now + 1600);
+      // 문어발 촉수로 지면을 덮음 (2스테이지부터)
+      if (stage2) this.spawnTentacles(now, finalRage ? 7 : 4);
     } else {
       const count = stage2 ? 12 : 7;
       for (let i = 0; i < count; i++) {
@@ -1200,12 +1422,86 @@ export class GameEngine {
     }
   }
 
+  // HP 1 최종 각성 — 다같이 요격해야 하는 대형 패턴
+  private runBossFinalPattern(now: number) {
+    const b = this.boss;
+    if (!b) return;
+    this.bossFinalDone = true;
+    // 사방 대형 탄막(2겹 회전 링)
+    for (let ring = 0; ring < 2; ring++) {
+      const count = 24;
+      const off = now / 500 + ring * 0.13;
+      for (let i = 0; i < count; i++) {
+        const a = off + (Math.PI * 2 * i) / count;
+        this.pushBossMissile(b.kind === "kraken" ? "wave" : b.kind === "mole" ? "spike" : "egg", b.x, b.y, a, 300 + ring * 60, now);
+      }
+    }
+    // 십자 레이저 4방향
+    for (let i = 0; i < 4; i++) {
+      const a = (Math.PI / 2) * i;
+      const len = Math.max(this.map.tiles.length, this.map.tiles[0]?.length ?? 0) * TILE;
+      this.bossLasers.push({
+        id: `fl${now.toFixed(0)}_${i}`,
+        x1: b.x,
+        y1: b.y,
+        x2: b.x + Math.cos(a) * len,
+        y2: b.y + Math.sin(a) * len,
+        born: now,
+        warnUntil: now + 900,
+        until: now + 1500,
+      });
+    }
+    // 보스 종류별 특수 각성
+    if (b.kind === "kraken") this.spawnTentacles(now, 8);
+    else if (b.kind === "mole") for (let i = 0; i < 5; i++) this.spawnBossSpinorb(now, (Math.PI * 2 * i) / 5);
+    else for (let i = 0; i < 3; i++) this.spawnBossChild(now, (Math.PI * 2 * i) / 3);
+  }
+
+  // 문어발 촉수 갱신 + 붙잡힘(먹힘) 판정
+  private updateBossTentacles(now: number) {
+    this.bossTentacles = this.bossTentacles.filter((t) => t.until > now);
+    if (this.self.dead) {
+      this.bossGrab = null;
+      return;
+    }
+    // 아직 안 잡혔으면: 경고 종료 직후 촉수 안에 있으면 붙잡힘
+    if (!this.bossGrab) {
+      for (const t of this.bossTentacles) {
+        if (now < t.warnUntil || now - t.warnUntil > 400) continue; // 짧은 판정 창
+        if (this.isProtected(now)) continue;
+        if (Math.hypot(t.x - this.self.x, t.y - this.self.y) <= t.r) {
+          this.bossGrab = { until: now + 5200, needed: 10, count: 0 };
+          this.addEmote(this.self.id, { id: `grab${now}`, kind: "emoji", value: "🐙", at: Date.now() });
+          break;
+        }
+      }
+    }
+    // 붙잡힌 동안: 이동 봉쇄 + 화살 10발로 탈출, 실패 시 먹힘
+    if (this.bossGrab) {
+      this.stunUntil = Math.max(this.stunUntil, now + 120);
+      if (this.bossGrab.count >= this.bossGrab.needed) {
+        this.addEmote(this.self.id, { id: `esc${now}`, kind: "emoji", value: "💪", at: Date.now() });
+        this.bossGrab = null;
+      } else if (now >= this.bossGrab.until) {
+        this.bossGrab = null;
+        this.die(); // 문어에게 먹힘
+      }
+    }
+  }
+
+  // 붙잡힘 상태 조회 (HUD용)
+  getBossGrab() {
+    return this.bossGrab ? { count: this.bossGrab.count, needed: this.bossGrab.needed } : null;
+  }
+
   private updateBossMissiles(dt: number, now: number) {
     if (!this.map.race || !this.boss?.alive) {
       this.bossMissiles = [];
       this.bossHazards = [];
       this.bossChildren = [];
       this.bossLasers = [];
+      this.bossTentacles = [];
+      this.bossGrab = null;
       return;
     }
     const stage2 = this.boss.hp / this.boss.maxHp <= 0.5;
@@ -1216,9 +1512,22 @@ export class GameEngine {
       this.nextBossMissileAt = now + (stage2 ? 1350 : 1900);
     }
     if (!this.self.dead && now >= this.nextBossPatternAt) {
-      this.runBossPattern(now, stage2);
-      this.nextBossPatternAt = now + (stage2 ? 3600 : 5200);
+      // HP 1 최종 각성 — 처음 도달 시 즉발, 이후 짧은 주기로 반복
+      if (this.boss.hp <= 1) {
+        this.runBossFinalPattern(now);
+        this.nextBossPatternAt = now + 2600;
+      } else {
+        this.runBossPattern(now, stage2);
+        this.nextBossPatternAt = now + (stage2 ? 3600 : 5200);
+      }
     }
+    // HP 1 도달 순간 첫 각성을 지연 없이 발동
+    if (!this.self.dead && this.boss.hp <= 1 && !this.bossFinalDone) {
+      this.runBossFinalPattern(now);
+      this.nextBossPatternAt = now + 2600;
+    }
+
+    this.updateBossTentacles(now);
 
     const remain: BossMissile[] = [];
     for (const m of this.bossMissiles) {
@@ -1236,8 +1545,12 @@ export class GameEngine {
       m.x += m.vx * dt;
       m.y += m.vy * dt;
       if (!this.self.dead && Math.hypot(m.x - this.self.x, m.y - this.self.y) < PLAYER_RADIUS + 12) {
-        this.raceMissileHits++;
         this.effects.push({ kind: "explosion", x: m.x, y: m.y, r: 44, until: now + 360, born: now });
+        if (this.isProtected(now)) {
+          this.addEmote(this.self.id, { id: `blk${now}`, kind: "emoji", value: "🛡️", at: Date.now() });
+          continue; // 쉴드/무적 — 탄막 무효화
+        }
+        this.raceMissileHits++;
         this.addEmote(this.self.id, { id: `hmhit${now}`, kind: "emoji", value: `${this.raceMissileHits}/3`, at: Date.now() });
         if (this.raceMissileHits >= 3) this.die();
         continue;
@@ -1249,6 +1562,29 @@ export class GameEngine {
     const liveChildren: BossChild[] = [];
     for (const c of this.bossChildren) {
       if (c.until <= now) continue;
+      if (c.kind === "spinorb") {
+        // 고슴도치 구체 — 천천히 떠다니며 뱅글뱅글 회전, 가시를 사방으로 발사
+        c.x += c.vx * dt;
+        c.y += c.vy * dt;
+        c.vx *= 0.985;
+        c.vy *= 0.985;
+        c.angle = (c.angle ?? 0) + dt * 4.2;
+        if (!this.self.dead && now >= c.nextShotAt) {
+          const spikes = 6;
+          for (let i = 0; i < spikes; i++) {
+            const a = (c.angle ?? 0) + (Math.PI * 2 * i) / spikes;
+            this.pushBossMissile("spike", c.x, c.y, a, stage2 ? 300 : 250, now);
+          }
+          c.nextShotAt = now + (stage2 ? 620 : 820);
+        }
+        if (!this.self.dead && Math.hypot(c.x - this.self.x, c.y - this.self.y) < PLAYER_RADIUS + 18 && now > this.lavaHitAt && !this.isProtected(now)) {
+          this.lavaHitAt = now + 700;
+          this.raceMissileHits++;
+          if (this.raceMissileHits >= 3) this.die();
+        }
+        liveChildren.push(c);
+        continue;
+      }
       if (!this.self.dead) {
         const a = Math.atan2(this.self.y - c.y, this.self.x - c.x);
         const speed = stage2 ? 235 : 190;
@@ -1265,7 +1601,7 @@ export class GameEngine {
         this.pushBossMissile("energy", c.x, c.y, a, stage2 ? 420 : 360, now);
         c.nextShotAt = now + (stage2 ? 760 : 980);
       }
-      if (!this.self.dead && Math.hypot(c.x - this.self.x, c.y - this.self.y) < PLAYER_RADIUS + 16 && now > this.lavaHitAt) {
+      if (!this.self.dead && Math.hypot(c.x - this.self.x, c.y - this.self.y) < PLAYER_RADIUS + 16 && now > this.lavaHitAt && !this.isProtected(now)) {
         this.lavaHitAt = now + 700;
         this.raceMissileHits++;
         if (this.raceMissileHits >= 3) this.die();
@@ -1277,7 +1613,7 @@ export class GameEngine {
     const liveLasers: BossLaser[] = [];
     for (const l of this.bossLasers) {
       if (l.until <= now) continue;
-      if (!this.self.dead && now >= l.warnUntil && !l.hitDone) {
+      if (!this.self.dead && now >= l.warnUntil && !l.hitDone && !this.isProtected(now)) {
         const d = this.distToSegment(this.self.x, this.self.y, l.x1, l.y1, l.x2, l.y2);
         if (d <= 34) {
           l.hitDone = true;
@@ -1291,7 +1627,7 @@ export class GameEngine {
     this.bossLasers = liveLasers;
 
     this.bossHazards = this.bossHazards.filter((h) => h.until > now);
-    if (!this.self.dead) {
+    if (!this.self.dead && !this.isProtected(now)) {
       for (const h of this.bossHazards) {
         if (h.kind !== "lava") continue;
         const d = Math.hypot(h.x - this.self.x, h.y - this.self.y);
@@ -1536,8 +1872,16 @@ export class GameEngine {
         else if (this.map.race && offroadAt(this.map, this.self.x, this.self.y)) {
           speed *= OFFROAD_MULT;
         }
-        // 아이템 효과 (터보/부스트/슬로우/기름)
+        // 아이템 효과 (터보/부스트/슬로우/기름/미니 등)
         if (now < this.effectUntil) speed *= this.effectMult;
+        // 보트 물튀김 이펙트 (바다 서킷)
+        if (this.map.vehicle === "boat" && now - this.lastSplashAt > 70) {
+          this.lastSplashAt = now;
+          this.spawnSplash();
+        }
+      } else {
+        // 도보(또는 마운트) — 물 위에서 보트 없이 다니면 70% 감속
+        if (waterTileAt(this.map, this.self.x, this.self.y)) speed *= 0.3;
       }
       this.moveAxis((dx / len) * speed * dt, 0);
       this.moveAxis(0, (dy / len) * speed * dt);
@@ -1563,39 +1907,45 @@ export class GameEngine {
         if (now < (this.itemCooldowns.get(o.id) ?? 0)) continue;
         if (o.type === "oil") {
           this.itemCooldowns.set(o.id, now + 1500);
-          this.effectMult = 0.35;
-          this.effectUntil = now + 1000;
-          this.cb.onItem?.("oil");
+          this.applyRaceItem("oil", now);
         } else {
           this.itemCooldowns.set(o.id, now + 6000);
-          // 카트라이더식 랜덤 아이템 (좋은 것/나쁜 것 도박)
-          const roll = Math.random();
-          let kind: RaceItemKind;
-          if (roll < 0.24) kind = "boost";
-          else if (roll < 0.44) kind = "turbo";
-          else if (roll < 0.6) kind = "rocket";
-          else if (roll < 0.74) kind = "slow";
-          else if (roll < 0.88) kind = "ink";
-          else kind = "meteor";
-          if (kind === "turbo") {
-            this.effectMult = 1.9;
-            this.effectUntil = now + 2000;
-          } else if (kind === "boost") {
-            this.effectMult = 1.5;
-            this.effectUntil = now + 1500;
-          } else if (kind === "rocket") {
-            this.launchBossRocket(now);
-          } else if (kind === "slow") {
-            this.effectMult = 0.55;
-            this.effectUntil = now + 1800;
-          } else if (kind === "ink") {
-            this.inkUntil = now + 2600; // 먹물 — 시야 가림
-          } else {
-            this.stunUntil = now + 2500; // 운석/폭탄 — 스턴
-          }
-          this.cb.onItem?.(kind);
+          // 카트라이더식 랜덤 아이템 룰렛 (10종+ · 좋은 것/나쁜 것 도박)
+          const bag: RaceItemKind[] = [
+            "boost", "boost", "turbo", "turbo", "rocket", "rocket", "bomb",
+            "star", "shield", "shield", "banana", "magnet", "lightning",
+            "slow", "ink", "meteor", "mini",
+          ];
+          const kind = bag[Math.floor(Math.random() * bag.length)];
+          this.applyRaceItem(kind, now);
         }
       }
+    }
+
+    // 바나나 함정 충돌 (탑승 중, 보호 중 아님)
+    if (this.self.onBike && this.bananas.length) {
+      for (const bnn of this.bananas) {
+        if (now > bnn.until) continue;
+        if (Math.hypot(bnn.x - this.self.x, bnn.y - this.self.y) < PLAYER_RADIUS + 10) {
+          bnn.until = 0; // 소모
+          if (!this.isProtected(now)) {
+            this.effectMult = 0.3;
+            this.effectUntil = now + 1200;
+            this.stunUntil = now + 320;
+            this.addEmote(this.self.id, { id: `ban${now}`, kind: "emoji", value: "🍌", at: Date.now() });
+          }
+        }
+      }
+      this.bananas = this.bananas.filter((b) => now <= b.until);
+    }
+    // 물튀김 파티클 이동/만료
+    if (this.splashes.length) {
+      for (const s of this.splashes) {
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+        s.vy += 90 * dt; // 중력
+      }
+      this.splashes = this.splashes.filter((s) => now - s.born < 500);
     }
 
     // 레이스 진행 체크
@@ -1955,6 +2305,9 @@ export class GameEngine {
       }
     }
 
+    // 레이스 이펙트 (물튀김/바나나/문어발/쉴드·스타 오라)
+    if (this.map.race) this.renderRaceFx(ctx, now);
+
     // PK 전투 렌더 (투사체/이펙트/체력바)
     if (
       this.isPk() ||
@@ -2019,6 +2372,132 @@ export class GameEngine {
       ctx.textAlign = "center";
       ctx.fillText("💫 스턴!", W / 2, 40);
     }
+    // 번개 섬광 (lightning 아이템)
+    if (now < this.flashUntil) {
+      const t = 1 - (this.flashUntil - now) / 450;
+      ctx.fillStyle = `rgba(255,255,255,${Math.max(0, 0.7 - t)})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+    // 쉴드/스타 남은 시간 배지
+    if (now < this.shieldUntil || now < this.invincUntil) {
+      const star = now < this.invincUntil;
+      const left = Math.ceil(((star ? this.invincUntil : this.shieldUntil) - now) / 1000);
+      ctx.fillStyle = star ? "rgba(250,204,21,0.95)" : "rgba(56,189,248,0.95)";
+      ctx.font = "bold 15px ui-sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(star ? `⭐ 무적 ${left}s` : `🛡️ 쉴드 ${left}s`, W / 2, 62);
+    }
+  }
+
+  // 화살 디자인 색 (상점에서 구매한 arrow 코스메틱)
+  private arrowColorFor(from: string, now: number): string {
+    const cos = from === this.self.id ? this.self.cosmetics : this.others.get(from)?.cosmetics;
+    const key = cos?.arrow;
+    const col = key ? ARROW_SKIN_COLOR[key] : undefined;
+    if (!col) return "#f8e7b0";
+    if (col === "rainbow") return `hsl(${(now / 6) % 360}, 90%, 62%)`;
+    return col;
+  }
+
+  // 레이스 전용 이펙트: 물튀김·바나나·문어발·쉴드/스타 오라
+  private renderRaceFx(ctx: CanvasRenderingContext2D, now: number) {
+    // 물튀김 파티클
+    for (const s of this.splashes) {
+      const t = (now - s.born) / 500;
+      ctx.globalAlpha = Math.max(0, 0.8 - t);
+      ctx.fillStyle = "#e0f2fe";
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 2.6 * (1 - t * 0.5), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // 바나나 껍질 함정
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (const bn of this.bananas) {
+      if (now > bn.until) continue;
+      ctx.font = "20px serif";
+      ctx.fillText("🍌", bn.x, bn.y);
+    }
+
+    // 문어발 촉수 — 지면을 덮음
+    for (const t of this.bossTentacles) {
+      const warning = now < t.warnUntil;
+      const pulse = 0.55 + Math.sin(now / 150 + t.x) * 0.12;
+      ctx.save();
+      const grd = ctx.createRadialGradient(t.x, t.y, 6, t.x, t.y, t.r);
+      if (warning) {
+        grd.addColorStop(0, "rgba(147,51,234,0.35)");
+        grd.addColorStop(0.7, "rgba(88,28,135,0.25)");
+        grd.addColorStop(1, "rgba(88,28,135,0)");
+      } else {
+        grd.addColorStop(0, `rgba(126,34,206,${pulse})`);
+        grd.addColorStop(0.7, "rgba(76,29,149,0.5)");
+        grd.addColorStop(1, "rgba(76,29,149,0)");
+      }
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2);
+      ctx.fill();
+      // 촉수 다리(빨판) — 방사형 곡선
+      ctx.strokeStyle = warning ? "rgba(216,180,254,0.6)" : "rgba(233,213,255,0.85)";
+      ctx.lineWidth = 5;
+      const legs = 6;
+      for (let i = 0; i < legs; i++) {
+        const a = (Math.PI * 2 * i) / legs + now / 600;
+        ctx.beginPath();
+        ctx.moveTo(t.x, t.y);
+        ctx.quadraticCurveTo(
+          t.x + Math.cos(a) * t.r * 0.6,
+          t.y + Math.sin(a) * t.r * 0.6 - 8,
+          t.x + Math.cos(a) * t.r,
+          t.y + Math.sin(a) * t.r
+        );
+        ctx.stroke();
+      }
+      if (warning) {
+        ctx.fillStyle = "rgba(233,213,255,0.95)";
+        ctx.font = "bold 13px ui-sans-serif";
+        ctx.fillText("⚠", t.x, t.y);
+      }
+      ctx.restore();
+    }
+    ctx.textBaseline = "alphabetic";
+
+    // 쉴드/스타(무적) 오라 — 내 캐릭터 주변
+    const protectedNow = this.isProtected(now);
+    if (protectedNow && !this.self.dead) {
+      const star = now < this.invincUntil;
+      ctx.save();
+      ctx.lineWidth = 3;
+      const hue = (now / 4) % 360;
+      ctx.strokeStyle = star ? `hsla(${hue},90%,65%,0.9)` : "rgba(56,189,248,0.85)";
+      ctx.shadowColor = ctx.strokeStyle as string;
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.arc(this.self.x, this.self.y, 20 + Math.sin(now / 120) * 2, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 붙잡힘 안내 (문어발) — 화면 중앙 하단
+    if (this.bossGrab) {
+      const W = this.canvas.width;
+      const H = this.canvas.height;
+      ctx.save();
+      ctx.resetTransform();
+      ctx.fillStyle = "rgba(88,28,135,0.85)";
+      const bw = 320;
+      roundRectPath(ctx, W / 2 - bw / 2, H - 120, bw, 46, 10);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 16px ui-sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(`🐙 문어발! 화살 연사로 탈출 ${this.bossGrab.count}/${this.bossGrab.needed}`, W / 2, H - 97);
+      ctx.textAlign = "left";
+      ctx.restore();
+    }
   }
 
   private renderPk(ctx: CanvasRenderingContext2D, now: number) {
@@ -2060,17 +2539,46 @@ export class GameEngine {
     }
     for (const c of this.bossChildren) {
       const pulse = 0.75 + Math.sin(now / 180 + c.x) * 0.2;
-      const icon = this.boss?.kind === "kraken" ? "🦑" : this.boss?.kind === "chicken" ? "🐔" : "🦔";
       ctx.save();
       ctx.translate(c.x, c.y);
-      ctx.shadowColor = `rgba(129,140,248,${pulse})`;
-      ctx.shadowBlur = 18;
-      ctx.font = "44px serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(icon, 0, 0);
-      ctx.shadowBlur = 0;
-      ctx.textBaseline = "alphabetic";
+      if (c.kind === "spinorb") {
+        // 회전하는 가시 구체
+        ctx.rotate(c.angle ?? 0);
+        ctx.shadowColor = "rgba(148,163,184,0.9)";
+        ctx.shadowBlur = 14;
+        // 가시
+        ctx.fillStyle = "#cbd5e1";
+        const spikes = 10;
+        for (let i = 0; i < spikes; i++) {
+          const a = (Math.PI * 2 * i) / spikes;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a) * 10, Math.sin(a) * 10);
+          ctx.lineTo(Math.cos(a + 0.16) * 22, Math.sin(a + 0.16) * 22);
+          ctx.lineTo(Math.cos(a - 0.16) * 22, Math.sin(a - 0.16) * 22);
+          ctx.closePath();
+          ctx.fill();
+        }
+        // 코어
+        ctx.fillStyle = "#64748b";
+        ctx.beginPath();
+        ctx.arc(0, 0, 12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#e2e8f0";
+        ctx.beginPath();
+        ctx.arc(-3, -3, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      } else {
+        const icon = this.boss?.kind === "kraken" ? "🦑" : this.boss?.kind === "chicken" ? "🐔" : "🦔";
+        ctx.shadowColor = `rgba(129,140,248,${pulse})`;
+        ctx.shadowBlur = 18;
+        ctx.font = "44px serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(icon, 0, 0);
+        ctx.shadowBlur = 0;
+        ctx.textBaseline = "alphabetic";
+      }
       ctx.restore();
     }
     // 투사체
@@ -2087,19 +2595,24 @@ export class GameEngine {
         const m = Math.hypot(pr.vx, pr.vy) || 1;
         const ax = pr.vx / m;
         const ay = pr.vy / m;
-        ctx.strokeStyle = "#f8e7b0";
+        const col = this.arrowColorFor(pr.from, now);
+        ctx.save();
+        ctx.shadowColor = col;
+        ctx.shadowBlur = 8;
+        ctx.strokeStyle = col;
         ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.moveTo(pr.x - ax * 17, pr.y - ay * 17);
         ctx.lineTo(pr.x + ax * 10, pr.y + ay * 10);
         ctx.stroke();
-        ctx.fillStyle = "#f8e7b0";
+        ctx.fillStyle = col;
         ctx.beginPath();
         ctx.moveTo(pr.x + ax * 14, pr.y + ay * 14);
         ctx.lineTo(pr.x + ay * 5 - ax * 2, pr.y - ax * 5 - ay * 2);
         ctx.lineTo(pr.x - ay * 5 - ax * 2, pr.y + ax * 5 - ay * 2);
         ctx.closePath();
         ctx.fill();
+        ctx.restore();
       } else {
         // 총알 — 진행 방향 짧은 선
         const len = w.kind === "sniper" ? 14 : 8;

@@ -92,3 +92,19 @@ export interface ToastItem {
   actionLabel?: string;
   action?: () => void;
 }
+
+// 레이싱 전용 알림 — 우측 하단에서 하나씩 위로 올라온다(레이스 방해 최소화).
+export function RaceToastStack({ toasts }: { toasts: ToastItem[] }) {
+  return (
+    <div className="pointer-events-none absolute bottom-24 right-3 z-40 flex w-auto max-w-[260px] flex-col-reverse items-end gap-1.5">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className="race-toast rounded-lg border border-white/10 bg-panel/90 px-3 py-1.5 text-xs font-medium text-slate-100 shadow-lg backdrop-blur"
+        >
+          {t.text}
+        </div>
+      ))}
+    </div>
+  );
+}

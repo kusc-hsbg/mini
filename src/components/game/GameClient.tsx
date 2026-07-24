@@ -65,7 +65,7 @@ import TetrisModal from "./TetrisModal";
 import PianoModal from "./PianoModal";
 import DeskModal from "./DeskModal";
 import RaceHud, { fmtMs, type LeaderEntry } from "./RaceHud";
-import { Modal, ToastStack, type ToastItem } from "./ui";
+import { Modal, ToastStack, RaceToastStack, type ToastItem } from "./ui";
 
 const GUEST_KEY = "pixeltown:guest-appearance";
 const GUEST_ID_KEY = "pixeltown:guest-id";
@@ -94,22 +94,6 @@ function rememberBio(id: string, bio: string) {
   } catch {}
 }
 
-function loadGuestWallet(): WalletState {
-  try {
-    const raw = typeof localStorage !== "undefined" ? localStorage.getItem(GUEST_WALLET_KEY) : null;
-    if (raw) {
-      const w = JSON.parse(raw);
-      return {
-        hearts: Number(w.hearts ?? 200),
-        coins: Number(w.coins ?? 0),
-        inventory: Array.isArray(w.inventory) ? w.inventory : [],
-        equipped: w.equipped ?? {},
-      };
-    }
-  } catch {}
-  return { hearts: 200, coins: 0, inventory: [], equipped: {} };
-}
-
 interface Identity {
   id: string;
   name: string;
@@ -132,6 +116,7 @@ function equippedToCosmetics(eq: Record<string, string>): PlayerCosmetics {
     mount: eq.mount,
     kart: eq.kart,
     dance: eq.dance,
+    arrow: eq.arrow,
   };
 }
 
@@ -204,6 +189,7 @@ type ModalState =
   | { kind: "collection" }
   | { kind: "auction" }
   | { kind: "quiz" }
+  | { kind: "help" }
   | null;
 
 type PanelState = "participants" | "chat" | "meetings" | "friends" | "store" | null;
@@ -320,6 +306,9 @@ export default function GameClient({
   const [touchedId, setTouchedId] = useState<string | null>(null);
   const [pkState, setPkState] = useState<{ hp: number; dead: boolean; weapon: string; kills: number } | null>(null);
   const [myBio, setMyBio] = useState("");
+  // 지갑 로컬 캐시 키 — 로그인 유저도 유저별로 캐시해 방 이동 시 하트가 사라지지 않게 한다.
+  const walletKey = profile ? `affinity:wallet:${profile.id}` : GUEST_WALLET_KEY;
+  const skipWalletPersist = useRef(true);
   const [wallet, setWallet] = useState<WalletState>(() =>
     profile
       ? {
@@ -330,17 +319,49 @@ export default function GameClient({
         }
       : { hearts: 200, coins: 0, inventory: [], equipped: {} }
   );
+  // 하이드레이트: 로컬 캐시와 병합. 서버 하트가 0/누락으로 내려와도 캐시로 복구해
+  // "다른 방으로 이동하면 하트가 0이 되는" 문제를 방지한다.
   useEffect(() => {
-    if (!profile) setWallet(loadGuestWallet());
-  }, [profile]);
-  // 게스트 지갑은 로컬에 영속화 (하트/아이템이 실제로 유지·증가하도록)
-  useEffect(() => {
+    let cached: Partial<WalletState> | null = null;
+    try {
+      const raw = typeof localStorage !== "undefined" ? localStorage.getItem(walletKey) : null;
+      if (raw) cached = JSON.parse(raw);
+    } catch {}
+    const cH = cached && typeof cached.hearts === "number" ? Number(cached.hearts) : null;
+    const cC = cached && typeof cached.coins === "number" ? Number(cached.coins) : null;
     if (!profile) {
-      try {
-        localStorage.setItem(GUEST_WALLET_KEY, JSON.stringify(wallet));
-      } catch {}
+      setWallet(
+        cached
+          ? {
+              hearts: cH ?? 200,
+              coins: cC ?? 0,
+              inventory: Array.isArray(cached.inventory) ? cached.inventory : [],
+              equipped: cached.equipped ?? {},
+            }
+          : { hearts: 200, coins: 0, inventory: [], equipped: {} }
+      );
+    } else {
+      const sH = profile.hearts ?? 0;
+      const sC = profile.coins ?? 0;
+      setWallet({
+        hearts: sH > 0 ? sH : Math.max(sH, cH ?? 0),
+        coins: sC > 0 ? sC : Math.max(sC, cC ?? 0),
+        inventory: profile.inventory ?? [],
+        equipped: profile.equipped ?? {},
+      });
     }
-  }, [wallet, profile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, walletKey]);
+  // 지갑 로컬 영속화 (게스트/로그인 모두) — 첫 렌더(하이드레이트 전)는 건너뛴다.
+  useEffect(() => {
+    if (skipWalletPersist.current) {
+      skipWalletPersist.current = false;
+      return;
+    }
+    try {
+      localStorage.setItem(walletKey, JSON.stringify(wallet));
+    } catch {}
+  }, [wallet, walletKey]);
   const [mounted, setMounted] = useState(false);
   const [summonedMount, setSummonedMount] = useState<string | null>(null);
   const activeCosmetics = useMemo(() => {
@@ -410,6 +431,14 @@ export default function GameClient({
     const id = randomId();
     setToasts((ts) => [...ts.slice(-3), { id, text, actionLabel, action }]);
     setTimeout(() => setToasts((ts) => ts.filter((t) => t.id !== id)), 7000);
+  }, []);
+
+  // ----- 레이싱 전용 토스트 (우측 하단, 하나씩 올라옴) -----
+  const [raceToasts, setRaceToasts] = useState<ToastItem[]>([]);
+  const addRaceToast = useCallback((text: string) => {
+    const id = randomId();
+    setRaceToasts((ts) => [...ts.slice(-4), { id, text }]);
+    setTimeout(() => setRaceToasts((ts) => ts.filter((t) => t.id !== id)), 3200);
   }, []);
 
   // ----- 실시간 채널 -----
@@ -994,7 +1023,7 @@ export default function GameClient({
                 laps: ev.laps,
               });
           } else if (ev.kind === "start") {
-            addToast(`🚦 레이스 시작! 시계방향으로 ${ev.laps}랩 완주하세요`);
+            addRaceToast(`🚦 레이스 시작! ${ev.laps}랩 완주!`);
             if (multiplayer)
               channelRef.current.send("race", {
                 from: identity.id,
@@ -1004,7 +1033,7 @@ export default function GameClient({
                 laps: ev.laps,
               });
           } else if (ev.kind === "lap" && ev.lapMs != null) {
-            addToast(`⏱️ LAP ${ev.lap - 1} 완료 — ${fmtMs(ev.lapMs)}`);
+            addRaceToast(`⏱️ LAP ${ev.lap - 1} — ${fmtMs(ev.lapMs)}`);
           } else if (ev.kind === "finish" && ev.totalMs != null) {
             addToast(`🏆 완주! 총 기록 ${fmtMs(ev.totalMs)} — 트로피장으로 이동합니다!`);
             applyRaceRecord(identity.id, identity.name, ev.totalMs);
@@ -1043,7 +1072,8 @@ export default function GameClient({
           if (!id) return;
           const now = Date.now();
           const prev = touchRewardRef.current.get(id) ?? 0;
-          if (now - prev > 60_000) {
+          // 같은 상대에게는 15초 쿨타임 (하트 파밍 방지). 처음 닿으면 바로 충전.
+          if (now - prev > 15_000) {
             touchRewardRef.current.set(id, now);
             awardHearts(1, "하이파이브");
           }
@@ -1093,16 +1123,23 @@ export default function GameClient({
         },
         onItem: (kind: RaceItemKind) => {
           const meta: Record<RaceItemKind, [string, string]> = {
-            turbo: ["🚀 터보! 2초간 초가속", "🚀"],
+            turbo: ["🚀 터보! 초가속", "🚀"],
             boost: ["⚡ 부스트!", "⚡"],
-            rocket: ["🎆 폭죽 로켓 발사! 보스에게 피해", "🚀"],
-            slow: ["🐢 꽝... 슬로우에 걸렸어요", "🐢"],
-            ink: ["🖤 먹물! 시야가 가려졌어요", "🖤"],
-            meteor: ["☄️ 운석/폭탄! 잠시 멈춰요", "💫"],
+            magnet: ["🧲 자석 가속!", "🧲"],
+            star: ["⭐ 스타! 5초 무적 + 가속", "⭐"],
+            shield: ["🛡️ 쉴드! 5초간 탄막 무효", "🛡️"],
+            rocket: ["🎆 폭죽 로켓! 보스에게 피해", "🚀"],
+            bomb: ["💣 폭탄 던지기!", "💣"],
+            banana: ["🍌 바나나 껍질을 뿌렸다!", "🍌"],
+            lightning: ["⚡ 번개에 감전! 잠깐 멈춤", "⚡"],
+            slow: ["🐢 꽝... 슬로우", "🐢"],
+            mini: ["🐁 미니! 작아지고 느려짐", "🐁"],
+            ink: ["🖤 먹물! 시야 가림", "🖤"],
+            meteor: ["☄️ 운석/폭탄! 잠시 멈춤", "💫"],
             oil: ["🛢️ 기름에 미끄러졌다!", "💫"],
           };
-          const [text, emoji] = meta[kind];
-          addToast(text);
+          const [text, emoji] = meta[kind] ?? ["🎁 아이템!", "🎁"];
+          addRaceToast(text);
           sendEmote("emoji", emoji);
         },
         onAreaBlocked: (area, reason) => {
@@ -1208,24 +1245,23 @@ export default function GameClient({
       setSecretCode("");
       return;
     }
-    if (!profile) {
-      setWallet((w) => ({ ...w, hearts: w.hearts + 10000, coins: w.coins + 10000 }));
-      setSecretOpen(false);
-      setSecretArmed(false);
-      setSecretCode("");
-      addToast("완료");
-      return;
-    }
-    const res = await redeemSecretWallet(code);
-    if ("error" in res) {
-      setSecretCode("");
-      return;
-    }
-    setWallet((w) => ({ ...w, hearts: res.hearts, coins: res.coins }));
+    // 로컬 즉시 충전(게스트/로그인 공통) — 캐시에 저장되어 방 이동에도 유지된다.
+    setWallet((w) => ({ ...w, hearts: w.hearts + 10000, coins: w.coins + 10000 }));
     setSecretOpen(false);
     setSecretArmed(false);
     setSecretCode("");
-    addToast("완료");
+    addToast("💗🪙 +10000 충전 완료!");
+    if (profile) {
+      // 서버에도 반영 (실패해도 로컬 하트는 유지)
+      const res = await redeemSecretWallet(code);
+      if (!("error" in res)) {
+        setWallet((w) => ({
+          ...w,
+          hearts: Math.max(w.hearts, res.hearts),
+          coins: Math.max(w.coins, res.coins),
+        }));
+      }
+    }
   }
 
   function startBalloonTour() {
@@ -1365,7 +1401,7 @@ export default function GameClient({
       const now = Date.now();
       let b = bossRef.current;
       if (!b || (!b.alive && now > bossRespawnRef.current)) {
-        const maxHp = 15;
+        const maxHp = 24; // 다같이 공략하는 팀 레이드 — 로켓 명중 1회당 1 피해
         b = { x: size.w / 2, y: size.h / 2, hp: maxHp, maxHp, kind, alive: true };
         bossRef.current = b;
       }
@@ -1879,13 +1915,12 @@ export default function GameClient({
   function awardHearts(amount: number, label = "보상") {
     const gain = Math.max(0, Math.min(30, Math.floor(amount)));
     if (gain <= 0) return;
+    // 낙관적 증가 — 로컬 캐시에 즉시 반영되어 방 이동에도 유지된다.
     setWallet((w) => ({ ...w, hearts: w.hearts + gain }));
     if (profile) {
       grantHearts(gain).then((res) => {
-        if ("error" in res) {
-          addToast(`❌ ${label} 저장 실패: ${res.error}`);
-          return;
-        }
+        // 서버 저장이 실패해도 로컬 하트는 유지 (경고 로그를 띄우지 않는다).
+        if ("error" in res) return;
         setWallet((w) => ({ ...w, hearts: Math.max(w.hearts, res.hearts) }));
       });
     }
@@ -2321,6 +2356,12 @@ export default function GameClient({
             i
           </HudIconButton>
           <HudIconButton
+            onClick={() => setModal({ kind: "help" })}
+            title="조작법 / 설정 도움말"
+          >
+            ?
+          </HudIconButton>
+          <HudIconButton
             onClick={() => {
               navigator.clipboard.writeText(`${window.location.origin}/s/${space.slug}`);
               addToast("🔗 스페이스 초대 링크를 복사했어요");
@@ -2528,38 +2569,47 @@ export default function GameClient({
         </div>
       )}
 
-      {/* ---------- 조작 안내 ---------- */}
-      <div className="pointer-events-none absolute bottom-20 left-3 z-10 rounded-lg bg-panel/70 px-3 py-2 text-[11px] leading-relaxed text-slate-400 backdrop-blur">
-        <div>
-          WASD/방향키 이동 · 더블클릭 자동 이동 · X 상호작용
-          {hintObj ? ` (${hintObj.name ?? OBJECT_DEFS[hintObj.type]?.label ?? "오브젝트"})` : ""}
-          {!hintObj && nearWater ? <span className="text-cyan-300"> · 🎣 X로 낚시</span> : ""}
+      {/* ---------- 상황별 상호작용 힌트 (조작 전체 설명은 ? 버튼/설정에서) ---------- */}
+      {(hintObj || nearWater) && (
+        <div className="pointer-events-none absolute bottom-20 left-3 z-10 rounded-lg bg-panel/70 px-3 py-2 text-[11px] leading-relaxed text-slate-300 backdrop-blur">
+          {hintObj ? (
+            <span>
+              X — {hintObj.name ?? OBJECT_DEFS[hintObj.type]?.label ?? "오브젝트"}
+            </span>
+          ) : (
+            <span className="text-cyan-300">🎣 X로 낚시</span>
+          )}
         </div>
-        <div>1~0 이모지 · Z 춤 · X 의자 앉기 · F {liveMap.vehicle === "kart" ? "카트" : "오토바이"} · G 고스트 · M 미니맵</div>
-      </div>
+      )}
 
       {/* ---------- 레이스 HUD (그랑프리) ---------- */}
       {identity && <RaceHud state={raceState} leaderboard={leaderboard} selfId={identity.id} />}
 
       {/* ---------- 보스 레이드 배너 ---------- */}
       {bossHud?.alive && (
-        <div className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-2xl border border-red-500/50 bg-panel/95 px-4 py-2 text-center shadow-xl backdrop-blur">
+        <div
+          className={`pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-2xl border bg-panel/95 px-4 py-2 text-center shadow-xl backdrop-blur ${
+            bossHud.hp <= 1 ? "border-red-500 animate-pulse" : "border-red-500/50"
+          }`}
+        >
           <div className="text-sm font-bold text-red-300">
-            {bossHud.hp / bossHud.maxHp <= 0.5 ? "STAGE 2 · " : ""}
+            {bossHud.hp <= 1 ? "⚠ FINAL RAGE · " : bossHud.hp / bossHud.maxHp <= 0.5 ? "STAGE 2 · " : ""}
             {bossHud.kind === "kraken" ? "🦑 크라켄" : bossHud.kind === "chicken" ? "🐔 알 쏘는 치킨" : "🦔 고슴도치"} 보스 레이드!
           </div>
           <div className="mx-auto mt-1 h-2.5 w-56 overflow-hidden rounded-full bg-black/50">
             <div className="h-full bg-red-500" style={{ width: `${Math.max(0, (bossHud.hp / bossHud.maxHp) * 100)}%` }} />
           </div>
           <div className="mt-1 text-xs text-slate-300">
-            1초 차지 화살로 탄막 요격 · 아이템 로켓 15회 명중으로 처치
+            다같이 공략! 1초 차지 화살로 탄막 요격 · 아이템 로켓으로 처치 · 🛡️쉴드/⭐스타로 생존
           </div>
           <div className="mt-0.5 text-[11px] text-slate-400">
-            {bossHud.kind === "kraken"
-              ? "패턴: 파도 탄막 / 2스테이지 자녀·에너지볼·레이저·먹물"
-              : bossHud.kind === "chicken"
-                ? "패턴: 알 탄막 / 2스테이지 자녀·에너지볼·레이저"
-                : "패턴: 사방 가시 / 2스테이지 자녀·에너지볼·레이저·용암"}
+            {bossHud.hp <= 1
+              ? "최종 각성! 십자 레이저 + 초대형 링 탄막 — 다같이 마무리하세요!"
+              : bossHud.kind === "kraken"
+                ? "패턴: 파도 탄막 · 2스테이지 문어발(화살 10발로 탈출)·에너지볼·레이저·먹물"
+                : bossHud.kind === "chicken"
+                  ? "패턴: 알 탄막 / 2스테이지 자녀·에너지볼·레이저"
+                  : "패턴: 사방 가시 · 회전 가시구체 / 2스테이지 자녀·레이저·용암"}
           </div>
         </div>
       )}
@@ -2790,6 +2840,44 @@ export default function GameClient({
         }}
         onDismiss={(id) => setToasts((ts) => ts.filter((x) => x.id !== id))}
       />
+      {/* 레이싱 알림 — 우측 하단 스택 */}
+      <RaceToastStack toasts={raceToasts} />
+
+      {/* ---------- 조작법 / 설정 도움말 ---------- */}
+      {modal?.kind === "help" && (
+        <Modal title="조작법 · 도움말" onClose={() => setModal(null)}>
+          <div className="space-y-4 text-sm text-slate-200">
+            <section>
+              <h4 className="mb-2 font-semibold text-white">🎮 기본 조작</h4>
+              <ul className="space-y-1 text-slate-300">
+                <li><b className="text-white">WASD / 방향키</b> — 이동</li>
+                <li><b className="text-white">더블클릭</b> — 클릭한 곳으로 자동 이동</li>
+                <li><b className="text-white">X</b> — 상호작용(오브젝트/의자 앉기/낚시)</li>
+                <li><b className="text-white">1~0</b> — 이모지 표현</li>
+                <li><b className="text-white">Z</b> — 춤 · <b className="text-white">G</b> — 고스트 모드 · <b className="text-white">M</b> — 미니맵</li>
+                <li><b className="text-white">F</b> — {liveMap.vehicle === "boat" ? "보트" : liveMap.vehicle === "plane" ? "비행기" : liveMap.vehicle === "kart" ? "카트" : "오토바이"} 탑승/하차</li>
+              </ul>
+            </section>
+            <section>
+              <h4 className="mb-2 font-semibold text-white">🏁 레이싱 · 보스전</h4>
+              <ul className="space-y-1 text-slate-300">
+                <li>노란 패드에서 <b className="text-white">F</b>로 탑승 후 결승선 통과 → 랩 시작</li>
+                <li><b className="text-white">🎁 아이템 박스</b> — 터보·부스트·스타·쉴드·폭탄·바나나 등 랜덤</li>
+                <li><b className="text-white">스페이스/클릭</b> — 보스전에서 차지 화살 발사(탄막 요격)</li>
+                <li><b className="text-white">🛥️ 바다 서킷</b> — 물 위에서는 보트 없이 걸으면 70% 느려져요</li>
+                <li><b className="text-white">🐙 문어발</b>에 잡히면 화살을 빠르게 10발 쏴 탈출!</li>
+              </ul>
+            </section>
+            <section>
+              <h4 className="mb-2 font-semibold text-white">💗 하트</h4>
+              <ul className="space-y-1 text-slate-300">
+                <li>친구와 <b className="text-white">닿으면</b> 하트가 충전돼요 (같은 상대 15초 쿨타임)</li>
+                <li>하트는 방을 이동해도 유지됩니다.</li>
+              </ul>
+            </section>
+          </div>
+        </Modal>
+      )}
 
       {/* ---------- 모달 ---------- */}
       {modal?.kind === "object" && <ObjectModal obj={modal.obj} onClose={() => setModal(null)} />}

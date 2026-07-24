@@ -104,6 +104,7 @@ export interface PlayerCosmetics {
   mount?: string;
   kart?: string;
   dance?: string;
+  arrow?: string; // 보스전 화살 디자인 (상점 구매)
 }
 
 // 이모지 / 채팅 브로드캐스트 메시지 (머리 위 말풍선).

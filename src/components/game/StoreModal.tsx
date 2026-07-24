@@ -29,6 +29,7 @@ const CATEGORY_ICON: Record<ShopCategory, string> = {
   댄스: "♫",
   감정표현: "☺",
   카트: "▰",
+  화살: "➶",
   소모품: "♪",
 };
 
