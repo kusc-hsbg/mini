@@ -1,7 +1,7 @@
 // 스페이스 로드 + 접근 제어 (서버 전용).
 import { cookies } from "next/headers";
 import { getSupabaseServer } from "./supabase/server";
-import { MAP_LIST } from "./game/maps";
+import { MAP_LIST, isActivePresetKey } from "./game/maps";
 import type { RoomRecord, SpaceRecord, SpaceRole } from "./game/types";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -19,6 +19,7 @@ function dedupeRooms(rooms: RoomRecord[]): RoomRecord[] {
   const result: RoomRecord[] = [];
 
   for (const room of rooms) {
+    if (!isActivePresetKey(room.template_key)) continue;
     const previous = byTemplate.get(room.template_key);
     if (!previous) {
       byTemplate.set(room.template_key, room);
@@ -86,7 +87,7 @@ export async function loadSpace(
   }
 
   // 누락된 프리셋 맵을 방으로 자동 생성 (관리자/오너 접속 시) —
-  // 오래된 스페이스에도 신규 맵(카페/아레나/테마서킷 등)이 항상 존재하도록 보정.
+  // 오래된 스페이스에도 신규 맵(카페/테마서킷 등)이 항상 존재하도록 보정.
   const isAdmin = space.owner_id === userId || role === "admin" || role === "mapmaker";
   if (isAdmin && userId) {
     const existing = new Set(rooms.map((r) => r.template_key));

@@ -17,7 +17,7 @@ import {
   objectInteraction,
   resolveMap,
 } from "@/lib/game/maps";
-import { EMOJIS, PROXIMITY_TILES, STATUS_META, TILE, headImgUrl, normalizeSpecial } from "@/lib/game/constants";
+import { DEFAULT_HEAD_STYLE, EMOJIS, PROXIMITY_TILES, STATUS_META, TILE, headImgUrl, normalizeSpecial, resolveHeadImgKey } from "@/lib/game/constants";
 import { OBJECT_DEFS } from "@/lib/game/objects";
 import { playPianoNote } from "@/lib/game/audio";
 import { filterProfanity } from "@/lib/game/moderation";
@@ -25,15 +25,13 @@ import { useRoomChannel } from "@/hooks/useRoomChannel";
 import { useControlChannel, type ControlChannel } from "@/hooks/useControlChannel";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { logEvent } from "@/lib/analytics";
-import { addKill, banTarget, blockTarget, buyItem, buyWeapon, claimAttendance, claimQuest, equipItem, grantHearts, incrementRaceWin, redeemSecretWallet, saveBio as saveBioAction, sendDm, sendFriendRequest, setRoomClosed as setRoomClosedAction, setStatus as setStatusAction, spendHearts, unblockTarget } from "@/app/actions";
+import { banTarget, blockTarget, buyItem, claimAttendance, claimQuest, equipItem, grantHearts, incrementRaceWin, redeemSecretWallet, saveBio as saveBioAction, sendDm, sendFriendRequest, setRoomClosed as setRoomClosedAction, setStatus as setStatusAction, spendHearts, unblockTarget } from "@/app/actions";
 import StoreModal, { type WalletState } from "./StoreModal";
 import FriendsPanel from "./FriendsPanel";
 import MiniGamesModal from "./MiniGamesModal";
 import BankModal from "./BankModal";
-import PkHud from "./PkHud";
 import AuctionModal from "./AuctionModal";
 import { SHOP_MAP } from "@/lib/game/shop";
-import { KILL_TITLES, WEAPON_MAP } from "@/lib/game/weapons";
 import type { PlayerCosmetics } from "@/lib/game/types";
 import type { GuidedMoveTarget, RoomJob, RtEventName, RtEvents, WbOp } from "@/lib/realtime/protocol";
 import type {
@@ -139,6 +137,7 @@ function resolveGuestIdentity(): Identity {
     glasses: "none",
     face: "smile",
     special: "none",
+    headImg: DEFAULT_HEAD_STYLE,
   };
   let name = "게스트-" + id.slice(-4);
   let guestBio = "";
@@ -160,7 +159,7 @@ function resolveGuestIdentity(): Identity {
         glasses: g.glasses ?? "none",
         face: (g.face as FaceType) ?? "smile",
         special: normalizeSpecial(g.special),
-        headImg: typeof g.headImg === "string" ? g.headImg : "none",
+        headImg: resolveHeadImgKey(typeof g.headImg === "string" ? g.headImg : DEFAULT_HEAD_STYLE),
         nameAbove: !!g.nameAbove,
       };
       if (g.name) name = g.name;
@@ -249,7 +248,7 @@ export default function GameClient({
           glasses: (profile.glasses as CharacterAppearance["glasses"]) ?? "none",
           face: profile.face as FaceType,
           special: normalizeSpecial(profile.special),
-          headImg: profile.head_img ?? "none",
+          headImg: resolveHeadImgKey(profile.head_img),
           nameAbove: !!profile.name_above,
         },
       });
@@ -304,7 +303,6 @@ export default function GameClient({
   const [raceState, setRaceState] = useState<RaceState | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderEntry[]>([]);
   const [touchedId, setTouchedId] = useState<string | null>(null);
-  const [pkState, setPkState] = useState<{ hp: number; dead: boolean; weapon: string; kills: number } | null>(null);
   const [myBio, setMyBio] = useState("");
   // 지갑 로컬 캐시 키 — 로그인 유저도 유저별로 캐시해 방 이동 시 하트가 사라지지 않게 한다.
   const walletKey = profile ? `affinity:wallet:${profile.id}` : GUEST_WALLET_KEY;
@@ -369,7 +367,7 @@ export default function GameClient({
     if (summonedMount) cos.mount = summonedMount;
     return cos;
   }, [wallet.equipped, summonedMount]);
-  const [stats, setStats] = useState({ raceWins: profile?.race_wins ?? 0, kills: profile?.kills ?? 0 });
+  const [stats, setStats] = useState({ raceWins: profile?.race_wins ?? 0 });
   const [roomClosed, setRoomClosedState] = useState(!!room.closed);
   const [pianoPlaced, setPianoPlaced] = useState(false);
   const [secretOpen, setSecretOpen] = useState(false);
@@ -1089,21 +1087,13 @@ export default function GameClient({
         onDeath: (killerName) =>
           addToast(
             liveMap.race
-              ? "💀 미사일 3회 피격 — 경기장 감옥으로 이동했습니다"
+              ? "⚠️ 장애물 3회 피격 — 경기장 감옥으로 이동했습니다"
               : killerName
-                ? `💀 ${killerName}님에게 당했습니다! 곧 부활합니다`
-                : "💀 사망! 곧 부활합니다"
+                ? `✨ ${killerName}님과의 챌린지에서 잠시 쉬어갑니다`
+                : "✨ 잠시 쉬어갑니다"
           ),
         onKill: (victimName) => {
-          addToast(`🎯 ${victimName}님을 처치했습니다!`);
-          if (profile) {
-            addKill().then((res) => {
-              if (!("error" in res)) {
-                setStats((s) => ({ ...s, kills: res.kills }));
-                if (res.newTitle) addToast(`🏅 새 칭호 획득: ${res.newTitle}!`);
-              }
-            });
-          }
+          addToast(`🎯 ${victimName}님과의 챌린지를 완료했습니다!`);
         },
         onRespawn: () => addToast("✨ 부활했습니다!"),
         onBossHit: (amount) => {
@@ -1418,20 +1408,6 @@ export default function GameClient({
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveMap, identity, isHost, multiplayer]);
-
-  // ----- PK HUD 폴링 (아레나에서만) -----
-  useEffect(() => {
-    if (!liveMap.pk) {
-      setPkState(null);
-      return;
-    }
-    const t = setInterval(() => {
-      const e = engineRef.current;
-      if (!e) return;
-      setPkState({ hp: e.getSelfHp(), dead: e.isDead(), weapon: e.getWeapon(), kills: e.getSelf().kills ?? 0 });
-    }, 120);
-    return () => clearInterval(t);
-  }, [liveMap, engineReady]);
 
   // ----- 근접 대화 시간 측정 (인사이트 conv_seconds) -----
   useEffect(() => {
@@ -2292,7 +2268,7 @@ export default function GameClient({
           {profile && (
             <HudIconButton
               onClick={() => setModal({ kind: "collection" })}
-              title="도감 — 우승/킬/칭호"
+              title="도감 — 우승/칭호"
             >
               ★
             </HudIconButton>
@@ -2612,53 +2588,6 @@ export default function GameClient({
                   : "패턴: 사방 가시 · 회전 가시구체 / 2스테이지 자녀·레이저·용암"}
           </div>
         </div>
-      )}
-
-      {/* ---------- PK HUD (배틀 아레나) ---------- */}
-      {liveMap.pk && identity && pkState && (
-        <PkHud
-          hp={pkState.hp}
-          dead={pkState.dead}
-          weapon={pkState.weapon}
-          selfKills={pkState.kills}
-          inventory={wallet.inventory}
-          hearts={wallet.hearts}
-          coins={wallet.coins}
-          players={players}
-          selfId={identity.id}
-          onSetWeapon={(k) => {
-            engineRef.current?.setWeapon(k);
-            setPkState((p) => (p ? { ...p, weapon: k } : p));
-          }}
-          onBuyWeapon={(k) => {
-            const wp = WEAPON_MAP[k];
-            if (!wp) return;
-            const invKey = `weapon-${k}`;
-            if (wallet.inventory.includes(invKey)) return;
-            const bal = wp.currency === "heart" ? wallet.hearts : wallet.coins;
-            if (bal < wp.price) {
-              addToast(wp.currency === "heart" ? "❌ 하트가 부족합니다." : "❌ 코인이 부족합니다.");
-              return;
-            }
-            if (profile) {
-              buyWeapon(k).then((res) => {
-                if ("error" in res) addToast("❌ " + res.error);
-                else {
-                  setWallet((w) => ({ ...w, hearts: res.hearts, coins: res.coins, inventory: res.inventory }));
-                  addToast("🔫 무기를 구매했어요!");
-                }
-              });
-            } else {
-              setWallet((w) => ({
-                ...w,
-                hearts: wp.currency === "heart" ? w.hearts - wp.price : w.hearts,
-                coins: wp.currency === "coin" ? w.coins - wp.price : w.coins,
-                inventory: [...w.inventory, invKey],
-              }));
-              addToast("🔫 무기를 구매했어요!");
-            }
-          }}
-        />
       )}
 
       {/* ---------- 하단 툴바 ---------- */}
@@ -2999,7 +2928,6 @@ export default function GameClient({
       {modal?.kind === "collection" && (
         <CollectionModal
           raceWins={stats.raceWins}
-          kills={stats.kills}
           titles={profile?.titles ?? []}
           inventoryCount={wallet.inventory.length}
           onClose={() => setModal(null)}
@@ -3232,20 +3160,21 @@ function QuizModal({
   );
 }
 
-// ---------- 도감 (우승/킬/칭호) ----------
+// ---------- 도감 (우승/칭호) ----------
 const TITLE_LABELS: Record<string, string> = {
   tutorial: "🌱 새싹 모험가",
-  ...Object.fromEntries(KILL_TITLES.map((t) => [t.title, "🎖️ " + t.label])),
+  "rookie-killer": "🎖️ 챌린지 참가자",
+  sharpshooter: "🎖️ 집중력 장인",
+  killer: "🎖️ 도전왕",
+  warlord: "🎖️ 레전드 모험가",
 };
 function CollectionModal({
   raceWins,
-  kills,
   titles,
   inventoryCount,
   onClose,
 }: {
   raceWins: number;
-  kills: number;
   titles: string[];
   inventoryCount: number;
   onClose: () => void;
@@ -3253,10 +3182,9 @@ function CollectionModal({
   return (
     <Modal title="📖 도감" onClose={onClose}>
       <div className="space-y-3">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {[
             ["🥇", "레이스 우승", raceWins],
-            ["🎯", "누적 킬", kills],
             ["🎒", "보유 아이템", inventoryCount],
           ].map(([icon, label, val]) => (
             <div key={label as string} className="rounded-xl bg-panel2 p-3 text-center">
@@ -3270,7 +3198,7 @@ function CollectionModal({
           <div className="mb-1 text-sm text-slate-300">획득 칭호</div>
           {titles.length === 0 ? (
             <p className="rounded-xl bg-panel2/60 p-3 text-sm text-slate-500">
-              아직 칭호가 없어요. 레이스 우승, PK 킬, 튜토리얼로 칭호를 모아보세요!
+              아직 칭호가 없어요. 레이스 우승과 튜토리얼로 칭호를 모아보세요!
             </p>
           ) : (
             <div className="flex flex-wrap gap-2">
@@ -3373,7 +3301,7 @@ function RoomThumb({ templateKey }: { templateKey: string }) {
       }
     }
   }, [templateKey]);
-  return <canvas ref={ref} className="h-full w-full [image-rendering:pixelated]" />;
+  return <canvas ref={ref} className="h-full w-full" />;
 }
 
 function WarpModal({

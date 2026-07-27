@@ -105,7 +105,7 @@ body {
 }
 
 canvas {
-  image-rendering: pixelated;
+  image-rendering: auto;
 }
 
 /* 레이싱 우측 하단 알림 — 아래에서 위로 올라오는 애니메이션 */

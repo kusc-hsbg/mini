@@ -28,7 +28,7 @@ export default async function Landing({
       <section className="relative z-10 flex flex-col items-center text-center">
         <div className="fade-up mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs tracking-wide text-slate-300 backdrop-blur">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent2" />
-          실시간 메타버스 · 레이싱 · PK · 소셜
+          실시간 메타버스 · 레이싱 · 모험 · 소셜
         </div>
 
         <h1
@@ -39,8 +39,8 @@ export default async function Landing({
         </h1>
 
         <p className="fade-up mx-auto mt-6 max-w-2xl text-lg text-slate-300/90 sm:text-xl" style={{ animationDelay: "0.15s" }}>
-          아바타로 만나 서로에게 <span className="text-white">닿고(Affinity)</span>, 함께 달리고, 꾸미고, 겨루는
-          <br className="hidden sm:block" /> 세련된 실시간 가상 세계.
+          아바타로 만나 서로에게 <span className="text-white">닿고(Affinity)</span>, 함께 달리고, 꾸미고, 탐험하는
+          <br className="hidden sm:block" /> 사랑스럽고 모험적인 실시간 가상 세계.
         </p>
 
         <div className="fade-up mt-9 flex flex-wrap items-center justify-center gap-3" style={{ animationDelay: "0.25s" }}>
@@ -94,12 +94,12 @@ const FEATURES = [
   {
     icon: "🏁",
     title: "테마 레이싱 & 보스 레이드",
-    desc: "지상·바다 요트·하늘 비행기 서킷. 부스트·로켓·먹물 아이템, 3랩 타임어택, 크라켄·치킨 보스 협동전.",
+    desc: "지상·바다 요트·하늘 비행기 서킷. 부스트·별·먹물 아이템, 3랩 타임어택, 크라켄·치킨 보스 협동전.",
   },
   {
-    icon: "🔫",
-    title: "배틀 아레나 (PK)",
-    desc: "무기 9종 상점, 실시간 총격·폭발·연막, 부활과 킬 칭호(킬러). 엄폐물 뒤 교전.",
+    icon: "⭐",
+    title: "스타홀 모험 갤러리",
+    desc: "그림책 장면과 캐릭터가 있는 따뜻한 전시 공간. 도슨트, 투어 열기구, 작품 설명을 함께 둘러보세요.",
   },
   {
     icon: "🛍️",

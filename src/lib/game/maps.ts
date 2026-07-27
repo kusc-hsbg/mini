@@ -154,7 +154,7 @@ export interface MapData {
   labels: MapLabel[];
   vehicle?: "bike" | "kart" | "boat" | "plane"; // B 타일 탑승 시 탈것 종류 (기본 bike)
   race?: RaceConfig;
-  pk?: boolean; // PK(전투) 존 — 무기/HP/사망 활성화
+  pk?: boolean; // 레거시 전투 플래그. 현재 프리셋에서는 활성화하지 않는다.
 }
 
 // ---------- 조회 헬퍼 ----------
@@ -299,6 +299,11 @@ export function spawnPoint(map: MapData, index = 0): TilePoint {
 import { PRESET_MAPS } from "./presets";
 
 export const MAP_LIST = Object.values(PRESET_MAPS);
+const MAP_KEY_SET = new Set(MAP_LIST.map((m) => m.key));
+
+export function isActivePresetKey(key: string | null | undefined): boolean {
+  return !!key && MAP_KEY_SET.has(key);
+}
 
 export function getPreset(key: string | null | undefined): MapData {
   return (key && PRESET_MAPS[key]) || PRESET_MAPS.plaza;
@@ -306,6 +311,7 @@ export function getPreset(key: string | null | undefined): MapData {
 
 // 방 레코드의 map_data(에디터 수정본)가 있으면 그것을, 없으면 템플릿을 사용.
 export function resolveMap(templateKey: string, mapData: unknown | null): MapData {
+  if (!isActivePresetKey(templateKey)) return PRESET_MAPS.plaza;
   if (mapData && typeof mapData === "object" && (mapData as MapData).tiles) {
     const m = mapData as MapData;
     // 누락 필드 보정
@@ -322,7 +328,7 @@ export function resolveMap(templateKey: string, mapData: unknown | null): MapDat
       labels: m.labels ?? [],
       vehicle: m.vehicle,
       race: m.race,
-      pk: m.pk,
+      pk: false,
     };
   }
   return getPreset(templateKey);

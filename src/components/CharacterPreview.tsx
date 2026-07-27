@@ -29,17 +29,16 @@ export default function CharacterPreview({
     const render = (t: number) => {
       if (!mounted) return;
       ctx.clearRect(0, 0, size, size);
-      ctx.fillStyle = "#141b2e";
+      const sky = ctx.createLinearGradient(0, 0, 0, size);
+      sky.addColorStop(0, "#dff7ff");
+      sky.addColorStop(0.62, "#f8fbff");
+      sky.addColorStop(1, "#d8f3d2");
+      ctx.fillStyle = sky;
       ctx.fillRect(0, 0, size, size);
-      ctx.strokeStyle = "rgba(255,255,255,0.04)";
-      for (let i = 0; i <= size; i += 20) {
-        ctx.beginPath();
-        ctx.moveTo(i, 0);
-        ctx.lineTo(i, size);
-        ctx.moveTo(0, i);
-        ctx.lineTo(size, i);
-        ctx.stroke();
-      }
+      ctx.fillStyle = "rgba(90, 190, 128, 0.20)";
+      ctx.beginPath();
+      ctx.ellipse(size / 2, size - 28, size * 0.38, 18, 0, 0, Math.PI * 2);
+      ctx.fill();
       // 걷기 미리보기
       drawCharacter(
         ctx,

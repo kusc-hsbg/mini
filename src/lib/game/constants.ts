@@ -103,8 +103,15 @@ export const HEAD_STYLES: { key: string; label: string }[] = [
   { key: "g-hana", label: "하나" },
 ];
 
+export const DEFAULT_HEAD_STYLE = "g-hana";
+
+export function resolveHeadImgKey(key: string | null | undefined): string {
+  const v = key && key !== "none" ? key : DEFAULT_HEAD_STYLE;
+  return HEAD_STYLES.some((h) => h.key === v) ? v : DEFAULT_HEAD_STYLE;
+}
+
 export function headImgUrl(key: string): string {
-  return `/avatars/heads/${key}.png`;
+  return `/avatars/heads/${resolveHeadImgKey(key)}.png`;
 }
 
 export const SHOES_COLORS = [

@@ -2,7 +2,7 @@
 import type { CharacterAppearance, Direction, PlayerCosmetics, UserStatus } from "./types";
 import { TILE_INFO, type MapObject } from "./maps";
 import { OBJECT_DEFS } from "./objects";
-import { STATUS_META, TILE, headImgUrl } from "./constants";
+import { STATUS_META, TILE, headImgUrl, resolveHeadImgKey } from "./constants";
 import { SHOP_MAP } from "./shop";
 
 // ---------- 유틸 ----------
@@ -52,6 +52,25 @@ function roundRect(
   ctx.arcTo(x, y + h, x, y, r);
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
+}
+
+function softRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+  color: string,
+  highlight = true
+) {
+  ctx.fillStyle = color;
+  roundRect(ctx, x, y, w, h, r);
+  ctx.fill();
+  if (!highlight || w < 3 || h < 3) return;
+  ctx.fillStyle = "rgba(255,255,255,0.16)";
+  roundRect(ctx, x + Math.max(1, w * 0.12), y + Math.max(1, h * 0.08), Math.max(1.5, w * 0.34), Math.max(1.5, h * 0.54), Math.max(1, r * 0.6));
+  ctx.fill();
 }
 
 // 커스텀 오브젝트 이미지 캐시
@@ -2241,9 +2260,9 @@ export function drawCharacter(
   const robot = special === "robot";
 
   // 그림자
-  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.fillStyle = "rgba(47,40,86,0.18)";
   ctx.beginPath();
-  ctx.ellipse(cx, cy, onBike ? 18 : 9, 4, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy, onBike ? 20 : 11, onBike ? 5 : 4.5, 0, 0, Math.PI * 2);
   ctx.fill();
 
   // 고스트 모드 — 캐릭터 몸체를 반투명하게 (이름표는 이후 100%로 복원)
@@ -2272,6 +2291,7 @@ export function drawCharacter(
 
   ctx.save();
   ctx.translate(Math.round(cx), Math.round(cy + bob * u - (onBike ? 8 : 0)));
+  ctx.imageSmoothingEnabled = true;
   if (lying) {
     // 침대에 누운 자세 — 몸 전체를 눕힘
     ctx.rotate(-1.35);
@@ -2329,25 +2349,23 @@ export function drawCharacter(
     const lA = sitting ? 0 : moving ? legLift[step] : dancing ? danceBeat * 2 : 0;
     const lB = sitting ? 0 : moving ? legLift[(step + 2) % 4] : dancing ? (1 - danceBeat) * 2 : 0;
     const legH = sitting ? 3 * u : 6 * u;
-    ctx.fillStyle = pants;
     if (dir === "left" || dir === "right") {
-      ctx.fillRect(-3 * u + side * u, -legH - lA, 3 * u, legH);
-      ctx.fillRect(0 * u + side * u, -legH - lB, 3 * u, legH);
+      softRect(ctx, -3 * u + side * u, -legH - lA, 3 * u, legH, 2.5, pants);
+      softRect(ctx, 0 * u + side * u, -legH - lB, 3 * u, legH, 2.5, pants);
       if (sitting) {
         // 옆모습: 허벅지가 앞으로 나온다
-        ctx.fillRect(side * 2 * u, -legH, 3 * u, 1.6 * u);
+        softRect(ctx, side * 2 * u, -legH, 3 * u, 1.6 * u, 2, pants, false);
       }
     } else {
-      ctx.fillRect(-4 * u, -legH - lA, 3.5 * u, legH + lA);
-      ctx.fillRect(0.5 * u, -legH - lB, 3.5 * u, legH + lB);
+      softRect(ctx, -4 * u, -legH - lA, 3.5 * u, legH + lA, 2.5, pants);
+      softRect(ctx, 0.5 * u, -legH - lB, 3.5 * u, legH + lB, 2.5, pants);
     }
-    ctx.fillStyle = shoesC;
     if (dir === "left" || dir === "right") {
-      ctx.fillRect(-3 * u + side * u, -1.5 * u - lA, 3.5 * u, 1.5 * u);
-      ctx.fillRect(0 * u + side * u, -1.5 * u - lB, 3.5 * u, 1.5 * u);
+      softRect(ctx, -3 * u + side * u, -1.5 * u - lA, 3.8 * u, 1.7 * u, 2, shoesC, false);
+      softRect(ctx, 0 * u + side * u, -1.5 * u - lB, 3.8 * u, 1.7 * u, 2, shoesC, false);
     } else {
-      ctx.fillRect(-4 * u, -1.5 * u - lA, 3.5 * u, 1.5 * u);
-      ctx.fillRect(0.5 * u, -1.5 * u - lB, 3.5 * u, 1.5 * u);
+      softRect(ctx, -4 * u, -1.5 * u - lA, 3.8 * u, 1.7 * u, 2, shoesC, false);
+      softRect(ctx, 0.5 * u, -1.5 * u - lB, 3.8 * u, 1.7 * u, 2, shoesC, false);
     }
   }
 
@@ -2368,37 +2386,32 @@ export function drawCharacter(
   // ----- 팔 (스윙/춤/손들기) -----
   const armSwing = moving ? (step === 1 ? 2 : step === 3 ? -2 : 0) : 0;
   const armC = app.topStyle === "suit" && !robot ? darken("#2b3040", 0.05) : darken(top, 0.1);
-  ctx.fillStyle = armC;
   const handRaised = extras?.hand;
   if (dancing && dir !== "left" && dir !== "right") {
     // 춤: 양팔 번갈아 번쩍
     const upL = danceBeat === 0;
     if (upL) {
-      ctx.fillRect(-7 * u, bodyTop - 5 * u, 2.5 * u, 7 * u);
-      ctx.fillRect(4.5 * u, bodyTop + u, 2.5 * u, 6 * u);
+      softRect(ctx, -7 * u, bodyTop - 5 * u, 2.7 * u, 7 * u, 3, armC);
+      softRect(ctx, 4.5 * u, bodyTop + u, 2.7 * u, 6 * u, 3, armC);
     } else {
-      ctx.fillRect(-7 * u, bodyTop + u, 2.5 * u, 6 * u);
-      ctx.fillRect(4.5 * u, bodyTop - 5 * u, 2.5 * u, 7 * u);
+      softRect(ctx, -7 * u, bodyTop + u, 2.7 * u, 6 * u, 3, armC);
+      softRect(ctx, 4.5 * u, bodyTop - 5 * u, 2.7 * u, 7 * u, 3, armC);
     }
-    ctx.fillStyle = skin;
-    if (upL) ctx.fillRect(-7 * u, bodyTop - 7 * u, 2.5 * u, 2.5 * u);
-    else ctx.fillRect(4.5 * u, bodyTop - 7 * u, 2.5 * u, 2.5 * u);
+    if (upL) softRect(ctx, -7 * u, bodyTop - 7 * u, 2.7 * u, 2.7 * u, 3, skin);
+    else softRect(ctx, 4.5 * u, bodyTop - 7 * u, 2.7 * u, 2.7 * u, 3, skin);
   } else if (dir === "left" || dir === "right") {
-    ctx.fillRect(side * 4 * u - u, bodyTop + 1.5 * u + armSwing, 2.5 * u, 6 * u);
-    ctx.fillStyle = skin;
-    ctx.fillRect(side * 4 * u - u, bodyTop + 7 * u + armSwing, 2.5 * u, 2 * u);
+    softRect(ctx, side * 4 * u - u, bodyTop + 1.5 * u + armSwing, 2.7 * u, 6 * u, 3, armC);
+    softRect(ctx, side * 4 * u - u, bodyTop + 7 * u + armSwing, 2.7 * u, 2.3 * u, 3, skin);
   } else {
-    ctx.fillRect(-7 * u, bodyTop + u + armSwing, 2.5 * u, 6 * u);
+    softRect(ctx, -7 * u, bodyTop + u + armSwing, 2.7 * u, 6 * u, 3, armC);
     if (handRaised) {
-      ctx.fillRect(4.5 * u, bodyTop - 6 * u, 2.5 * u, 7 * u);
-      ctx.fillStyle = skin;
-      ctx.fillRect(4.5 * u, bodyTop - 8 * u, 2.5 * u, 2.5 * u);
-      ctx.fillRect(-7 * u, bodyTop + 6.5 * u + armSwing, 2.5 * u, 2 * u);
+      softRect(ctx, 4.5 * u, bodyTop - 6 * u, 2.7 * u, 7 * u, 3, armC);
+      softRect(ctx, 4.5 * u, bodyTop - 8 * u, 2.7 * u, 2.7 * u, 3, skin);
+      softRect(ctx, -7 * u, bodyTop + 6.5 * u + armSwing, 2.7 * u, 2.3 * u, 3, skin);
     } else {
-      ctx.fillRect(4.5 * u, bodyTop + u - armSwing, 2.5 * u, 6 * u);
-      ctx.fillStyle = skin;
-      ctx.fillRect(-7 * u, bodyTop + 6.5 * u + armSwing, 2.5 * u, 2 * u);
-      ctx.fillRect(4.5 * u, bodyTop + 6.5 * u - armSwing, 2.5 * u, 2 * u);
+      softRect(ctx, 4.5 * u, bodyTop + u - armSwing, 2.7 * u, 6 * u, 3, armC);
+      softRect(ctx, -7 * u, bodyTop + 6.5 * u + armSwing, 2.7 * u, 2.3 * u, 3, skin);
+      softRect(ctx, 4.5 * u, bodyTop + 6.5 * u - armSwing, 2.7 * u, 2.3 * u, 3, skin);
     }
   }
 
@@ -2429,16 +2442,17 @@ export function drawCharacter(
 
   // 특별 헤어 스타일: 얼굴+헤어 일체형 이미지가 픽셀 머리를 통째로 대체.
   // (이미지 로딩 전에는 기존 픽셀 머리로 폴백)
-  const headImg =
-    !robot && app.headImg && app.headImg !== "none"
-      ? getImage(headImgUrl(app.headImg))
-      : null;
+  const headImg = !robot ? getImage(headImgUrl(resolveHeadImgKey(app.headImg))) : null;
 
   if (headImg) {
     // 이미지 얼굴 중심(약 540,640/1080)이 픽셀 머리 중심에 오도록 앵커링
     const S = 72;
     ctx.save();
     if (dir === "left") ctx.scale(-1, 1);
+    ctx.imageSmoothingEnabled = true;
+    ctx.shadowColor = "rgba(62,48,98,0.20)";
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetY = 1;
     ctx.drawImage(headImg, -S / 2, headTop - 33, S, S);
     ctx.restore();
   } else {
@@ -2571,9 +2585,7 @@ function drawTop(
   const H = 8.5 * u;
   if (style === "suit" && !robot) {
     // 정장: 짙은 자켓 + 셔츠 + 넥타이
-    ctx.fillStyle = "#2b3040";
-    roundRect(ctx, -5 * u, bodyTop, 10 * u, H, 3);
-    ctx.fill();
+    softRect(ctx, -5 * u, bodyTop, 10 * u, H, 6, "#2b3040");
     if (dir !== "up") {
       ctx.fillStyle = "#f3f4f6";
       ctx.beginPath();
@@ -2586,9 +2598,7 @@ function drawTop(
       ctx.fillRect(-0.6 * u, bodyTop + 0.5 * u, 1.2 * u, 3.5 * u); // 넥타이
     }
   } else {
-    ctx.fillStyle = color;
-    roundRect(ctx, -5 * u, bodyTop, 10 * u, H, 3);
-    ctx.fill();
+    softRect(ctx, -5 * u, bodyTop, 10 * u, H, 6, color);
     if (style === "stripe") {
       ctx.fillStyle = robot ? "rgba(255,255,255,0.5)" : lighten(color, 0.45);
       ctx.fillRect(-5 * u, bodyTop + 1.5 * u, 10 * u, 1.2 * u);
@@ -2616,7 +2626,7 @@ function drawTop(
   // 외곽선
   ctx.strokeStyle = OUTLINE;
   ctx.lineWidth = 1.2;
-  roundRect(ctx, -5 * u, bodyTop, 10 * u, H, 3);
+  roundRect(ctx, -5 * u, bodyTop, 10 * u, H, 6);
   ctx.stroke();
 }
 

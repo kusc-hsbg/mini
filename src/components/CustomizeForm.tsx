@@ -8,6 +8,7 @@ import CharacterPreview from "./CharacterPreview";
 import { saveProfile } from "@/app/actions";
 import {
   BODY_COLORS,
+  DEFAULT_HEAD_STYLE,
   FACES,
   FACIAL_HAIRS,
   GLASSES,
@@ -22,6 +23,7 @@ import {
   TOP_STYLES,
   headImgUrl,
   normalizeSpecial,
+  resolveHeadImgKey,
 } from "@/lib/game/constants";
 import type {
   CharacterAppearance,
@@ -76,7 +78,7 @@ export default function CustomizeForm({
       glasses: "none",
       face: "smile",
       special: "none",
-      headImg: "none",
+      headImg: DEFAULT_HEAD_STYLE,
       nameAbove: false,
     };
     if (profile) {
@@ -95,7 +97,7 @@ export default function CustomizeForm({
         glasses: (profile.glasses as GlassesType) ?? "none",
         face: profile.face as FaceType,
         special: normalizeSpecial(profile.special),
-        headImg: profile.head_img ?? "none",
+        headImg: resolveHeadImgKey(profile.head_img),
         nameAbove: !!profile.name_above,
       };
     }
@@ -105,6 +107,7 @@ export default function CustomizeForm({
         if (raw) {
           const g = { ...def, ...JSON.parse(raw) };
           g.special = normalizeSpecial(g.special);
+          g.headImg = resolveHeadImgKey(g.headImg);
           return g;
         }
       } catch {}
@@ -136,7 +139,7 @@ export default function CustomizeForm({
           glasses: app.glasses,
           face: app.face,
           special: app.special,
-          head_img: app.headImg ?? "none",
+          head_img: resolveHeadImgKey(app.headImg),
           name_above: app.nameAbove ?? false,
         });
         if ("error" in res) {
@@ -172,7 +175,7 @@ export default function CustomizeForm({
       glasses: Math.random() < 0.35 ? (pick(GLASSES).key as GlassesType) : "none",
       face: pick(FACES).key as FaceType,
       special: "none",
-      headImg: "none",
+      headImg: pick(HEAD_STYLES).key,
       nameAbove: app.nameAbove ?? false,
     });
   }
@@ -238,14 +241,14 @@ export default function CustomizeForm({
             <>
               <Section label="✨ 특별 헤어 스타일 (이미지)">
                 <button
-                  onClick={() => patch({ headImg: "none" })}
-                  className={`grid h-14 w-14 place-items-center rounded-xl text-[11px] transition ${
-                    (app.headImg ?? "none") === "none"
+                  onClick={() => patch({ headImg: DEFAULT_HEAD_STYLE })}
+                  className={`grid h-14 w-14 place-items-center rounded-xl px-1 text-center text-[10px] leading-tight transition ${
+                    resolveHeadImgKey(app.headImg) === DEFAULT_HEAD_STYLE
                       ? "bg-accent text-white ring-2 ring-accent"
                       : "bg-panel2 text-slate-300 hover:bg-panel2/70"
                   }`}
                 >
-                  기본
+                  기본 캐릭터
                 </button>
                 {HEAD_STYLES.map((h) => (
                   <button
@@ -253,7 +256,7 @@ export default function CustomizeForm({
                     onClick={() => patch({ headImg: h.key })}
                     title={h.label}
                     className={`relative h-14 w-14 overflow-hidden rounded-xl bg-panel2 transition hover:brightness-110 ${
-                      app.headImg === h.key ? "ring-2 ring-accent" : ""
+                      resolveHeadImgKey(app.headImg) === h.key ? "ring-2 ring-accent" : ""
                     }`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -268,11 +271,9 @@ export default function CustomizeForm({
                   </button>
                 ))}
               </Section>
-              {app.headImg && app.headImg !== "none" && (
-                <p className="text-xs text-amber-300/80">
-                  💡 특별 스타일 사용 중에는 헤어/표정/모자/안경/수염 옵션이 적용되지 않아요.
-                </p>
-              )}
+              <p className="text-xs text-amber-300/80">
+                💡 PNG 캐릭터 헤드를 기본으로 사용해 더 둥글고 부드럽게 표시됩니다.
+              </p>
               <Section label="피부톤">
                 {SKIN_TONES.map((c) => (
                   <Swatch key={c} color={c} active={app.skin === c} onClick={() => patch({ skin: c })} />

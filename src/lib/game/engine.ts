@@ -83,8 +83,8 @@ export interface EngineCallbacks {
   onItem?: (kind: RaceItemKind) => void; // 레이스 아이템 획득/기름 밟음
   onTouch?: (id: string | null) => void; // 근접(닿음)한 상대 — 하트/소개 팝업
   onGhost?: (active: boolean) => void; // 고스트 모드 토글
-  onShot?: (p: ShotPayload) => void; // PK 발사(브로드캐스트용)
-  onKillBroadcast?: (p: KillPayload) => void; // 내가 죽었을 때 킬 정보 브로드캐스트
+  onShot?: (p: ShotPayload) => void; // 레이스 보스전 투사체 브로드캐스트용
+  onKillBroadcast?: (p: KillPayload) => void; // 레거시 챌린지 결과 브로드캐스트
   onDeath?: (killerName: string) => void; // 내가 죽음
   onKill?: (victimName: string) => void; // 내가 상대를 처치
   onRespawn?: () => void;
@@ -110,7 +110,7 @@ export type RaceItemKind =
   | "mini"
   | "magnet";
 
-// PK 투사체
+// 투사체
 interface Projectile {
   id: string;
   from: string;
@@ -183,7 +183,7 @@ interface Effect {
   born: number;
 }
 
-// PK 발사 브로드캐스트 payload
+// 투사체 브로드캐스트 payload
 export interface ShotPayload {
   id: string;
   from: string;
@@ -234,7 +234,7 @@ export class GameEngine {
 
   private bikeCooldown = 0;
   private ghostUntil = 0; // 고스트 모드 만료 시각(performance.now 기준)
-  // PK 전투
+  // 레거시 챌린지 상태
   private projectiles: Projectile[] = [];
   private effects: Effect[] = [];
   private lastFire = 0;
@@ -330,7 +330,7 @@ export class GameEngine {
       mounted: false,
       hp: MAX_HP,
       dead: false,
-      weapon: "pistol",
+      weapon: "arrow",
       kills: 0,
     };
     this.raceItems = map.objects.filter((o) => o.type === "itembox" || o.type === "oil");
@@ -769,7 +769,7 @@ export class GameEngine {
 
   private onClick = (e: MouseEvent) => {
     if (this.editorMode) return;
-    // PK 존 또는 레이스 보스: 클릭한 방향으로 발사
+    // 레이스 보스전: 클릭한 방향으로 에너지 발사
     if (this.canShoot() && !this.inputLocked) {
       this.setAimFromScreen(e.clientX, e.clientY);
       this.fire(this.aimAngle);
@@ -918,7 +918,7 @@ export class GameEngine {
     this.wasInStartRect = inStart;
   }
 
-  // ---------- PK 전투 (아레나) ----------
+  // ---------- 레거시 챌린지 ----------
 
   setBoss(b: { x: number; y: number; hp: number; maxHp: number; kind: string; alive: boolean } | null) {
     this.boss = b;
@@ -1142,7 +1142,7 @@ export class GameEngine {
     return !!this.self.dead;
   }
   getWeapon() {
-    return this.self.weapon ?? "pistol";
+    return this.self.weapon ?? "arrow";
   }
   setWeapon(key: string) {
     if (WEAPON_MAP[key]) {
@@ -1159,10 +1159,10 @@ export class GameEngine {
     this.aimAngle = Math.atan2(wy - this.self.y, wx - this.self.x);
   }
 
-  // 발사 (angle 라디안). 무기의 pellet/spread 만큼 투사체 생성 + 브로드캐스트.
+  // 발사 (angle 라디안). 도구의 pellet/spread 만큼 투사체 생성 + 브로드캐스트.
   fire(angle: number) {
     if (!this.canShoot()) return;
-    const w = this.map.race ? WEAPON_MAP.arrow : WEAPON_MAP[this.self.weapon ?? "pistol"];
+    const w = this.map.race ? WEAPON_MAP.arrow : WEAPON_MAP[this.self.weapon ?? "arrow"];
     if (!w) return;
     const now = performance.now();
     // 문어발에 붙잡히면 화살 연사로 탈출 — 쿨다운 대폭 단축
@@ -1671,7 +1671,7 @@ export class GameEngine {
     this.pushState();
   }
 
-  // 다른 곳에서 온 kill 이벤트 — 내가 킬러면 킬 수 증가
+  // 다른 곳에서 온 레거시 챌린지 이벤트
   receiveKill(p: KillPayload) {
     if (p.killer !== this.self.id) return;
     this.self.kills = (this.self.kills ?? 0) + 1;
@@ -1794,7 +1794,7 @@ export class GameEngine {
       if (k.has("arrowright") || k.has("d")) dx += 1;
     }
 
-    // PK 사망 / 레이스 스턴(운석·폭탄) 중에는 이동 불가
+    // 레거시 챌린지 상태 / 레이스 스턴(운석·폭탄) 중에는 이동 불가
     if (this.self.dead || now < this.stunUntil) {
       dx = 0;
       dy = 0;
@@ -1951,7 +1951,7 @@ export class GameEngine {
     // 레이스 진행 체크
     this.updateRace(now);
 
-    // PK 전투 (아레나 전용)
+    // 레거시 챌린지 처리
     if (this.isPk() || this.map.race) this.updatePk(dt, now);
 
     // 보스 레이드 (레이스 맵)
@@ -2308,7 +2308,7 @@ export class GameEngine {
     // 레이스 이펙트 (물튀김/바나나/문어발/쉴드·스타 오라)
     if (this.map.race) this.renderRaceFx(ctx, now);
 
-    // PK 전투 렌더 (투사체/이펙트/체력바)
+    // 레거시 챌린지 렌더 (투사체/이펙트/체력바)
     if (
       this.isPk() ||
       this.projectiles.length > 0 ||

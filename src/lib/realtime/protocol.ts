@@ -32,7 +32,7 @@ export interface RtEvents {
     totalMs?: number;
     bestLapMs?: number;
   };
-  // PK 전투 (아레나)
+  // 레거시 챌린지 이벤트
   shot: {
     id: string;
     from: string;

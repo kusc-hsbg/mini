@@ -310,7 +310,7 @@ export async function redeemSecretWallet(code: string): Promise<Result<{ hearts:
   return { ok: true, hearts, coins };
 }
 
-// ---- PK 무기 구매 + 킬 기록 ----
+// ---- 레거시 장비 구매 + 챌린지 기록 ----
 
 export async function buyWeapon(
   weaponKey: string
@@ -318,11 +318,11 @@ export async function buyWeapon(
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
   const wp = WEAPON_MAP[weaponKey];
-  if (!wp) return { error: "존재하지 않는 무기입니다." };
+  if (!wp) return { error: "존재하지 않는 아이템입니다." };
   const invKey = `weapon-${weaponKey}`;
   const w = await loadWallet(supabase, user.id);
   if (!w) return { error: "프로필을 찾을 수 없습니다." };
-  if (w.inventory.includes(invKey)) return { error: "이미 보유한 무기입니다." };
+  if (w.inventory.includes(invKey)) return { error: "이미 보유한 아이템입니다." };
   const bal = wp.currency === "heart" ? w.hearts : w.coins;
   if (bal < wp.price) return { error: wp.currency === "heart" ? "하트가 부족합니다." : "코인이 부족합니다." };
   const inventory = [...w.inventory, invKey];
