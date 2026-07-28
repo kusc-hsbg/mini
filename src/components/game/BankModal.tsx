@@ -31,7 +31,7 @@ export default function BankModal({
 
   useEffect(() => {
     refreshBank().then((res) => {
-      if (!("error" in res)) {
+      if (!("error" in res) && !("degraded" in res)) {
         setBank(res.bank);
         onHearts(res.hearts);
         if (res.gained > 0) setMsg(`💹 이자 +${res.gained}💗 가 붙었어요!`);
@@ -53,6 +53,7 @@ export default function BankModal({
     startTransition(async () => {
       const res = await depositBank(n);
       if ("error" in res) return setMsg("❌ " + res.error);
+      if ("degraded" in res) return setMsg("⚠️ 하트 기능 준비 중이에요 (DB 스키마 미반영)");
       setBank(res.bank);
       onHearts(res.hearts);
       setAmount("");
@@ -63,6 +64,7 @@ export default function BankModal({
     startTransition(async () => {
       const res = await withdrawBank(n);
       if ("error" in res) return setMsg("❌ " + res.error);
+      if ("degraded" in res) return setMsg("⚠️ 하트 기능 준비 중이에요 (DB 스키마 미반영)");
       setBank(res.bank);
       onHearts(res.hearts);
       setAmount("");

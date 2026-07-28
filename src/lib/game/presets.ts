@@ -667,6 +667,16 @@ function buildCircuit(): MapData {
   g.rect(14, 14, 60, 28, "r"); // 안쪽 연석
   g.rect(15, 15, 58, 26, ","); // 잔디 아일랜드
   g.scatter(";", 120, 16, 16, 56, 24, 43, ",");
+  // 코너를 둥글게 — 사각형 느낌 제거. 외곽 4코너 러너프를 잔디로 챔퍼(레이싱 라인은 안쪽이라 영향 최소).
+  for (const [cx, cy] of [[8, 8], [79, 8], [8, 47], [79, 47]] as [number, number][]) {
+    for (let dx = 0; dx < 4; dx++) {
+      for (let dy = 0; dy < 4 - dx; dy++) {
+        const x = cx + (cx < 40 ? dx : -dx);
+        const y = cy + (cy < 27 ? dy : -dy);
+        if (g.g[y]?.[x] === "a") g.set(x, y, ",");
+      }
+    }
+  }
   addRaceBarrierLoop(c, 7, 7, 74, 42);
   addRaceBarrierLoop(c, 14, 14, 60, 28);
   for (const [x, y, dir] of [
@@ -704,10 +714,11 @@ function buildCircuit(): MapData {
   add(c, "sign", 28, 17, {
     name: "피트레인 안내",
     props: {
-      text: "🏁 그랑프리 서킷에 오신 걸 환영합니다!\n\n0) 출발선 양옆 👹보스 ON / 🕊️보스 OFF 발판에 서서 3초!\n1) 노란 칸에서 F 키로 카트 탑승\n2) 체커 라인을 지나면 랩 타이머 시작\n3) 시계 방향으로 3랩 완주!\n\n⚡ 노란 화살표 = 스피드 부스트\n🎁 ? 박스 = 랜덤 아이템 (터보/부스트/슬로우)\n🛢️ 기름 웅덩이 = 밟으면 미끄러져요\n🚧 라바콘은 완전히 막혀요 — 피하세요\n🌿 잔디/모래에선 카트가 느려집니다",
+      text: "🏁 그랑프리 서킷에 오신 걸 환영합니다!\n\n0) 중앙 라운지 👹보스 ON / 🕊️보스 OFF 발판에 서서 3초! → 트랙 이동\n1) 노란 칸에서 F 키로 카트 탑승\n2) 체커 라인을 지나면 랩 타이머 시작\n3) 시계 방향으로 3랩 완주!\n\n⚡ 노란 화살표 = 스피드 부스트\n🎁 ? 박스 = 랜덤 아이템 (터보/부스트/슬로우)\n🛢️ 기름 웅덩이 = 밟으면 미끄러져요\n🚧 라바콘은 완전히 막혀요 — 피하세요\n🌿 잔디/모래에선 카트가 느려집니다",
     },
   });
-  c.spawns.push({ x: 40, y: 11 }, { x: 42, y: 11 }, { x: 47, y: 11 }, { x: 49, y: 11 });
+  // 처음 접속 시 중앙 라운지에서 스폰 → 보스전 투표 후 트랙으로 이동
+  c.spawns.push({ x: 43, y: 34 }, { x: 45, y: 34 }, { x: 41, y: 34 }, { x: 47, y: 34 }, { x: 43, y: 32 }, { x: 45, y: 32 });
   c.labels.push({ x: 29, y: 16, text: "🔧 피트레인 (F로 카트 탑승)" });
 
   // ---- 포디움 + 깃발 (아일랜드 중앙) ----
@@ -716,9 +727,12 @@ function buildCircuit(): MapData {
   add(c, "flag", 46, 28);
   c.labels.push({ x: 41, y: 27, text: "🏆 포디움" });
 
-  // ---- 아일랜드 꾸미기 ----
+  // ---- 아일랜드 꾸미기 (귀여운 가든) ----
   g.blob(62, 33, 6, 3.5, "s");
   g.blob(62, 33, 4.6, 2.5, "~");
+  add(c, "fountain", 24, 36); // 가든 분수 (좌)
+  add(c, "fountain", 60, 24); // 가든 분수 (우)
+  for (const [fx, fy] of [[23, 35], [26, 35], [23, 38], [26, 38], [59, 23], [62, 23], [59, 26], [62, 26]] as [number, number][]) add(c, "flowerbed", fx, fy);
   add(c, "tree", 20, 26);
   add(c, "tree", 25, 32);
   add(c, "tree", 55, 26);
@@ -822,9 +836,10 @@ function buildCircuit(): MapData {
   for (const [px, py] of [[8, 12], [80, 12]] as [number, number][]) add(c, "plant", px, py);
   for (const [fx, fy] of [[3, 3], [84, 3], [3, 50], [84, 50], [35, 25], [51, 25], [35, 30], [51, 30]] as [number, number][]) add(c, "flowerbed", fx, fy);
 
-  // ---- 보스 ON/OFF 투표 발판 안내 (출발선 양옆) — 발판에 서서 3초 게이지 ----
-  c.labels.push({ x: 36, y: 7, text: "👹 보스 ON" });
-  c.labels.push({ x: 47, y: 7, text: "🕊️ 보스 OFF" });
+  // ---- 보스 ON/OFF 투표 라운지 (중앙) — 발판에 서서 3초 게이지 → 트랙 이동 ----
+  c.labels.push({ x: 37, y: 30, text: "🏁 출발 준비 라운지 — 발판에 서서 보스전 결정!" });
+  c.labels.push({ x: 38, y: 31, text: "👹 보스 ON" });
+  c.labels.push({ x: 49, y: 31, text: "🕊️ 보스 OFF" });
 
   return {
     key: "circuit",
@@ -847,8 +862,8 @@ function buildCircuit(): MapData {
         { x: 8, y: 26, w: 7, h: 2 }, // CP3 좌측
       ],
       bossVote: {
-        on: { x: 36, y: 8, w: 3, h: 3 }, // 출발선 왼쪽 발판
-        off: { x: 47, y: 8, w: 3, h: 3 }, // 출발선 오른쪽 발판
+        on: { x: 38, y: 32, w: 3, h: 3 }, // 중앙 라운지 왼쪽 발판
+        off: { x: 49, y: 32, w: 3, h: 3 }, // 중앙 라운지 오른쪽 발판
       },
     },
   };
@@ -1351,8 +1366,8 @@ function buildRingRace(theme: "sea" | "sky"): MapData {
   ];
   for (const [bx, by] of boosts) g.set(bx, by, "^");
 
-  // 스폰(출발선 뒤)
-  c.spawns.push({ x: 34, y: 11 }, { x: 37, y: 11 }, { x: 42, y: 11 }, { x: 45, y: 11 }, { x: 34, y: 9 }, { x: 45, y: 9 });
+  // 스폰 — 처음 접속 시 중앙 라운지(보스전 투표 후 트랙 이동)
+  c.spawns.push({ x: 39, y: 24 }, { x: 41, y: 24 }, { x: 38, y: 24 }, { x: 42, y: 24 }, { x: 39, y: 22 }, { x: 41, y: 22 });
 
   // ---- 아이템 박스 / 기름 (2배·랜덤 배치, 시드 고정 → 전 클라이언트 동일 레이아웃) ----
   const rng = mulberry32(theme === "sea" ? 2027 : 7053);
@@ -1421,10 +1436,11 @@ function buildRingRace(theme: "sea" | "sky"): MapData {
   add(c, "lamp", 6, H - 7);
   add(c, "lamp", W - 7, H - 7);
 
-  // ---- 유아 스타일 귀여운 데코 (깃발) + 보스 ON/OFF 투표 발판 안내 ----
+  // ---- 유아 스타일 귀여운 데코 (깃발) + 보스 ON/OFF 투표 라운지(중앙) ----
   for (const [bx, by] of [[14, 3], [22, 3], [56, 3], [64, 3]] as [number, number][]) add(c, "flag", bx, by);
-  c.labels.push({ x: 33, y: 7, text: "👹 보스 ON" });
-  c.labels.push({ x: 44, y: 7, text: "🕊️ 보스 OFF" });
+  c.labels.push({ x: 32, y: 21, text: "🏁 출발 준비 라운지 — 발판에 서서 보스전 결정!" });
+  c.labels.push({ x: 33, y: 22, text: "👹 보스 ON" });
+  c.labels.push({ x: 44, y: 22, text: "🕊️ 보스 OFF" });
 
   // ---- 워프 포탈(안쪽 섬) — 전체 미니맵으로 어디든 이동 ----
   // (트랙 위에 방 포털을 두면 주행 중 오발동하므로, 안쪽 섬의 워프 포탈로만 이동)
@@ -1455,8 +1471,8 @@ function buildRingRace(theme: "sea" | "sky"): MapData {
         { x: 8, y: 24, w: 6, h: 2 }, // 좌측
       ],
       bossVote: {
-        on: { x: 33, y: 8, w: 3, h: 3 }, // 출발선 왼쪽 발판
-        off: { x: 44, y: 8, w: 3, h: 3 }, // 출발선 오른쪽 발판
+        on: { x: 33, y: 22, w: 3, h: 3 }, // 중앙 라운지 왼쪽 발판
+        off: { x: 44, y: 22, w: 3, h: 3 }, // 중앙 라운지 오른쪽 발판
       },
     },
   };

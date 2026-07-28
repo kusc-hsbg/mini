@@ -84,7 +84,16 @@ export default function StoreModal({
     startTransition(async () => {
       const res = await buyItem(item.key);
       if ("error" in res) return setMsg(res.error);
-      onChange({ hearts: res.hearts, coins: res.coins, inventory: res.inventory });
+      if ("degraded" in res) {
+        const nextInv = wallet.inventory.includes(item.key) ? wallet.inventory : [...wallet.inventory, item.key];
+        onChange(
+          item.currency === "heart"
+            ? { hearts: wallet.hearts - item.price, inventory: nextInv }
+            : { coins: wallet.coins - item.price, inventory: nextInv }
+        );
+      } else {
+        onChange({ hearts: res.hearts, coins: res.coins, inventory: res.inventory });
+      }
       setMsg(`${item.name} 구매 완료`);
     });
   }
@@ -100,7 +109,14 @@ export default function StoreModal({
     startTransition(async () => {
       const res = await equipItem(slot, key);
       if ("error" in res) return setMsg(res.error);
-      onChange({ equipped: res.equipped });
+      if ("degraded" in res) {
+        const eq = { ...wallet.equipped };
+        if (key === null) delete eq[slot];
+        else eq[slot] = key;
+        onChange({ equipped: eq });
+      } else {
+        onChange({ equipped: res.equipped });
+      }
     });
   }
 
@@ -116,7 +132,8 @@ export default function StoreModal({
     startTransition(async () => {
       const res = await exchangeToCoins(n);
       if ("error" in res) return setMsg(res.error);
-      onChange({ hearts: res.hearts, coins: res.coins });
+      if ("degraded" in res) onChange({ hearts: wallet.hearts - cost, coins: wallet.coins + n });
+      else onChange({ hearts: res.hearts, coins: res.coins });
       setMsg(`${n}코인 환전 완료`);
     });
   }

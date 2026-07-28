@@ -382,7 +382,6 @@ export default function GameClient({
   const [bossVoteHud, setBossVoteHud] = useState<{ on: number; off: number; gaugeMs: number; decided: boolean; mode: boolean } | null>(null);
   const bossModeRef = useRef<boolean | null>(null); // null=미정(투표중), true=보스 ON, false=OFF
   const voteGaugeRef = useRef(0);
-  const voteLockedRef = useRef(false); // 확정 후 발판이 빌 때까지 재투표 잠금
   // 보스 레이드 호스트 선출 (가장 작은 id) — 안정적 단일 시뮬레이터
   const isHost = useMemo(() => {
     if (!identity) return false;
@@ -1061,7 +1060,7 @@ export default function GameClient({
             }
             if (profile) {
               incrementRaceWin().then((res) => {
-                if (!("error" in res)) {
+                if (!("error" in res) && !("degraded" in res)) {
                   setStats((s) => ({ ...s, raceWins: res.raceWins }));
                   addToast(`🥇 레이스 우승 기록! 누적 ${res.raceWins}회 (도감에서 확인)`);
                 }
@@ -1259,7 +1258,7 @@ export default function GameClient({
     if (profile) {
       // 서버에도 반영 (실패해도 로컬 하트는 유지)
       const res = await redeemSecretWallet(code);
-      if (!("error" in res)) {
+      if (!("error" in res) && !("degraded" in res)) {
         setWallet((w) => ({
           ...w,
           hearts: Math.max(w.hearts, res.hearts),
@@ -1331,6 +1330,7 @@ export default function GameClient({
           addToast("❌ 열기구 호출 실패: " + res.error);
           return;
         }
+        if ("degraded" in res) return; // DB 미반영 — 로컬 지갑 유지
         setWallet((w) => ({ ...w, hearts: res.hearts }));
       });
     }
@@ -1399,7 +1399,6 @@ export default function GameClient({
       engineRef.current?.setBossVote(null);
       bossModeRef.current = null;
       voteGaugeRef.current = 0;
-      voteLockedRef.current = false;
       return;
     }
     // 투표 발판이 없는(구버전) 맵은 기존처럼 보스 ON 기본값.
@@ -1414,8 +1413,9 @@ export default function GameClient({
       if (!e) return;
       const now = Date.now();
 
-      // ---- 보스 ON/OFF 투표 집계 (보스가 살아있지 않을 때만) ----
-      if (vote && !bossRef.current?.alive) {
+      // ---- 보스 ON/OFF 투표 집계 (미정일 때만, 중앙 라운지 발판) ----
+      // 접속 시 한 번만 결정: 확정되면 다시 열지 않는다.
+      if (vote && bossModeRef.current === null) {
         const players = [e.getSelf(), ...e.getOthers()];
         let on = 0;
         let off = 0;
@@ -1424,24 +1424,21 @@ export default function GameClient({
           else if (inRaceRect(vote.off, p.x, p.y)) off++;
         }
         if (on + off === 0) {
-          // 발판이 비면 게이지 초기화 + 재투표 잠금 해제
-          voteGaugeRef.current = 0;
-          voteLockedRef.current = false;
-        } else if (!voteLockedRef.current) {
+          voteGaugeRef.current = 0; // 발판이 비면 게이지 초기화
+        } else {
           voteGaugeRef.current += TICK;
           if (voteGaugeRef.current >= 3000) {
             const decidedOn = on > off; // 더 많이 선 쪽 (동점은 OFF=평화 레이스)
             bossModeRef.current = decidedOn;
-            voteLockedRef.current = true;
             voteGaugeRef.current = 3000;
-            addToast(decidedOn ? "👹 보스 ON! 협동 보스 레이스 시작!" : "🕊️ 보스 OFF! 평화로운 레이스 시작!");
+            addToast(decidedOn ? "👹 보스 ON! 트랙으로 이동합니다!" : "🕊️ 보스 OFF! 트랙으로 이동합니다!");
           }
         }
         const voteFx = {
           on,
           off,
           gaugeMs: voteGaugeRef.current,
-          decided: bossModeRef.current !== null && voteLockedRef.current,
+          decided: bossModeRef.current !== null,
           mode: bossModeRef.current === true,
         };
         e.setBossVote(voteFx);
@@ -1480,6 +1477,25 @@ export default function GameClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveMap, identity, isHost, multiplayer]);
 
+  // ----- 투표 확정 시 트랙(출발선)으로 이동 -----
+  const votedTpRef = useRef(false);
+  useEffect(() => {
+    const race = liveMap.race;
+    if (!race?.bossVote) return;
+    if (bossVoteHud?.decided && !votedTpRef.current) {
+      votedTpRef.current = true;
+      const e = engineRef.current;
+      const s = race.start;
+      // 출발선 홈 스트레이트로 이동 — 노란 카트 패드 위치 (약간의 분산)
+      if (e) {
+        const jitter = Math.floor(Math.random() * 5) - 2;
+        e.teleport(Math.floor(s.x + s.w / 2) + jitter, s.y + 3);
+      }
+      addToast("🏁 트랙으로 이동했어요! 노란 칸에서 F로 카트 탑승!");
+    }
+    if (!bossVoteHud?.decided) votedTpRef.current = false;
+  }, [bossVoteHud?.decided, liveMap]);
+
   // ----- 근접 대화 시간 측정 (인사이트 conv_seconds) -----
   useEffect(() => {
     if (!multiplayer) return;
@@ -1513,7 +1529,7 @@ export default function GameClient({
     if (profile) {
       (async () => {
         const res = await claimAttendance();
-        if (done || "error" in res || res.already) return;
+        if (done || "error" in res || "degraded" in res || res.already) return;
         setWallet((w) => ({ ...w, hearts: res.hearts, coins: res.coins }));
         addToast(
           `📅 출석 완료! 💗${res.rewardHearts}${res.rewardCoins ? ` +🪙${res.rewardCoins}` : ""} 획득 (연속 ${res.streak}일)`
@@ -1864,7 +1880,9 @@ export default function GameClient({
         addToast("❌ " + res.error);
         return;
       }
-      setWallet((w) => ({ ...w, equipped: res.equipped }));
+      // DB 미반영이면 로컬 장착 유지
+      if ("degraded" in res) setWallet((w) => ({ ...w, equipped: { ...w.equipped, [item.slot]: item.key } }));
+      else setWallet((w) => ({ ...w, equipped: res.equipped }));
       addToast(`${item.name} 장착 완료`);
       return;
     }
@@ -1891,7 +1909,17 @@ export default function GameClient({
       addToast("❌ " + res.error);
       return;
     }
-    setWallet((w) => ({ ...w, hearts: res.hearts, coins: res.coins, inventory: res.inventory }));
+    if ("degraded" in res) {
+      // DB 미반영 — 로컬 지갑에 구매 반영
+      setWallet((w) => {
+        const nextInv = w.inventory.includes(item.key) ? w.inventory : [...w.inventory, item.key];
+        return item.currency === "heart"
+          ? { ...w, hearts: w.hearts - item.price, inventory: nextInv }
+          : { ...w, coins: w.coins - item.price, inventory: nextInv };
+      });
+    } else {
+      setWallet((w) => ({ ...w, hearts: res.hearts, coins: res.coins, inventory: res.inventory }));
+    }
     addToast(`${item.name} 구매 완료`);
   }
 
@@ -1966,8 +1994,8 @@ export default function GameClient({
     setWallet((w) => ({ ...w, hearts: w.hearts + gain }));
     if (profile) {
       grantHearts(gain).then((res) => {
-        // 서버 저장이 실패해도 로컬 하트는 유지 (경고 로그를 띄우지 않는다).
-        if ("error" in res) return;
+        // 서버 저장이 실패/미반영이어도 로컬 하트는 유지 (경고 로그를 띄우지 않는다).
+        if ("error" in res || "degraded" in res) return;
         setWallet((w) => ({ ...w, hearts: Math.max(w.hearts, res.hearts) }));
       });
     }
@@ -2000,6 +2028,7 @@ export default function GameClient({
           addToast("❌ 자동차 소환 실패: " + res.error);
           return;
         }
+        if ("degraded" in res) return; // DB 미반영 — 로컬 지갑 유지
         setWallet((w) => ({ ...w, hearts: res.hearts }));
       });
     }
@@ -2637,31 +2666,23 @@ export default function GameClient({
       {/* ---------- 레이스 HUD (그랑프리) ---------- */}
       {identity && <RaceHud state={raceState} leaderboard={leaderboard} selfId={identity.id} />}
 
-      {/* ---------- 보스 ON/OFF 투표 배너 (유아 스타일 파스텔) ---------- */}
-      {liveMap.race?.bossVote && !bossHud?.alive && bossVoteHud && (
+      {/* ---------- 보스 ON/OFF 투표 배너 (유아 스타일 파스텔) — 확정 전까지만 ---------- */}
+      {liveMap.race?.bossVote && !bossHud?.alive && bossVoteHud && !bossVoteHud.decided && (
         <div className="pointer-events-none absolute left-1/2 top-16 z-20 w-[min(92vw,380px)] -translate-x-1/2 rounded-[28px] border-4 border-white/80 bg-gradient-to-b from-pink-200/95 to-sky-200/95 px-5 py-3 text-center shadow-xl backdrop-blur">
-          {bossVoteHud.decided ? (
-            <div className="text-base font-black text-slate-800">
-              {bossVoteHud.mode ? "👹 보스 ON! 다같이 무찌르자!" : "🕊️ 보스 OFF! 평화 레이스 🌸"}
-            </div>
-          ) : (
-            <>
-              <div className="text-sm font-black text-slate-800">🏁 보스전 할까요? 발판에 서서 골라요!</div>
-              <div className="mt-2 flex items-center justify-center gap-3 text-sm font-bold text-slate-700">
-                <span className="rounded-full bg-white/70 px-3 py-1">👹 ON {bossVoteHud.on}명</span>
-                <span className="rounded-full bg-white/70 px-3 py-1">🕊️ OFF {bossVoteHud.off}명</span>
-              </div>
-              <div className="mx-auto mt-2 h-3 w-56 overflow-hidden rounded-full bg-white/60">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-amber-400 to-pink-500 transition-[width] duration-150"
-                  style={{ width: `${Math.min(100, (bossVoteHud.gaugeMs / 3000) * 100)}%` }}
-                />
-              </div>
-              <div className="mt-1 text-[11px] font-semibold text-slate-600">
-                {bossVoteHud.on + bossVoteHud.off > 0 ? "3초 동안 유지하면 확정돼요!" : "발판(출발선 양옆)에 올라서세요"}
-              </div>
-            </>
-          )}
+          <div className="text-sm font-black text-slate-800">🏁 보스전 할까요? 가운데 발판에 서서 골라요!</div>
+          <div className="mt-2 flex items-center justify-center gap-3 text-sm font-bold text-slate-700">
+            <span className="rounded-full bg-white/70 px-3 py-1">👹 ON {bossVoteHud.on}명</span>
+            <span className="rounded-full bg-white/70 px-3 py-1">🕊️ OFF {bossVoteHud.off}명</span>
+          </div>
+          <div className="mx-auto mt-2 h-3 w-56 overflow-hidden rounded-full bg-white/60">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-amber-400 to-pink-500 transition-[width] duration-150"
+              style={{ width: `${Math.min(100, (bossVoteHud.gaugeMs / 3000) * 100)}%` }}
+            />
+          </div>
+          <div className="mt-1 text-[11px] font-semibold text-slate-600">
+            {bossVoteHud.on + bossVoteHud.off > 0 ? "3초 동안 유지하면 확정돼요!" : "가운데 라운지 발판에 올라서세요"}
+          </div>
         </div>
       )}
 
@@ -2894,7 +2915,7 @@ export default function GameClient({
             <section>
               <h4 className="mb-2 font-semibold text-white">🏁 레이싱 · 보스전</h4>
               <ul className="space-y-1 text-slate-300">
-                <li><b className="text-white">👹 보스 ON / 🕊️ 보스 OFF 발판</b>에 서서 3초 유지 → 그 모드로 레이스 시작</li>
+                <li><b className="text-white">👹 보스 ON / 🕊️ 보스 OFF 발판</b>(가운데 라운지)에 서서 3초 → 트랙으로 이동해 레이스 시작</li>
                 <li>노란 패드에서 <b className="text-white">F</b>로 탑승 후 결승선 통과 → 랩 시작</li>
                 <li><b className="text-white">🎁 아이템 박스</b> — 터보·부스트·스타·쉴드·폭탄·바나나 등 랜덤</li>
                 <li><b className="text-white">스페이스/클릭</b> — 보스전에서 차지 화살 발사(탄막 요격)</li>
@@ -3065,6 +3086,11 @@ export default function GameClient({
             if ("error" in res) {
               addToast("❌ " + res.error);
               return null;
+            }
+            if ("degraded" in res) {
+              // DB 미반영 — 로컬 지갑에 보상 반영
+              setWallet((w) => ({ ...w, hearts: w.hearts + 100 }));
+              return 100;
             }
             if (!res.already) setWallet((w) => ({ ...w, hearts: res.hearts }));
             return res.already ? "already" : res.hearts;

@@ -51,6 +51,7 @@ export default function AuctionModal({
     startTransition(async () => {
       const res = await buyAuction(l.id);
       if ("error" in res) return setMsg("❌ " + res.error);
+      if ("degraded" in res) return setMsg("⚠️ 하트 기능 준비 중이에요 (DB 스키마 미반영)");
       onChange({ hearts: res.hearts, inventory: res.inventory });
       setMsg("✅ 구매 완료!");
       load();
@@ -60,6 +61,7 @@ export default function AuctionModal({
     startTransition(async () => {
       const res = await cancelAuction(l.id);
       if ("error" in res) return setMsg("❌ " + res.error);
+      if ("degraded" in res) return setMsg("⚠️ 하트 기능 준비 중이에요 (DB 스키마 미반영)");
       onChange({ inventory: res.inventory });
       setMsg("판매를 취소했어요.");
       load();
@@ -71,6 +73,7 @@ export default function AuctionModal({
     startTransition(async () => {
       const res = await listAuction(sellItem, p);
       if ("error" in res) return setMsg("❌ " + res.error);
+      if ("degraded" in res) return setMsg("⚠️ 하트 기능 준비 중이에요 (DB 스키마 미반영)");
       onChange({ inventory: res.inventory, equipped: res.equipped });
       setMsg("🏷️ 경매에 등록했어요!");
       setSellItem("");

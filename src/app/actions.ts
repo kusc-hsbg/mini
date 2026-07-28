@@ -130,6 +130,18 @@ export async function setStatus(status: UserStatus, message: string): Promise<Re
 
 // ============ 경제 / 인벤토리 (하트·코인·상점) ============
 
+// 경제 컬럼(hearts 등)이 DB 스키마에 아직 반영되지 않았거나 PostgREST 캐시가
+// 갱신되지 않았을 때를 감지 — 이 경우 클라이언트 로컬 지갑으로 부드럽게 폴백한다.
+function schemaNotReady(msg?: string | null): boolean {
+  if (!msg) return false;
+  const m = msg.toLowerCase();
+  return m.includes("schema cache") || m.includes("does not exist");
+}
+
+// 경제 액션의 반환: 성공 / 스키마 미반영(로컬 폴백) / 오류
+type Econ<T> = ({ ok: true } & T) | { ok: true; degraded: true } | { error: string };
+const DEGRADED = { ok: true as const, degraded: true as const };
+
 interface Wallet {
   hearts: number;
   coins: number;
@@ -137,13 +149,29 @@ interface Wallet {
   equipped: Record<string, string>;
 }
 
-async function loadWallet(supabase: NonNullable<ReturnType<typeof getSupabaseServer>>, userId: string): Promise<Wallet | null> {
-  const { data } = await supabase
+// 프로필 행이 없으면 자동 생성한다("프로필을 찾을 수 없습니다" 방지).
+async function ensureProfileRow(
+  supabase: NonNullable<ReturnType<typeof getSupabaseServer>>,
+  userId: string
+): Promise<void> {
+  await supabase.from("profiles").upsert({ id: userId }, { onConflict: "id", ignoreDuplicates: true });
+}
+
+// 지갑 로드 — 스키마 미반영이면 "degraded", 그 외 정상 지갑(행 없으면 자동 생성 후 기본값)
+async function loadWallet(
+  supabase: NonNullable<ReturnType<typeof getSupabaseServer>>,
+  userId: string
+): Promise<Wallet | "degraded"> {
+  const { data, error } = await supabase
     .from("profiles")
     .select("hearts, coins, inventory, equipped")
     .eq("id", userId)
     .maybeSingle();
-  if (!data) return null;
+  if (error) return "degraded";
+  if (!data) {
+    await ensureProfileRow(supabase, userId);
+    return { hearts: 0, coins: 0, inventory: [], equipped: {} };
+  }
   return {
     hearts: Number(data.hearts ?? 0),
     coins: Number(data.coins ?? 0),
@@ -154,13 +182,13 @@ async function loadWallet(supabase: NonNullable<ReturnType<typeof getSupabaseSer
 
 export async function buyItem(
   itemKey: string
-): Promise<Result<{ hearts: number; coins: number; inventory: string[] }>> {
+): Promise<Econ<{ hearts: number; coins: number; inventory: string[] }>> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
   const item = SHOP_MAP[itemKey];
   if (!item) return { error: "존재하지 않는 아이템입니다." };
   const w = await loadWallet(supabase, user.id);
-  if (!w) return { error: "프로필을 찾을 수 없습니다." };
+  if (w === "degraded") return DEGRADED;
   if (w.inventory.includes(itemKey)) return { error: "이미 보유한 아이템입니다." };
   const bal = item.currency === "heart" ? w.hearts : w.coins;
   if (bal < item.price) {
@@ -171,7 +199,7 @@ export async function buyItem(
   if (item.currency === "heart") patch.hearts = w.hearts - item.price;
   else patch.coins = w.coins - item.price;
   const { error: err } = await supabase.from("profiles").update(patch).eq("id", user.id);
-  if (err) return { error: err.message };
+  if (err) return schemaNotReady(err.message) ? DEGRADED : { error: err.message };
   return {
     ok: true,
     hearts: (patch.hearts as number) ?? w.hearts,
@@ -180,11 +208,11 @@ export async function buyItem(
   };
 }
 
-export async function equipItem(slot: string, itemKey: string | null): Promise<Result<{ equipped: Record<string, string> }>> {
+export async function equipItem(slot: string, itemKey: string | null): Promise<Econ<{ equipped: Record<string, string> }>> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
   const w = await loadWallet(supabase, user.id);
-  if (!w) return { error: "프로필을 찾을 수 없습니다." };
+  if (w === "degraded") return DEGRADED;
   const equipped = { ...w.equipped };
   if (itemKey === null) {
     delete equipped[slot];
@@ -193,54 +221,58 @@ export async function equipItem(slot: string, itemKey: string | null): Promise<R
     equipped[slot] = itemKey;
   }
   const { error: err } = await supabase.from("profiles").update({ equipped }).eq("id", user.id);
-  if (err) return { error: err.message };
+  if (err) return schemaNotReady(err.message) ? DEGRADED : { error: err.message };
   return { ok: true, equipped };
 }
 
 // 소모품 사용(휴대용 피아노 등) — 인벤토리에서 제거.
-export async function consumeItem(itemKey: string): Promise<Result<{ inventory: string[] }>> {
+export async function consumeItem(itemKey: string): Promise<Econ<{ inventory: string[] }>> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
   const w = await loadWallet(supabase, user.id);
-  if (!w) return { error: "프로필을 찾을 수 없습니다." };
+  if (w === "degraded") return DEGRADED;
   if (!w.inventory.includes(itemKey)) return { error: "보유하지 않은 아이템입니다." };
   const inventory = w.inventory.filter((k) => k !== itemKey);
   const { error: err } = await supabase.from("profiles").update({ inventory }).eq("id", user.id);
-  if (err) return { error: err.message };
+  if (err) return schemaNotReady(err.message) ? DEGRADED : { error: err.message };
   return { ok: true, inventory };
 }
 
 // 하트 → 코인 환전
 export async function exchangeToCoins(
   coinAmount: number
-): Promise<Result<{ hearts: number; coins: number }>> {
+): Promise<Econ<{ hearts: number; coins: number }>> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
   const n = Math.floor(coinAmount);
   if (n < 1) return { error: "1코인 이상 환전하세요." };
   const w = await loadWallet(supabase, user.id);
-  if (!w) return { error: "프로필을 찾을 수 없습니다." };
+  if (w === "degraded") return DEGRADED;
   const cost = n * HEARTS_PER_COIN;
   if (w.hearts < cost) return { error: `하트가 부족합니다. (${cost} 하트 필요)` };
   const hearts = w.hearts - cost;
   const coins = w.coins + n;
   const { error: err } = await supabase.from("profiles").update({ hearts, coins }).eq("id", user.id);
-  if (err) return { error: err.message };
+  if (err) return schemaNotReady(err.message) ? DEGRADED : { error: err.message };
   return { ok: true, hearts, coins };
 }
 
 // 출석 보상 — 하루 1회 하트 지급, 7일 연속마다 코인 지급.
 export async function claimAttendance(): Promise<
-  Result<{ already?: boolean; hearts: number; coins: number; streak: number; rewardHearts: number; rewardCoins: number }>
+  Econ<{ already?: boolean; hearts: number; coins: number; streak: number; rewardHearts: number; rewardCoins: number }>
 > {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
-  const { data } = await supabase
+  const { data, error: loadErr } = await supabase
     .from("profiles")
     .select("hearts, coins, last_attendance, attendance_streak")
     .eq("id", user.id)
     .maybeSingle();
-  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  if (loadErr) return DEGRADED;
+  if (!data) {
+    await ensureProfileRow(supabase, user.id);
+    return DEGRADED;
+  }
   const hearts0 = Number(data.hearts ?? 0);
   const coins0 = Number(data.coins ?? 0);
   const today = new Date().toISOString().slice(0, 10);
@@ -258,41 +290,47 @@ export async function claimAttendance(): Promise<
     .from("profiles")
     .update({ hearts, coins, last_attendance: today, attendance_streak: streak })
     .eq("id", user.id);
-  if (err) return { error: err.message };
+  if (err) return schemaNotReady(err.message) ? DEGRADED : { error: err.message };
   return { ok: true, hearts, coins, streak, rewardHearts, rewardCoins };
 }
 
 // 미니게임 보상 하트 지급 (호출당 최대 30하트로 제한 — 남용 방지)
-export async function grantHearts(amount: number): Promise<Result<{ hearts: number }>> {
+export async function grantHearts(amount: number): Promise<Econ<{ hearts: number }>> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
   const add = Math.max(0, Math.min(30, Math.floor(amount)));
   const { data, error: loadErr } = await supabase.from("profiles").select("hearts").eq("id", user.id).maybeSingle();
-  if (loadErr) return { error: loadErr.message };
-  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  if (loadErr) return DEGRADED;
+  if (!data) {
+    await ensureProfileRow(supabase, user.id);
+    return DEGRADED;
+  }
   const hearts = Number(data.hearts ?? 0) + add;
   const { error: err } = await supabase.from("profiles").update({ hearts }).eq("id", user.id);
-  if (err) return { error: err.message };
+  if (err) return schemaNotReady(err.message) ? DEGRADED : { error: err.message };
   return { ok: true, hearts };
 }
 
-export async function spendHearts(amount: number): Promise<Result<{ hearts: number }>> {
+export async function spendHearts(amount: number): Promise<Econ<{ hearts: number }>> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
   const n = Math.floor(amount);
   if (n < 1) return { error: "1하트 이상 사용하세요." };
   const { data, error: loadErr } = await supabase.from("profiles").select("hearts").eq("id", user.id).maybeSingle();
-  if (loadErr) return { error: loadErr.message };
-  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  if (loadErr) return DEGRADED;
+  if (!data) {
+    await ensureProfileRow(supabase, user.id);
+    return DEGRADED;
+  }
   const hearts0 = Number(data.hearts ?? 0);
   if (hearts0 < n) return { error: "하트가 부족합니다." };
   const hearts = hearts0 - n;
   const { error: err } = await supabase.from("profiles").update({ hearts }).eq("id", user.id);
-  if (err) return { error: err.message };
+  if (err) return schemaNotReady(err.message) ? DEGRADED : { error: err.message };
   return { ok: true, hearts };
 }
 
-export async function redeemSecretWallet(code: string): Promise<Result<{ hearts: number; coins: number }>> {
+export async function redeemSecretWallet(code: string): Promise<Econ<{ hearts: number; coins: number }>> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
   if (code.trim() !== "2009") return { error: "코드가 올바르지 않습니다." };
@@ -301,12 +339,15 @@ export async function redeemSecretWallet(code: string): Promise<Result<{ hearts:
     .select("hearts, coins")
     .eq("id", user.id)
     .maybeSingle();
-  if (loadErr) return { error: loadErr.message };
-  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  if (loadErr) return DEGRADED;
+  if (!data) {
+    await ensureProfileRow(supabase, user.id);
+    return DEGRADED;
+  }
   const hearts = Number(data.hearts ?? 0) + 10000;
   const coins = Number(data.coins ?? 0) + 10000;
   const { error: err } = await supabase.from("profiles").update({ hearts, coins }).eq("id", user.id);
-  if (err) return { error: err.message };
+  if (err) return schemaNotReady(err.message) ? DEGRADED : { error: err.message };
   return { ok: true, hearts, coins };
 }
 
@@ -314,14 +355,14 @@ export async function redeemSecretWallet(code: string): Promise<Result<{ hearts:
 
 export async function buyWeapon(
   weaponKey: string
-): Promise<Result<{ hearts: number; coins: number; inventory: string[] }>> {
+): Promise<Econ<{ hearts: number; coins: number; inventory: string[] }>> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
   const wp = WEAPON_MAP[weaponKey];
   if (!wp) return { error: "존재하지 않는 아이템입니다." };
   const invKey = `weapon-${weaponKey}`;
   const w = await loadWallet(supabase, user.id);
-  if (!w) return { error: "프로필을 찾을 수 없습니다." };
+  if (w === "degraded") return DEGRADED;
   if (w.inventory.includes(invKey)) return { error: "이미 보유한 아이템입니다." };
   const bal = wp.currency === "heart" ? w.hearts : w.coins;
   if (bal < wp.price) return { error: wp.currency === "heart" ? "하트가 부족합니다." : "코인이 부족합니다." };
@@ -330,7 +371,7 @@ export async function buyWeapon(
   if (wp.currency === "heart") patch.hearts = w.hearts - wp.price;
   else patch.coins = w.coins - wp.price;
   const { error: err } = await supabase.from("profiles").update(patch).eq("id", user.id);
-  if (err) return { error: err.message };
+  if (err) return schemaNotReady(err.message) ? DEGRADED : { error: err.message };
   return {
     ok: true,
     hearts: (patch.hearts as number) ?? w.hearts,
@@ -339,11 +380,15 @@ export async function buyWeapon(
   };
 }
 
-export async function addKill(): Promise<Result<{ kills: number; newTitle: string | null }>> {
+export async function addKill(): Promise<Econ<{ kills: number; newTitle: string | null }>> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
-  const { data } = await supabase.from("profiles").select("kills, titles").eq("id", user.id).maybeSingle();
-  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  const { data, error: loadErr } = await supabase.from("profiles").select("kills, titles").eq("id", user.id).maybeSingle();
+  if (loadErr) return DEGRADED;
+  if (!data) {
+    await ensureProfileRow(supabase, user.id);
+    return DEGRADED;
+  }
   const kills = Number(data.kills ?? 0) + 1;
   const titles = Array.isArray(data.titles) ? (data.titles as string[]) : [];
   const earned = titleForKills(kills);
@@ -354,7 +399,7 @@ export async function addKill(): Promise<Result<{ kills: number; newTitle: strin
     patch.titles = [...titles, earned.title];
   }
   const { error: err } = await supabase.from("profiles").update(patch).eq("id", user.id);
-  if (err) return { error: err.message };
+  if (err) return schemaNotReady(err.message) ? DEGRADED : { error: err.message };
   return { ok: true, kills, newTitle };
 }
 
@@ -369,11 +414,15 @@ function accrueInterest(bank: number, bankAtIso: string | null): number {
   return Math.floor(bank * Math.pow(1.01, days));
 }
 
-export async function refreshBank(): Promise<Result<{ hearts: number; bank: number; gained: number }>> {
+export async function refreshBank(): Promise<Econ<{ hearts: number; bank: number; gained: number }>> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
-  const { data } = await supabase.from("profiles").select("hearts, bank, bank_at").eq("id", user.id).maybeSingle();
-  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  const { data, error: loadErr } = await supabase.from("profiles").select("hearts, bank, bank_at").eq("id", user.id).maybeSingle();
+  if (loadErr) return DEGRADED;
+  if (!data) {
+    await ensureProfileRow(supabase, user.id);
+    return DEGRADED;
+  }
   const bank0 = Number(data.bank ?? 0);
   const bank = accrueInterest(bank0, data.bank_at as string | null);
   const gained = bank - bank0;
@@ -383,13 +432,17 @@ export async function refreshBank(): Promise<Result<{ hearts: number; bank: numb
   return { ok: true, hearts: Number(data.hearts ?? 0), bank, gained };
 }
 
-export async function depositBank(amount: number): Promise<Result<{ hearts: number; bank: number }>> {
+export async function depositBank(amount: number): Promise<Econ<{ hearts: number; bank: number }>> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
   const n = Math.floor(amount);
   if (n < 1) return { error: "1하트 이상 예치하세요." };
-  const { data } = await supabase.from("profiles").select("hearts, bank, bank_at").eq("id", user.id).maybeSingle();
-  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  const { data, error: loadErr } = await supabase.from("profiles").select("hearts, bank, bank_at").eq("id", user.id).maybeSingle();
+  if (loadErr) return DEGRADED;
+  if (!data) {
+    await ensureProfileRow(supabase, user.id);
+    return DEGRADED;
+  }
   const hearts0 = Number(data.hearts ?? 0);
   if (hearts0 < n) return { error: "하트가 부족합니다." };
   const bank = accrueInterest(Number(data.bank ?? 0), data.bank_at as string | null) + n;
@@ -398,17 +451,21 @@ export async function depositBank(amount: number): Promise<Result<{ hearts: numb
     .from("profiles")
     .update({ hearts, bank, bank_at: new Date().toISOString() })
     .eq("id", user.id);
-  if (err) return { error: err.message };
+  if (err) return schemaNotReady(err.message) ? DEGRADED : { error: err.message };
   return { ok: true, hearts, bank };
 }
 
-export async function withdrawBank(amount: number): Promise<Result<{ hearts: number; bank: number }>> {
+export async function withdrawBank(amount: number): Promise<Econ<{ hearts: number; bank: number }>> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
   const n = Math.floor(amount);
   if (n < 1) return { error: "1하트 이상 출금하세요." };
-  const { data } = await supabase.from("profiles").select("hearts, bank, bank_at").eq("id", user.id).maybeSingle();
-  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  const { data, error: loadErr } = await supabase.from("profiles").select("hearts, bank, bank_at").eq("id", user.id).maybeSingle();
+  if (loadErr) return DEGRADED;
+  if (!data) {
+    await ensureProfileRow(supabase, user.id);
+    return DEGRADED;
+  }
   const bank0 = accrueInterest(Number(data.bank ?? 0), data.bank_at as string | null);
   if (bank0 < n) return { error: "예치금이 부족합니다." };
   const bank = bank0 - n;
@@ -417,7 +474,7 @@ export async function withdrawBank(amount: number): Promise<Result<{ hearts: num
     .from("profiles")
     .update({ hearts, bank, bank_at: new Date().toISOString() })
     .eq("id", user.id);
-  if (err) return { error: err.message };
+  if (err) return schemaNotReady(err.message) ? DEGRADED : { error: err.message };
   return { ok: true, hearts, bank };
 }
 
@@ -434,27 +491,35 @@ export async function transferHearts(toId: string, amount: number): Promise<Resu
 }
 
 // 레이스 완주(우승) 기록 — race_wins 증가 (도감)
-export async function incrementRaceWin(): Promise<Result<{ raceWins: number }>> {
+export async function incrementRaceWin(): Promise<Econ<{ raceWins: number }>> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
-  const { data } = await supabase.from("profiles").select("race_wins").eq("id", user.id).maybeSingle();
-  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  const { data, error: loadErr } = await supabase.from("profiles").select("race_wins").eq("id", user.id).maybeSingle();
+  if (loadErr) return DEGRADED;
+  if (!data) {
+    await ensureProfileRow(supabase, user.id);
+    return DEGRADED;
+  }
   const raceWins = Number(data.race_wins ?? 0) + 1;
   const { error: err } = await supabase.from("profiles").update({ race_wins: raceWins }).eq("id", user.id);
-  if (err) return { error: err.message };
+  if (err) return schemaNotReady(err.message) ? DEGRADED : { error: err.message };
   return { ok: true, raceWins };
 }
 
 // 온보딩 퀘스트 완료 보상 (계정당 1회) — 100하트 + 'tutorial' 칭호
-export async function claimQuest(): Promise<Result<{ hearts: number; already?: boolean }>> {
+export async function claimQuest(): Promise<Econ<{ hearts: number; already?: boolean }>> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
-  const { data } = await supabase
+  const { data, error: loadErr } = await supabase
     .from("profiles")
     .select("hearts, titles")
     .eq("id", user.id)
     .maybeSingle();
-  if (!data) return { error: "프로필을 찾을 수 없습니다." };
+  if (loadErr) return DEGRADED;
+  if (!data) {
+    await ensureProfileRow(supabase, user.id);
+    return DEGRADED;
+  }
   const titles = Array.isArray(data.titles) ? (data.titles as string[]) : [];
   const hearts0 = Number(data.hearts ?? 0);
   if (titles.includes("tutorial")) return { ok: true, hearts: hearts0, already: true };
@@ -463,7 +528,7 @@ export async function claimQuest(): Promise<Result<{ hearts: number; already?: b
     .from("profiles")
     .update({ hearts, titles: [...titles, "tutorial"] })
     .eq("id", user.id);
-  if (err) return { error: err.message };
+  if (err) return schemaNotReady(err.message) ? DEGRADED : { error: err.message };
   return { ok: true, hearts };
 }
 
@@ -968,7 +1033,7 @@ export async function getAuctions(): Promise<{ listings: AuctionEntry[] } | { er
 export async function listAuction(
   itemKey: string,
   price: number
-): Promise<Result<{ inventory: string[]; equipped: Record<string, string> }>> {
+): Promise<Econ<{ inventory: string[]; equipped: Record<string, string> }>> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
   const item = SHOP_MAP[itemKey];
@@ -979,7 +1044,7 @@ export async function listAuction(
   const p = Math.floor(price);
   if (p < min || p > base) return { error: `가격은 ${min}~${base} 하트 범위여야 해요(시중가 최대 10% 할인).` };
   const w = await loadWallet(supabase, user.id);
-  if (!w) return { error: "프로필을 찾을 수 없습니다." };
+  if (w === "degraded") return DEGRADED;
   if (!w.inventory.includes(itemKey)) return { error: "보유하지 않은 아이템입니다." };
   const { count } = await supabase
     .from("auction_listings")
@@ -1006,7 +1071,7 @@ export async function listAuction(
   return { ok: true, inventory, equipped };
 }
 
-export async function cancelAuction(listingId: string): Promise<Result<{ inventory: string[] }>> {
+export async function cancelAuction(listingId: string): Promise<Econ<{ inventory: string[] }>> {
   const { supabase, user, error } = await requireUser();
   if (error || !supabase || !user) return { error: error! };
   const { data: listing } = await supabase
@@ -1018,7 +1083,8 @@ export async function cancelAuction(listingId: string): Promise<Result<{ invento
   const { error: delErr } = await supabase.from("auction_listings").delete().eq("id", listingId);
   if (delErr) return { error: delErr.message };
   const w = await loadWallet(supabase, user.id);
-  const inventory = w ? (w.inventory.includes(listing.item_key as string) ? w.inventory : [...w.inventory, listing.item_key as string]) : [];
+  if (w === "degraded") return DEGRADED;
+  const inventory = w.inventory.includes(listing.item_key as string) ? w.inventory : [...w.inventory, listing.item_key as string];
   await supabase.from("profiles").update({ inventory }).eq("id", user.id);
   return { ok: true, inventory };
 }

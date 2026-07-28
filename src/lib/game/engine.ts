@@ -944,6 +944,7 @@ export class GameEngine {
     const vote = this.map.race?.bossVote;
     if (!vote) return;
     const fx = this.bossVoteFx;
+    if (fx?.decided) return; // 확정되면 발판/게이지 숨김 (레이스 시작)
     const pads: [typeof vote.on, boolean, string, string][] = [
       [vote.on, true, "👹", "#f9a8d4"],
       [vote.off, false, "🕊️", "#a5f3fc"],
