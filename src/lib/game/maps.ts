@@ -139,6 +139,7 @@ export interface RaceConfig {
   laps: number;
   start: RaceRect; // 출발/결승선
   checkpoints: RaceRect[]; // 순서대로 통과해야 랩 인정
+  bossVote?: { on: RaceRect; off: RaceRect }; // 보스 ON/OFF 투표 발판 (게임 시작 전 3초 게이지)
 }
 
 export interface MapData {

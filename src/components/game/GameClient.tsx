@@ -13,6 +13,7 @@ import {
   PrivateArea,
   TILE_INFO,
   getPreset,
+  inRaceRect,
   mapPixelSize,
   objectInteraction,
   resolveMap,
@@ -377,6 +378,11 @@ export default function GameClient({
   const [bossHud, setBossHud] = useState<{ hp: number; maxHp: number; kind: string; alive: boolean } | null>(null);
   const bossRef = useRef<{ x: number; y: number; hp: number; maxHp: number; kind: string; alive: boolean } | null>(null);
   const bossRespawnRef = useRef(0);
+  // 보스 ON/OFF 투표 — 발판에 서서 3초 게이지가 차면 그 모드로 확정
+  const [bossVoteHud, setBossVoteHud] = useState<{ on: number; off: number; gaugeMs: number; decided: boolean; mode: boolean } | null>(null);
+  const bossModeRef = useRef<boolean | null>(null); // null=미정(투표중), true=보스 ON, false=OFF
+  const voteGaugeRef = useRef(0);
+  const voteLockedRef = useRef(false); // 확정 후 발판이 빌 때까지 재투표 잠금
   // 보스 레이드 호스트 선출 (가장 작은 id) — 안정적 단일 시뮬레이터
   const isHost = useMemo(() => {
     if (!identity) return false;
@@ -772,9 +778,18 @@ export default function GameClient({
       case "boss": {
         const b = payload as RtEvents["boss"];
         if (!isHostRef.current) {
-          bossRef.current = b;
-          engineRef.current?.setBoss(b);
-          setBossHud({ hp: b.hp, maxHp: b.maxHp, kind: b.kind, alive: b.alive });
+          bossRef.current = b.alive ? b : null;
+          engineRef.current?.setBoss(b.alive ? b : null);
+          setBossHud(b.alive ? { hp: b.hp, maxHp: b.maxHp, kind: b.kind, alive: b.alive } : null);
+        }
+        break;
+      }
+      case "bossmode": {
+        const v = payload as RtEvents["bossmode"];
+        if (!isHostRef.current) {
+          bossModeRef.current = v.decided ? v.mode : null;
+          engineRef.current?.setBossVote(v);
+          setBossVoteHud(v);
         }
         break;
       }
@@ -912,7 +927,7 @@ export default function GameClient({
           applyRaceRecord(r.from, r.name, r.totalMs);
           addToast(`🏁 ${r.name}님이 ${r.laps}랩 완주! ${fmtMs(r.totalMs)}`);
         } else if (r.kind === "countdown") {
-          addToast(`🚦 ${r.name}님의 보스전이 10초 뒤 시작됩니다`);
+          addToast(`🚦 ${r.name}님의 레이스가 10초 뒤 시작됩니다`);
         } else if (r.kind === "start") {
           addToast(`🚦 ${r.name}님이 레이스를 시작했어요!`);
         }
@@ -1011,7 +1026,7 @@ export default function GameClient({
         },
         onRace: (ev) => {
           if (ev.kind === "countdown") {
-            addToast("🚦 보스전 시작까지 10초 — 출발선에서 대기하세요");
+            addToast("🚦 레이스 시작까지 10초 — 출발선에서 대기하세요");
             if (multiplayer)
               channelRef.current.send("race", {
                 from: identity.id,
@@ -1374,37 +1389,93 @@ export default function GameClient({
     return () => clearInterval(t);
   }, [liveMap, engineReady]);
 
-  // ----- 보스 레이드 (레이스 맵) — 호스트가 시뮬레이션/브로드캐스트 -----
+  // ----- 보스 ON/OFF 투표 + 보스 레이드 (레이스 맵) — 호스트가 시뮬레이션/브로드캐스트 -----
   useEffect(() => {
     if (!liveMap.race || !identity) {
       bossRef.current = null;
       setBossHud(null);
+      setBossVoteHud(null);
       engineRef.current?.setBoss(null);
+      engineRef.current?.setBossVote(null);
+      bossModeRef.current = null;
+      voteGaugeRef.current = 0;
+      voteLockedRef.current = false;
       return;
     }
-    if (!isHost) return; // 비호스트는 boss 이벤트로 수신
+    // 투표 발판이 없는(구버전) 맵은 기존처럼 보스 ON 기본값.
+    const vote = liveMap.race.bossVote;
+    if (!vote) bossModeRef.current = true;
+    if (!isHost) return; // 비호스트는 boss/bossmode 이벤트로 수신
     const kind = liveMap.key.includes("sea") ? "kraken" : liveMap.key.includes("sky") ? "chicken" : "mole";
     const size = mapPixelSize(liveMap);
+    const TICK = 150;
     const t = setInterval(() => {
       const e = engineRef.current;
       if (!e) return;
       const now = Date.now();
-      let b = bossRef.current;
-      if (!b || (!b.alive && now > bossRespawnRef.current)) {
-        const maxHp = 24; // 다같이 공략하는 팀 레이드 — 로켓 명중 1회당 1 피해
-        b = { x: size.w / 2, y: size.h / 2, hp: maxHp, maxHp, kind, alive: true };
-        bossRef.current = b;
+
+      // ---- 보스 ON/OFF 투표 집계 (보스가 살아있지 않을 때만) ----
+      if (vote && !bossRef.current?.alive) {
+        const players = [e.getSelf(), ...e.getOthers()];
+        let on = 0;
+        let off = 0;
+        for (const p of players) {
+          if (inRaceRect(vote.on, p.x, p.y)) on++;
+          else if (inRaceRect(vote.off, p.x, p.y)) off++;
+        }
+        if (on + off === 0) {
+          // 발판이 비면 게이지 초기화 + 재투표 잠금 해제
+          voteGaugeRef.current = 0;
+          voteLockedRef.current = false;
+        } else if (!voteLockedRef.current) {
+          voteGaugeRef.current += TICK;
+          if (voteGaugeRef.current >= 3000) {
+            const decidedOn = on > off; // 더 많이 선 쪽 (동점은 OFF=평화 레이스)
+            bossModeRef.current = decidedOn;
+            voteLockedRef.current = true;
+            voteGaugeRef.current = 3000;
+            addToast(decidedOn ? "👹 보스 ON! 협동 보스 레이스 시작!" : "🕊️ 보스 OFF! 평화로운 레이스 시작!");
+          }
+        }
+        const voteFx = {
+          on,
+          off,
+          gaugeMs: voteGaugeRef.current,
+          decided: bossModeRef.current !== null && voteLockedRef.current,
+          mode: bossModeRef.current === true,
+        };
+        e.setBossVote(voteFx);
+        setBossVoteHud(voteFx);
+        if (multiplayer) channelRef.current.send("bossmode", voteFx);
       }
-      if (b.alive) {
-        b.x = size.w / 2;
-        b.y = size.h / 2;
+
+      // ---- 보스 시뮬레이션 (보스 ON 확정 시에만) ----
+      if (bossModeRef.current === true) {
+        let b = bossRef.current;
+        if (!b || (!b.alive && now > bossRespawnRef.current)) {
+          const maxHp = 24; // 다같이 공략하는 팀 레이드 — 로켓 명중 1회당 1 피해
+          b = { x: size.w / 2, y: size.h / 2, hp: maxHp, maxHp, kind, alive: true };
+          bossRef.current = b;
+        }
+        if (b.alive) {
+          b.x = size.w / 2;
+          b.y = size.h / 2;
+        }
+        e.setBoss(b);
+        setBossHud({ hp: b.hp, maxHp: b.maxHp, kind: b.kind, alive: b.alive });
+        if (multiplayer) {
+          channelRef.current.send("boss", { x: b.x, y: b.y, hp: b.hp, maxHp: b.maxHp, kind: b.kind, alive: b.alive });
+        }
+      } else {
+        // 보스 OFF/미정 — 보스 제거
+        if (bossRef.current) {
+          bossRef.current = null;
+          if (multiplayer) channelRef.current.send("boss", { x: 0, y: 0, hp: 0, maxHp: 24, kind, alive: false });
+        }
+        e.setBoss(null);
+        setBossHud(null);
       }
-      e.setBoss(b);
-      setBossHud({ hp: b.hp, maxHp: b.maxHp, kind: b.kind, alive: b.alive });
-      if (multiplayer) {
-        channelRef.current.send("boss", { x: b.x, y: b.y, hp: b.hp, maxHp: b.maxHp, kind: b.kind, alive: b.alive });
-      }
-    }, 150);
+    }, TICK);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveMap, identity, isHost, multiplayer]);
@@ -2191,18 +2262,23 @@ export default function GameClient({
           </Link>
           <div className="flex min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-[#101720]/80 px-3 py-2 shadow-xl backdrop-blur-xl">
             <span className="max-w-[150px] truncate text-xs font-semibold text-white sm:max-w-[220px]">{space.name}</span>
-            <span className="h-4 w-px bg-white/10" />
-            <select
-              value={room.id}
-              onChange={(e) => router.push(`/s/${space.id}/${e.target.value}`)}
-              className="max-w-[150px] cursor-pointer rounded-md bg-transparent text-xs text-slate-300 outline-none hover:text-white sm:max-w-[220px]"
-            >
-              {rooms.map((r) => (
-                <option key={r.id} value={r.id} className="bg-panel">
-                  {r.name}
-                </option>
-              ))}
-            </select>
+            {/* 레이싱장에서는 상단 맵 종류(방 선택) 드롭다운을 숨긴다 */}
+            {!liveMap.race && (
+              <>
+                <span className="h-4 w-px bg-white/10" />
+                <select
+                  value={room.id}
+                  onChange={(e) => router.push(`/s/${space.id}/${e.target.value}`)}
+                  className="max-w-[150px] cursor-pointer rounded-md bg-transparent text-xs text-slate-300 outline-none hover:text-white sm:max-w-[220px]"
+                >
+                  {rooms.map((r) => (
+                    <option key={r.id} value={r.id} className="bg-panel">
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
           </div>
           {(isOwner || role === "admin") && (
             <Link
@@ -2561,24 +2637,52 @@ export default function GameClient({
       {/* ---------- 레이스 HUD (그랑프리) ---------- */}
       {identity && <RaceHud state={raceState} leaderboard={leaderboard} selfId={identity.id} />}
 
+      {/* ---------- 보스 ON/OFF 투표 배너 (유아 스타일 파스텔) ---------- */}
+      {liveMap.race?.bossVote && !bossHud?.alive && bossVoteHud && (
+        <div className="pointer-events-none absolute left-1/2 top-16 z-20 w-[min(92vw,380px)] -translate-x-1/2 rounded-[28px] border-4 border-white/80 bg-gradient-to-b from-pink-200/95 to-sky-200/95 px-5 py-3 text-center shadow-xl backdrop-blur">
+          {bossVoteHud.decided ? (
+            <div className="text-base font-black text-slate-800">
+              {bossVoteHud.mode ? "👹 보스 ON! 다같이 무찌르자!" : "🕊️ 보스 OFF! 평화 레이스 🌸"}
+            </div>
+          ) : (
+            <>
+              <div className="text-sm font-black text-slate-800">🏁 보스전 할까요? 발판에 서서 골라요!</div>
+              <div className="mt-2 flex items-center justify-center gap-3 text-sm font-bold text-slate-700">
+                <span className="rounded-full bg-white/70 px-3 py-1">👹 ON {bossVoteHud.on}명</span>
+                <span className="rounded-full bg-white/70 px-3 py-1">🕊️ OFF {bossVoteHud.off}명</span>
+              </div>
+              <div className="mx-auto mt-2 h-3 w-56 overflow-hidden rounded-full bg-white/60">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-400 to-pink-500 transition-[width] duration-150"
+                  style={{ width: `${Math.min(100, (bossVoteHud.gaugeMs / 3000) * 100)}%` }}
+                />
+              </div>
+              <div className="mt-1 text-[11px] font-semibold text-slate-600">
+                {bossVoteHud.on + bossVoteHud.off > 0 ? "3초 동안 유지하면 확정돼요!" : "발판(출발선 양옆)에 올라서세요"}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* ---------- 보스 레이드 배너 ---------- */}
       {bossHud?.alive && (
         <div
-          className={`pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-2xl border bg-panel/95 px-4 py-2 text-center shadow-xl backdrop-blur ${
-            bossHud.hp <= 1 ? "border-red-500 animate-pulse" : "border-red-500/50"
+          className={`pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-[28px] border-4 bg-gradient-to-b from-rose-200/95 to-fuchsia-200/95 px-4 py-2 text-center shadow-xl backdrop-blur ${
+            bossHud.hp <= 1 ? "border-red-400 animate-pulse" : "border-white/80"
           }`}
         >
-          <div className="text-sm font-bold text-red-300">
+          <div className="text-sm font-black text-rose-700">
             {bossHud.hp <= 1 ? "⚠ FINAL RAGE · " : bossHud.hp / bossHud.maxHp <= 0.5 ? "STAGE 2 · " : ""}
             {bossHud.kind === "kraken" ? "🦑 크라켄" : bossHud.kind === "chicken" ? "🐔 알 쏘는 치킨" : "🦔 고슴도치"} 보스 레이드!
           </div>
-          <div className="mx-auto mt-1 h-2.5 w-56 overflow-hidden rounded-full bg-black/50">
-            <div className="h-full bg-red-500" style={{ width: `${Math.max(0, (bossHud.hp / bossHud.maxHp) * 100)}%` }} />
+          <div className="mx-auto mt-1 h-2.5 w-56 overflow-hidden rounded-full bg-white/60">
+            <div className="h-full rounded-full bg-gradient-to-r from-rose-400 to-fuchsia-500" style={{ width: `${Math.max(0, (bossHud.hp / bossHud.maxHp) * 100)}%` }} />
           </div>
-          <div className="mt-1 text-xs text-slate-300">
+          <div className="mt-1 text-xs font-semibold text-slate-700">
             다같이 공략! 1초 차지 화살로 탄막 요격 · 아이템 로켓으로 처치 · 🛡️쉴드/⭐스타로 생존
           </div>
-          <div className="mt-0.5 text-[11px] text-slate-400">
+          <div className="mt-0.5 text-[11px] font-medium text-slate-600">
             {bossHud.hp <= 1
               ? "최종 각성! 십자 레이저 + 초대형 링 탄막 — 다같이 마무리하세요!"
               : bossHud.kind === "kraken"
@@ -2790,6 +2894,7 @@ export default function GameClient({
             <section>
               <h4 className="mb-2 font-semibold text-white">🏁 레이싱 · 보스전</h4>
               <ul className="space-y-1 text-slate-300">
+                <li><b className="text-white">👹 보스 ON / 🕊️ 보스 OFF 발판</b>에 서서 3초 유지 → 그 모드로 레이스 시작</li>
                 <li>노란 패드에서 <b className="text-white">F</b>로 탑승 후 결승선 통과 → 랩 시작</li>
                 <li><b className="text-white">🎁 아이템 박스</b> — 터보·부스트·스타·쉴드·폭탄·바나나 등 랜덤</li>
                 <li><b className="text-white">스페이스/클릭</b> — 보스전에서 차지 화살 발사(탄막 요격)</li>

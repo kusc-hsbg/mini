@@ -256,6 +256,8 @@ export class GameEngine {
   // 크라켄 문어발 붙잡힘: 화살을 needed 회 이상 쏴야 탈출, 못 하면 잡아먹힘
   private bossGrab: { until: number; needed: number; count: number } | null = null;
   private bossFinalDone = false; // HP 1 최종 각성 패턴 발동 여부
+  // 보스 ON/OFF 투표 발판 렌더 상태 (호스트가 계산해 setter 로 주입)
+  private bossVoteFx: { on: number; off: number; gaugeMs: number; decided: boolean; mode: boolean } | null = null;
   // 레이스 아이템 (아이템 박스/기름 웅덩이)
   private raceItems: MapObject[] = [];
   private itemCooldowns = new Map<string, number>(); // object id -> 다시 활성화되는 시각
@@ -933,6 +935,56 @@ export class GameEngine {
       this.releaseRacePrison();
     }
   }
+  setBossVote(v: { on: number; off: number; gaugeMs: number; decided: boolean; mode: boolean } | null) {
+    this.bossVoteFx = v;
+  }
+
+  // 보스 ON/OFF 투표 발판 렌더 (귀여운 파스텔 발판 + 게이지 링)
+  private renderBossVotePads(ctx: CanvasRenderingContext2D) {
+    const vote = this.map.race?.bossVote;
+    if (!vote) return;
+    const fx = this.bossVoteFx;
+    const pads: [typeof vote.on, boolean, string, string][] = [
+      [vote.on, true, "👹", "#f9a8d4"],
+      [vote.off, false, "🕊️", "#a5f3fc"],
+    ];
+    for (const [r, isOn, icon, color] of pads) {
+      const x = r.x * TILE;
+      const y = r.y * TILE;
+      const w = r.w * TILE;
+      const h = r.h * TILE;
+      const chosen = fx?.decided && fx.mode === isOn;
+      const count = isOn ? fx?.on ?? 0 : fx?.off ?? 0;
+      ctx.save();
+      // 발판 (둥근 파스텔)
+      roundRectPath(ctx, x + 4, y + 4, w - 8, h - 8, 14);
+      ctx.fillStyle = chosen ? color : `${color}66`;
+      ctx.fill();
+      ctx.lineWidth = chosen ? 5 : 3;
+      ctx.strokeStyle = chosen ? "#ffffff" : color;
+      ctx.stroke();
+      // 게이지 링 (모으는 중)
+      if (fx && !fx.decided && count > 0) {
+        const p = Math.min(1, fx.gaugeMs / 3000);
+        ctx.beginPath();
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = "#ffffff";
+        ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2 - 6, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2);
+        ctx.stroke();
+      }
+      // 아이콘 + 인원수
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "26px serif";
+      ctx.fillText(icon, x + w / 2, y + h / 2 - 4);
+      ctx.font = "bold 13px ui-sans-serif, system-ui";
+      ctx.fillStyle = "#1f2937";
+      ctx.fillText(`${count}명`, x + w / 2, y + h - 12);
+      ctx.textBaseline = "alphabetic";
+      ctx.restore();
+    }
+  }
+
   // 쉴드/스타(무적)로 보호 중인지
   private isProtected(now: number) {
     return now < this.shieldUntil || now < this.invincUntil;
@@ -2307,6 +2359,9 @@ export class GameEngine {
 
     // 레이스 이펙트 (물튀김/바나나/문어발/쉴드·스타 오라)
     if (this.map.race) this.renderRaceFx(ctx, now);
+
+    // 보스 ON/OFF 투표 발판 (보스가 없을 때만 안내)
+    if (this.map.race && this.map.race.bossVote && !this.boss?.alive) this.renderBossVotePads(ctx);
 
     // 레거시 챌린지 렌더 (투사체/이펙트/체력바)
     if (

@@ -32,39 +32,39 @@ export default function RaceHud({
 
   return (
     <div className="pointer-events-none absolute right-3 top-48 z-10 flex w-52 flex-col gap-2">
-      {/* 레이스 타이머 */}
-      <div className="rounded-xl border border-white/10 bg-panel/85 p-3 backdrop-blur">
+      {/* 레이스 타이머 (유아 스타일 파스텔 카드) */}
+      <div className="rounded-[22px] border-4 border-white/80 bg-gradient-to-b from-amber-100/95 to-orange-100/95 p-3 shadow-lg backdrop-blur">
         {countdownSec > 0 ? (
           <div className="text-center">
-            <div className="text-xs font-semibold text-amber-300">보스전 카운트다운</div>
-            <div className="mt-1 font-mono text-4xl font-black tabular-nums text-white">{countdownSec}</div>
-            <div className="mt-1 text-[10px] text-slate-400">출발선 유지 · 시계방향 주행</div>
+            <div className="text-xs font-black text-orange-500">🚦 출발 준비!</div>
+            <div className="mt-1 font-mono text-4xl font-black tabular-nums text-slate-800">{countdownSec}</div>
+            <div className="mt-1 text-[10px] font-semibold text-slate-500">출발선 유지 · 시계방향 주행</div>
           </div>
         ) : state.active ? (
           <>
             <div className="flex items-baseline justify-between">
-              <span className="text-xs font-medium text-amber-300">
+              <span className="text-xs font-black text-orange-500">
                 🏁 LAP {state.lap}/{state.laps}
               </span>
-              <span className="text-[10px] text-slate-400">
+              <span className="text-[10px] font-semibold text-slate-500">
                 CP {state.cpIndex}/{state.cpTotal}
               </span>
             </div>
-            <div className="mt-1 font-mono text-xl font-bold tabular-nums text-white">
+            <div className="mt-1 font-mono text-xl font-black tabular-nums text-slate-800">
               {fmtMs(state.lapElapsedMs)}
             </div>
-            <div className="mt-0.5 flex justify-between text-[10px] text-slate-400">
+            <div className="mt-0.5 flex justify-between text-[10px] font-semibold text-slate-500">
               <span>총 {fmtMs(state.elapsedMs)}</span>
               {state.bestLapMs != null && <span>베스트 {fmtMs(state.bestLapMs)}</span>}
             </div>
           </>
         ) : (
-          <div className="text-xs text-slate-300">
-            🏁 <b className="text-white">카트를 타고 체커 라인</b>을 지나면
+          <div className="text-xs font-semibold text-slate-700">
+            🏎️ <b className="text-orange-500">카트를 타고 체커 라인</b>을 지나면
             <br />
-            시계방향 {state.laps}랩 레이스가 시작됩니다!
+            시계방향 {state.laps}바퀴 레이스가 시작돼요!
             {state.bestLapMs != null && (
-              <div className="mt-1 text-[10px] text-slate-400">
+              <div className="mt-1 text-[10px] text-slate-500">
                 내 베스트 랩 {fmtMs(state.bestLapMs)}
               </div>
             )}
@@ -72,16 +72,16 @@ export default function RaceHud({
         )}
       </div>
 
-      {/* 리더보드 */}
+      {/* 리더보드 (파스텔) */}
       {sorted.length > 0 && (
-        <div className="rounded-xl border border-white/10 bg-panel/85 p-3 backdrop-blur">
-          <div className="mb-1.5 text-xs font-medium text-slate-300">🏆 리더보드 (완주 기록)</div>
+        <div className="rounded-[22px] border-4 border-white/80 bg-gradient-to-b from-sky-100/95 to-indigo-100/95 p-3 shadow-lg backdrop-blur">
+          <div className="mb-1.5 text-xs font-black text-indigo-500">🏆 리더보드 (완주 기록)</div>
           <ol className="space-y-0.5">
             {sorted.map((e, i) => (
               <li
                 key={e.id}
-                className={`flex items-center justify-between text-xs ${
-                  e.id === selfId ? "text-accent2" : "text-slate-200"
+                className={`flex items-center justify-between text-xs font-semibold ${
+                  e.id === selfId ? "text-pink-600" : "text-slate-700"
                 }`}
               >
                 <span className="truncate">

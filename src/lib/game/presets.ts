@@ -704,7 +704,7 @@ function buildCircuit(): MapData {
   add(c, "sign", 28, 17, {
     name: "피트레인 안내",
     props: {
-      text: "🏁 그랑프리 서킷에 오신 걸 환영합니다!\n\n1) 노란 칸에서 F 키로 카트 탑승\n2) 체커 라인을 지나면 랩 타이머 시작\n3) 시계 방향으로 3랩 완주!\n\n⚡ 노란 화살표 = 스피드 부스트\n🎁 ? 박스 = 랜덤 아이템 (터보/부스트/슬로우)\n🛢️ 기름 웅덩이 = 밟으면 미끄러져요\n🚧 라바콘은 완전히 막혀요 — 피하세요\n🌿 잔디/모래에선 카트가 느려집니다",
+      text: "🏁 그랑프리 서킷에 오신 걸 환영합니다!\n\n0) 출발선 양옆 👹보스 ON / 🕊️보스 OFF 발판에 서서 3초!\n1) 노란 칸에서 F 키로 카트 탑승\n2) 체커 라인을 지나면 랩 타이머 시작\n3) 시계 방향으로 3랩 완주!\n\n⚡ 노란 화살표 = 스피드 부스트\n🎁 ? 박스 = 랜덤 아이템 (터보/부스트/슬로우)\n🛢️ 기름 웅덩이 = 밟으면 미끄러져요\n🚧 라바콘은 완전히 막혀요 — 피하세요\n🌿 잔디/모래에선 카트가 느려집니다",
     },
   });
   c.spawns.push({ x: 40, y: 11 }, { x: 42, y: 11 }, { x: 47, y: 11 }, { x: 49, y: 11 });
@@ -817,6 +817,15 @@ function buildCircuit(): MapData {
   add(c, "door", 48, 20, { name: "하늘 비행기 서킷" });
   c.portals.push({ id: "cc-po-sky", x: 48, y: 20, kind: "room", roomTemplate: "circuit-sky", label: "✈️ 하늘 비행기 서킷으로" });
 
+  // ---- 유아 스타일 귀여운 데코 (깃발·꽃밭·화분) ----
+  for (const [bx, by] of [[16, 3], [24, 3], [50, 3], [58, 3]] as [number, number][]) add(c, "flag", bx, by);
+  for (const [px, py] of [[8, 12], [80, 12]] as [number, number][]) add(c, "plant", px, py);
+  for (const [fx, fy] of [[3, 3], [84, 3], [3, 50], [84, 50], [35, 25], [51, 25], [35, 30], [51, 30]] as [number, number][]) add(c, "flowerbed", fx, fy);
+
+  // ---- 보스 ON/OFF 투표 발판 안내 (출발선 양옆) — 발판에 서서 3초 게이지 ----
+  c.labels.push({ x: 36, y: 7, text: "👹 보스 ON" });
+  c.labels.push({ x: 47, y: 7, text: "🕊️ 보스 OFF" });
+
   return {
     key: "circuit",
     name: "그랑프리 서킷",
@@ -837,6 +846,10 @@ function buildCircuit(): MapData {
         { x: 43, y: 41, w: 2, h: 7 }, // CP2 하단
         { x: 8, y: 26, w: 7, h: 2 }, // CP3 좌측
       ],
+      bossVote: {
+        on: { x: 36, y: 8, w: 3, h: 3 }, // 출발선 왼쪽 발판
+        off: { x: 47, y: 8, w: 3, h: 3 }, // 출발선 오른쪽 발판
+      },
     },
   };
 }
@@ -1408,6 +1421,11 @@ function buildRingRace(theme: "sea" | "sky"): MapData {
   add(c, "lamp", 6, H - 7);
   add(c, "lamp", W - 7, H - 7);
 
+  // ---- 유아 스타일 귀여운 데코 (깃발) + 보스 ON/OFF 투표 발판 안내 ----
+  for (const [bx, by] of [[14, 3], [22, 3], [56, 3], [64, 3]] as [number, number][]) add(c, "flag", bx, by);
+  c.labels.push({ x: 33, y: 7, text: "👹 보스 ON" });
+  c.labels.push({ x: 44, y: 7, text: "🕊️ 보스 OFF" });
+
   // ---- 워프 포탈(안쪽 섬) — 전체 미니맵으로 어디든 이동 ----
   // (트랙 위에 방 포털을 두면 주행 중 오발동하므로, 안쪽 섬의 워프 포탈로만 이동)
   add(c, "portalhub", 9, 9, { name: "트랙 워프 포탈" });
@@ -1436,6 +1454,10 @@ function buildRingRace(theme: "sea" | "sky"): MapData {
         { x: 39, y: H - 14, w: 2, h: 6 }, // 하단
         { x: 8, y: 24, w: 6, h: 2 }, // 좌측
       ],
+      bossVote: {
+        on: { x: 33, y: 8, w: 3, h: 3 }, // 출발선 왼쪽 발판
+        off: { x: 44, y: 8, w: 3, h: 3 }, // 출발선 오른쪽 발판
+      },
     },
   };
 }
