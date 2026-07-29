@@ -26,7 +26,7 @@ export default function SpaceCard({
     <div className="card flex flex-col justify-between">
       <div>
         <div className="flex items-center gap-2">
-          <h3 className="font-semibold text-white">{space.name}</h3>
+          <h3 className="font-semibold text-stone-800">{space.name}</h3>
           {badge && (
             <span className="rounded-full bg-accent2/15 px-2 py-0.5 text-xs text-accent2">
               {badge}
@@ -36,10 +36,10 @@ export default function SpaceCard({
           {space.guest_checkin && <span title="게스트 체크인">🚪</span>}
           {!space.is_public && <span title="비공개">🔒</span>}
         </div>
-        <p className="mt-1 line-clamp-2 text-sm text-slate-400">
+        <p className="mt-1 line-clamp-2 text-sm text-stone-500">
           {space.description || "광장 · 오피스 · 파크 · 스타홀 등 프리셋 맵"}
         </p>
-        <p className="mt-1 text-xs text-slate-600">/s/{space.slug}</p>
+        <p className="mt-1 text-xs text-stone-400">/s/{space.slug}</p>
       </div>
       <div className="mt-4 flex items-center gap-2">
         <Link href={`/s/${space.id}`} className="btn-primary flex-1">

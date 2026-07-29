@@ -27,8 +27,8 @@ export default function CreateSpaceForm() {
 
   return (
     <div className="card">
-      <h2 className="font-semibold text-white">🏗️ 스페이스 만들기</h2>
-      <p className="mb-4 mt-1 text-sm text-slate-400">
+      <h2 className="font-semibold text-stone-800">🏗️ 스페이스 만들기</h2>
+      <p className="mb-4 mt-1 text-sm text-stone-500">
         광장·오피스·파크·서킷·비치·스타홀 등 프리셋 맵이 자동 생성됩니다. 생성 후 설정에서 방 추가, 비밀번호,
         멤버 역할, 게스트 체크인 등을 관리할 수 있어요.
       </p>
@@ -47,7 +47,7 @@ export default function CreateSpaceForm() {
           maxLength={200}
           onChange={(e) => setDescription(e.target.value)}
         />
-        <label className="flex items-center gap-2 text-sm text-slate-300">
+        <label className="flex items-center gap-2 text-sm text-stone-600">
           <input
             type="checkbox"
             checked={isPublic}

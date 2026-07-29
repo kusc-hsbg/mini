@@ -2513,23 +2513,20 @@ export function drawCharacter(
     ctx.drawImage(headImg, -S / 2, headTop - 33, S, S);
     ctx.restore();
   } else if (headImg && dir === "up") {
-    // 위로 이동 = 뒷모습. 얼굴 이미지 대신 뒤통수 — 머리카락으로 두상을 충분히 덮는다.
-    ctx.fillStyle = skin;
+    // 위로 이동 = 뒷모습. 뒤통수 전체를 머리카락 색으로 채운다(민머리 노출 없음).
+    const hairStyle = app.hair ?? "short";
+    const backColor = hairStyle === "none" ? skin : hairC;
+    ctx.fillStyle = backColor;
     roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
     ctx.fill();
     ctx.strokeStyle = OUTLINE;
     ctx.lineWidth = 1.2;
     roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
     ctx.stroke();
-    // 뒤통수를 꽉 채우는 머리카락 덩어리 (뒷목 살짝만 남김)
-    const hairStyle = app.hair ?? "short";
     if (hairStyle !== "none") {
-      ctx.fillStyle = hairC;
-      roundRect(ctx, -5.7 * u, headTop - 0.7 * u, 11.4 * u, 8.6 * u, 6);
-      ctx.fill();
       // 정수리 하이라이트로 입체감
       ctx.fillStyle = lighten(hairC, 0.18);
-      roundRect(ctx, -3.5 * u, headTop + 0.4 * u, 4 * u, 2 * u, 3);
+      roundRect(ctx, -3.5 * u, headTop + 0.6 * u, 4 * u, 2 * u, 3);
       ctx.fill();
     }
     // 스타일별 뒷머리 디테일(긴머리/포니테일 등)
