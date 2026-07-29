@@ -2282,8 +2282,22 @@ export function drawCharacter(
   extras?: CharacterExtras
 ) {
   const u = 2; // 픽셀 유닛
-  const lying = !!extras?.lying && !onBike;
-  const sitting = (!!extras?.sitting || lying) && !onBike;
+  const cos = extras?.cosmetics;
+  // 상점 탈것(마운트) 탑승 — 캐릭터가 탈것 위에 온전히 앉는다.
+  const riding = !!(extras?.mounted && cos?.mount) && !onBike;
+  const mountKey = riding ? cos!.mount! : "";
+  // 탈것별 좌석 높이(발을 얼마나 들어올려 앉힐지)
+  const mountLift = !riding
+    ? 0
+    : mountKey === "mount-balloon"
+      ? 6
+      : mountKey === "mount-carpet"
+        ? 10
+        : mountKey === "mount-sportscar" || mountKey.includes("cruiser")
+          ? 15
+          : 17;
+  const lying = !!extras?.lying && !onBike && !riding;
+  const sitting = ((!!extras?.sitting || lying) && !onBike) || riding;
   const dancing = !!extras?.dancing && !moving && !onBike && !sitting;
   const step = moving && !sitting ? Math.floor(t / 130) % 4 : 0; // 걷기 프레임 0..3
   const danceBeat = Math.floor(t / 200) % 2; // 춤 비트
@@ -2315,7 +2329,6 @@ export function drawCharacter(
   if (ghost) ctx.globalAlpha = 0.4;
 
   // 상점 탈것(마운트) — 캐릭터 아래
-  const cos = extras?.cosmetics;
   if (extras?.mounted && cos?.mount) {
     const mi = SHOP_MAP[cos.mount];
     if (mi) drawMount(ctx, cx, cy - 2, cos.mount, mi.color ?? "#94a3b8", t, dir, mi.seats ?? 1);
@@ -2335,7 +2348,7 @@ export function drawCharacter(
   }
 
   ctx.save();
-  ctx.translate(Math.round(cx), Math.round(cy + bob * u - (onBike ? 8 : 0)));
+  ctx.translate(Math.round(cx), Math.round(cy + bob * u - (onBike ? 8 : riding ? mountLift : 0)));
   ctx.imageSmoothingEnabled = true;
   if (lying) {
     // 침대에 누운 자세 — 몸 전체를 눕힘
@@ -2533,7 +2546,10 @@ export function drawCharacter(
     drawHair(ctx, u, headTop, hairStyle, hairC, "up");
     drawHatPixel(ctx, u, headTop, app.hat, top);
   } else {
-  ctx.fillStyle = skin;
+  // 뒷모습(위로 이동)은 뒤통수를 머리카락 색으로 채워 얼굴이 보이지 않게 한다.
+  // (민머리는 두피=피부색 유지) 로봇은 항상 금속색.
+  const backHead = !robot && dir === "up" && (app.hair ?? "short") !== "none";
+  ctx.fillStyle = backHead ? hairC : skin;
   roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, robot ? 3 : 6);
   ctx.fill();
   // 외곽선 (게더 스타일의 또렷한 실루엣)
@@ -2618,7 +2634,7 @@ export function drawCharacter(
 
   // ----- 이름표 + 상태 -----
   // nameAbove: 긴 머리 스타일이 가려지지 않도록 이름표를 더 위로 올린다.
-  const labelY = cy - (app.nameAbove ? 62 : 46) - (onBike ? 8 : 0);
+  const labelY = cy - (app.nameAbove ? 62 : 46) - (onBike ? 8 : riding ? mountLift : 0);
   ctx.font = "bold 11px ui-sans-serif, system-ui";
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";

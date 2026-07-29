@@ -93,6 +93,8 @@ export interface EngineCallbacks {
   onPlayerRightClick?: (id: string) => void; // 우클릭 — 탈것 탑승 요청 등
   onDetach?: () => void; // 탈것에서 내림(승객 해제)
   onFishingSpot?: (near: boolean) => void; // 물가 근접 여부 변화 (낚시)
+  onRaceEnd?: () => void; // 레이스 전멸(모두 감옥) — 게임 종료
+  onRevive?: (targetId: string, targetName: string) => void; // 감옥에서 다른 수감자를 구출
 }
 
 export type RaceItemKind =
@@ -250,6 +252,9 @@ export class GameEngine {
   private raceMissileHits = 0;
   private lavaHitAt = 0;
   private racePrisoned = false;
+  private racePrisonUntil = 0; // 감옥 자동 석방 시각(구출이 없을 때의 안전장치)
+  private raceReviveCooldown = 0; // E 구출 재입력 쿨다운
+  private raceEnded = false; // 모두 감옥 → 게임 종료를 한 번만 발생
   private bossHazards: BossHazard[] = [];
   private bossChildren: BossChild[] = [];
   private bossLasers: BossLaser[] = [];
@@ -772,6 +777,7 @@ export class GameEngine {
     }
     this.keys.add(k);
     if (k === "f") this.tryToggleBike();
+    if (k === "e") this.tryRevivePrisoner();
     if (k === "z") this.toggleDance();
     if (k === "g") this.toggleGhost();
     if (k === " ") {
@@ -856,6 +862,8 @@ export class GameEngine {
 
   private tryToggleBike() {
     if (this.bikeCooldown > 0 || this.seat) return;
+    // F 탑승은 레이싱 맵의 카트/보트/비행기 전용. 일반 맵의 탈것은 하트로 소환한다.
+    if (!this.map.race) return;
     if (this.self.onBike) {
       this.self.onBike = false;
       this.bikeCooldown = 350;
@@ -913,9 +921,35 @@ export class GameEngine {
     };
   }
 
+  // 레이스 감옥 처리 — 모두 갇히면 게임 종료, 아니면 시간 초과 시 자동 석방.
+  private updateRacePrison(now: number) {
+    if (!this.map.race) return;
+    if (!this.racePrisoned || !this.self.dead) {
+      // 살아있는 사람이 하나라도 있으면 전멸 상태를 초기화(재시작 대비)
+      if (!this.self.dead) this.raceEnded = false;
+      return;
+    }
+    // 나 + 다른 모든 참가자가 전부 사망(감옥) → 레이스 종료
+    const others = Array.from(this.others.values());
+    const everyoneJailed = others.every((p) => p.dead);
+    if (everyoneJailed) {
+      if (!this.raceEnded) {
+        this.raceEnded = true;
+        this.cb.onRaceEnd?.();
+      }
+      this.releaseRacePrison();
+      return;
+    }
+    // 구출되지 못하면 20초 후 자동 석방(영구 갇힘 방지)
+    if (this.racePrisonUntil && now >= this.racePrisonUntil) {
+      this.releaseRacePrison();
+    }
+  }
+
   private updateRace(now: number) {
     const race = this.map.race;
     if (!race) return;
+    this.updateRacePrison(now);
     if (!this.self.onBike) {
       this.wasInStartRect = false;
       this.raceCountdownUntil = 0;
@@ -1158,10 +1192,7 @@ export class GameEngine {
   private updateBoss(now: number) {
     const b = this.boss;
     if (!b || !b.alive) return;
-    if (this.racePrisoned && this.self.dead) {
-      const someoneAlive = Array.from(this.others.values()).some((p) => !p.dead);
-      if (!someoneAlive) this.releaseRacePrison();
-    }
+    // 감옥 전멸/석방 처리는 updateRacePrison 에서 담당한다.
   }
 
   private mountedSpeed() {
@@ -1371,9 +1402,37 @@ export class GameEngine {
     this.self.onBike = false;
     this.raceMissileHits = 0;
     this.racePrisoned = false;
+    this.racePrisonUntil = 0;
+    this.respawnAt = 0;
     this.lastHitFrom = null;
     this.cb.onRespawn?.();
     this.pushState();
+  }
+
+  // 감옥 안에서 근처의 다른 수감자를 E 키로 구출한다(네트워크로 대상에게 부활 신호).
+  private tryRevivePrisoner() {
+    if (!this.map.race || !this.racePrisoned || !this.self.dead) return;
+    const now = performance.now();
+    if (now < this.raceReviveCooldown) return;
+    let best: PlayerState | null = null;
+    let bestD = Infinity;
+    for (const p of this.others.values()) {
+      if (!p.dead) continue; // 감옥에 갇힌(사망) 동료만 구출 가능
+      const d = Math.hypot(p.x - this.self.x, p.y - this.self.y);
+      if (d < bestD) {
+        bestD = d;
+        best = p;
+      }
+    }
+    if (best && bestD <= TILE * 2.2) {
+      this.raceReviveCooldown = now + 600;
+      this.cb.onRevive?.(best.id, best.name);
+    }
+  }
+
+  // 다른 수감자가 나를 구출 — 감옥에서 풀려나 경기에 복귀.
+  reviveFromPrison() {
+    if (this.map.race && this.racePrisoned) this.releaseRacePrison();
   }
 
   private launchBossRocket(now: number) {
@@ -1774,6 +1833,7 @@ export class GameEngine {
       this.self.onBike = false;
       this.raceActive = false;
       this.racePrisoned = true;
+      this.racePrisonUntil = performance.now() + 20000; // 20초 뒤 자동 석방(구출이 우선)
       this.bossMissiles = [];
     }
     const killer = this.lastHitFrom;
@@ -1913,8 +1973,9 @@ export class GameEngine {
       if (k.has("arrowright") || k.has("d")) dx += 1;
     }
 
-    // 레거시 챌린지 상태 / 레이스 스턴(운석·폭탄) 중에는 이동 불가
-    if (this.self.dead || now < this.stunUntil) {
+    // 레거시 챌린지 상태 / 레이스 스턴(운석·폭탄) 중에는 이동 불가.
+    // 단, 레이스 감옥에 갇힌 경우엔 감옥 안에서 움직여 서로를 구출할 수 있다.
+    if ((this.self.dead && !this.racePrisoned) || now < this.stunUntil) {
       dx = 0;
       dy = 0;
     }
@@ -2893,7 +2954,8 @@ export class GameEngine {
       ctx.fillRect(a.x * TILE, a.y * TILE, a.w * TILE, a.h * TILE);
       ctx.strokeStyle = "rgba(168,85,247,0.6)";
       ctx.strokeRect(a.x * TILE, a.y * TILE, a.w * TILE, a.h * TILE);
-      ctx.fillStyle = "#e9d5ff";
+      // 밝은 맵 위에서도 읽히도록 진한 보라색 라벨(어두운 배경엔 필요 시 대비 유지)
+      ctx.fillStyle = "#6b21a8";
       ctx.textAlign = "left";
       ctx.fillText(a.name, a.x * TILE + 4, a.y * TILE + 14);
       ctx.textAlign = "center";

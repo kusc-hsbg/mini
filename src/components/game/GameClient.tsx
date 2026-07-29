@@ -807,6 +807,13 @@ export default function GameClient({
         }
         break;
       }
+      case "revive": {
+        const r = payload as RtEvents["revive"];
+        if (r.to !== myId) break;
+        engineRef.current?.reviveFromPrison();
+        addToast(`🤝 ${r.fromName}님이 감옥에서 구출해줬어요!`);
+        break;
+      }
       case "ride-req": {
         const r = payload as RtEvents["ride-req"];
         if (r.to !== myId || blockedRef.current.has(r.from)) break;
@@ -1101,7 +1108,7 @@ export default function GameClient({
         onDeath: (killerName) =>
           addToast(
             liveMap.race
-              ? "⚠️ 장애물 3회 피격 — 경기장 감옥으로 이동했습니다"
+              ? "⚠️ 장애물 3회 피격 — 경기장 감옥으로 이동했습니다 (E로 동료 구출)"
               : killerName
                 ? `✨ ${killerName}님과의 챌린지에서 잠시 쉬어갑니다`
                 : "✨ 잠시 쉬어갑니다"
@@ -1110,6 +1117,28 @@ export default function GameClient({
           addToast(`🎯 ${victimName}님과의 챌린지를 완료했습니다!`);
         },
         onRespawn: () => addToast("✨ 부활했습니다!"),
+        onRaceEnd: () => {
+          addToast("🏁 모두 감옥에 갇혀 레이스가 종료됐어요!");
+          // 호스트는 보스를 제거해 라운드를 마무리(다시 투표로 재시작 가능).
+          if (isHostRef.current) {
+            const b = bossRef.current;
+            if (b && b.alive) {
+              b.alive = false;
+              bossRespawnRef.current = Number.POSITIVE_INFINITY;
+              if (multiplayer)
+                channelRef.current.send("boss", { ...b, alive: false });
+            }
+          }
+        },
+        onRevive: (targetId, targetName) => {
+          if (multiplayer)
+            channelRef.current.send("revive", {
+              from: identity?.id ?? "",
+              fromName: identity?.name ?? "",
+              to: targetId,
+            });
+          addToast(`🤝 ${targetName}님을 감옥에서 구출했어요!`);
+        },
         onBossHit: (amount) => {
           if (isHostRef.current) {
             const b = bossRef.current;
@@ -2002,21 +2031,25 @@ export default function GameClient({
     addToast(`💗 ${label} +${gain}`);
   }
 
+  // 탈것 소환 — 하트 10으로 "자신이 구매한 탈것" 스타일로 탑승한다.
+  // (구매한 탈것이 없으면 기본 스포츠카) F 키로는 탈 수 없다.
   function summonCar() {
-    if (mounted && summonedMount === SPORTSCAR_SUMMON_KEY) {
+    if (mounted && summonedMount) {
       setMounted(false);
       setSummonedMount(null);
-      addToast("🚶 자동차에서 내렸어요");
+      addToast("🚶 탈것에서 내렸어요");
       return;
     }
+    const mountKey = walletRef.current.equipped.mount || SPORTSCAR_SUMMON_KEY;
+    const mountName = SHOP_MAP[mountKey]?.name ?? "탈것";
     if (walletRef.current.hearts < CAR_SUMMON_COST) {
-      addToast(`❌ 자동차 소환에는 ${CAR_SUMMON_COST}하트가 필요해요`);
+      addToast(`❌ 탈것 소환에는 ${CAR_SUMMON_COST}하트가 필요해요`);
       return;
     }
     const activate = () => {
-      setSummonedMount(SPORTSCAR_SUMMON_KEY);
+      setSummonedMount(mountKey);
       setMounted(true);
-      addToast(`🚗 자동차를 소환했어요 (-${CAR_SUMMON_COST}💗)`);
+      addToast(`🚗 ${mountName} 소환! (-${CAR_SUMMON_COST}💗)`);
     };
     setWallet((w) => ({ ...w, hearts: w.hearts - CAR_SUMMON_COST }));
     if (profile) {
@@ -2025,7 +2058,7 @@ export default function GameClient({
           setWallet((w) => ({ ...w, hearts: w.hearts + CAR_SUMMON_COST }));
           setMounted(false);
           setSummonedMount(null);
-          addToast("❌ 자동차 소환 실패: " + res.error);
+          addToast("❌ 탈것 소환 실패: " + res.error);
           return;
         }
         if ("degraded" in res) return; // DB 미반영 — 로컬 지갑 유지
@@ -2371,26 +2404,16 @@ export default function GameClient({
           >
             OX
           </HudIconButton>
-          {wallet.equipped.mount && (
-            <HudIconButton
-              active={mounted && !summonedMount}
-              onClick={() => {
-                const wasMounted = mounted && !summonedMount;
-                setSummonedMount(null);
-                setMounted(!wasMounted);
-                addToast(wasMounted ? "🚶 탈것에서 내렸어요" : "🐺 탈것을 소환했어요");
-              }}
-              title="탈것 타기/내리기"
-            >
-              ◆
-            </HudIconButton>
-          )}
           <HudIconButton
-            active={mounted && summonedMount === SPORTSCAR_SUMMON_KEY}
+            active={mounted && !!summonedMount}
             onClick={summonCar}
-            title={`자동차 소환/내리기 — ${CAR_SUMMON_COST}하트`}
+            title={
+              wallet.equipped.mount
+                ? `탈것 소환/내리기 — 구매한 탈것 스타일, ${CAR_SUMMON_COST}하트`
+                : `탈것 소환/내리기 — 기본 자동차, ${CAR_SUMMON_COST}하트`
+            }
           >
-            ▰
+            🚗
           </HudIconButton>
           {wallet.inventory.includes("portable-piano") && (
             <HudIconButton
@@ -2505,7 +2528,7 @@ export default function GameClient({
           {currentArea.lockable && (
             <button
               onClick={toggleAreaLock}
-              className="rounded-lg bg-panel2 px-2 py-0.5 text-xs text-stone-500 hover:text-white"
+              className="rounded-lg bg-panel2 px-2 py-0.5 text-xs text-stone-500 hover:bg-accent hover:text-white"
             >
               {lockedAreas.has(currentArea.id) ? "🔒 잠김 (해제)" : "🔓 잠그기"}
             </button>
@@ -2517,7 +2540,7 @@ export default function GameClient({
               );
               addToast("🔗 이 영역으로 바로 오는 링크를 복사했어요");
             }}
-            className="rounded-lg bg-panel2 px-2 py-0.5 text-xs text-stone-500 hover:text-white"
+            className="rounded-lg bg-panel2 px-2 py-0.5 text-xs text-stone-500 hover:bg-accent hover:text-white"
           >
             🔗
           </button>
@@ -2898,7 +2921,10 @@ export default function GameClient({
                 <li><b className="text-stone-700">X</b> — 상호작용(오브젝트/의자 앉기/낚시)</li>
                 <li><b className="text-stone-700">1~0</b> — 이모지 표현</li>
                 <li><b className="text-stone-700">Z</b> — 춤 · <b className="text-stone-700">G</b> — 고스트 모드 · <b className="text-stone-700">M</b> — 미니맵</li>
-                <li><b className="text-stone-700">F</b> — {liveMap.vehicle === "boat" ? "보트" : liveMap.vehicle === "plane" ? "비행기" : liveMap.vehicle === "kart" ? "카트" : "오토바이"} 탑승/하차</li>
+                <li><b className="text-stone-700">🚗 탈것 버튼</b> — 하트 {CAR_SUMMON_COST}로 구매한 탈것 소환/내리기 (F로는 탈 수 없어요)</li>
+                {liveMap.race && (
+                  <li><b className="text-stone-700">F</b> — {liveMap.vehicle === "boat" ? "보트" : liveMap.vehicle === "plane" ? "비행기" : "카트"} 탑승/하차 (레이싱 전용)</li>
+                )}
               </ul>
             </section>
             <section>
@@ -2910,6 +2936,7 @@ export default function GameClient({
                 <li><b className="text-stone-700">스페이스/클릭</b> — 보스전에서 차지 화살 발사(탄막 요격)</li>
                 <li><b className="text-stone-700">🛥️ 바다 서킷</b> — 물 위에서는 보트 없이 걸으면 70% 느려져요</li>
                 <li><b className="text-stone-700">🐙 문어발</b>에 잡히면 화살을 빠르게 10발 쏴 탈출!</li>
+                <li><b className="text-stone-700">🚧 감옥</b> — 3회 피격 시 갇혀요. 갇힌 사람끼리 가까이서 <b className="text-stone-700">E</b>로 서로 구출! 모두 갇히면 레이스 종료</li>
               </ul>
             </section>
             <section>

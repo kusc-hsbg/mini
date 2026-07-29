@@ -42,6 +42,7 @@ const EVENTS: RtEventName[] = [
   "ride-req",
   "ride-ok",
   "ride-end",
+  "revive",
   "party-warp",
   "job-update",
   "job-sync-req",

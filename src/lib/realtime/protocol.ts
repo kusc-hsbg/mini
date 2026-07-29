@@ -63,6 +63,8 @@ export interface RtEvents {
   "boss-dmg": { amount: number; byName: string };
   // 보스 ON/OFF 투표 (호스트 권위) — 발판에 서면 3초 게이지 후 모드 확정
   bossmode: { on: number; off: number; gaugeMs: number; decided: boolean; mode: boolean };
+  // 레이스 감옥 — 근처 수감자를 서로 구출(부활)
+  revive: { from: string; fromName: string; to: string };
   // 탈것(양탄자) 동승 + 파티 워프
   "ride-req": { from: string; fromName: string; to: string };
   "ride-ok": { owner: string; ownerName: string; rider: string };
