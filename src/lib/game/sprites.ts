@@ -262,20 +262,21 @@ export function drawTile(
       break;
     }
     case "#": {
-      // 벽 2.5D: 윗면 밝게 + 몸통 + 아랫단 그림자
+      // 벽: 딱딱한 사각 벽돌 대신 둥근 쿠션형 — 타일보다 살짝 겹치게 그려 이음새가 몽글하게 이어진다.
+      const pad = 1;
+      ctx.fillStyle = "rgba(0,0,0,0.14)";
+      roundRect(ctx, x + pad, y + 4, TILE - pad * 2, TILE - 4, 12);
+      ctx.fill();
+      ctx.fillStyle = darken(info.color, 0.05);
+      roundRect(ctx, x + pad, y + 2, TILE - pad * 2, TILE - 4, 12);
+      ctx.fill();
       ctx.fillStyle = info.accent!;
-      ctx.fillRect(x, y, TILE, 10);
-      ctx.fillStyle = darken(info.color, 0.08);
-      ctx.fillRect(x, y + 10, TILE, TILE - 10);
-      ctx.fillStyle = "rgba(255,255,255,0.10)";
-      ctx.fillRect(x, y, TILE, 2);
-      ctx.fillStyle = "rgba(0,0,0,0.28)";
-      ctx.fillRect(x, y + TILE - 5, TILE, 5);
-      // 벽돌 라인
-      ctx.fillStyle = "rgba(0,0,0,0.12)";
-      ctx.fillRect(x, y + 17, TILE, 1);
-      ctx.fillRect(x + ((col % 2) * 16 + 8) % TILE, y + 10, 1, 7);
-      ctx.fillRect(x + ((col % 2) * 8 + 16) % TILE, y + 18, 1, 8);
+      roundRect(ctx, x + pad, y + 1, TILE - pad * 2, TILE - 10, 11);
+      ctx.fill();
+      // 부드러운 하이라이트
+      ctx.fillStyle = "rgba(255,255,255,0.28)";
+      roundRect(ctx, x + 5, y + 3, TILE - 12, 5, 3);
+      ctx.fill();
       break;
     }
     case "B":
@@ -1372,21 +1373,23 @@ export function drawObject(
       break;
     }
     case "crate": {
-      ctx.fillStyle = "rgba(0,0,0,0.2)";
-      ctx.fillRect(x + 2, y + h - 4, w - 4, 4);
-      ctx.fillStyle = "#a3722e";
-      roundRect(ctx, x + 3, y + 4, w - 6, h - 7, 3);
-      ctx.fill();
-      ctx.fillStyle = "#c68a3e";
-      ctx.fillRect(x + 3, y + 4, w - 6, 4);
-      ctx.strokeStyle = "#6b4a1e";
-      ctx.lineWidth = 2;
+      // 딱딱한 나무 상자 대신 몽글한 쿠션 블록.
+      ctx.fillStyle = "rgba(0,0,0,0.18)";
       ctx.beginPath();
-      ctx.moveTo(x + 4, y + 5);
-      ctx.lineTo(x + w - 4, y + h - 4);
-      ctx.moveTo(x + w - 4, y + 5);
-      ctx.lineTo(x + 4, y + h - 4);
-      ctx.stroke();
+      ctx.ellipse(x + w / 2, y + h - 2, w / 2 - 4, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#f0a94b";
+      roundRect(ctx, x + 3, y + 3, w - 6, h - 6, 11);
+      ctx.fill();
+      // 소프트 하이라이트
+      ctx.fillStyle = "rgba(255,255,255,0.32)";
+      roundRect(ctx, x + 7, y + 6, w - 20, 6, 4);
+      ctx.fill();
+      // 단추(솔기) 포인트
+      ctx.fillStyle = "rgba(0,0,0,0.12)";
+      ctx.beginPath();
+      ctx.arc(x + w / 2, y + h / 2, 2, 0, Math.PI * 2);
+      ctx.fill();
       break;
     }
     case "barrel": {
