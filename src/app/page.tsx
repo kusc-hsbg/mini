@@ -17,7 +17,9 @@ export default async function Landing({
   const { configured, userId } = await getSessionContext();
 
   return (
-    <main className="relative mx-auto flex min-h-screen max-w-6xl flex-col items-center overflow-hidden px-6 py-16">
+    <main className="relative mx-auto flex min-h-screen max-w-6xl flex-col items-center overflow-hidden px-6 py-16 text-slate-100">
+      {/* 전체 화면 어두운 배경 (밝은 전역 테마 위로) */}
+      <div className="fixed inset-0 -z-10 bg-[#0e1525]" />
       {/* 배경 레이어: 오브 + 격자 */}
       <div className="orb" style={{ width: 520, height: 520, top: -160, left: -120, background: "#6c8cff" }} />
       <div className="orb" style={{ width: 460, height: 460, bottom: -180, right: -120, background: "#34d399" }} />

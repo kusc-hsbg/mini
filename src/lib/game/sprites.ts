@@ -2489,17 +2489,30 @@ export function drawCharacter(
   // (이미지 로딩 전에는 기존 픽셀 머리로 폴백)
   const headImg = !robot ? getImage(headImgUrl(resolveHeadImgKey(app.headImg))) : null;
 
-  if (headImg) {
-    // 이미지 얼굴 중심(약 540,640/1080)이 픽셀 머리 중심에 오도록 앵커링
+  if (headImg && dir !== "up") {
+    // 이미지 얼굴 — 좌우 이동 시 옆모습처럼 보이도록 진행 방향으로 살짝 밀고 미러링.
     const S = 72;
     ctx.save();
     if (dir === "left") ctx.scale(-1, 1);
+    // 옆을 볼 땐 얼굴을 바깥쪽으로 조금 이동해 측면 느낌.
+    const profileShift = dir === "left" || dir === "right" ? 5 : 0;
     ctx.imageSmoothingEnabled = true;
     ctx.shadowColor = "rgba(62,48,98,0.20)";
     ctx.shadowBlur = 4;
     ctx.shadowOffsetY = 1;
-    ctx.drawImage(headImg, -S / 2, headTop - 33, S, S);
+    ctx.drawImage(headImg, -S / 2 + profileShift, headTop - 33, S, S);
     ctx.restore();
+  } else if (headImg && dir === "up") {
+    // 위로 이동 = 뒷모습. 얼굴 이미지 대신 뒤통수(민머리 두상 + 머리카락 + 모자).
+    ctx.fillStyle = skin;
+    roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
+    ctx.fill();
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 1.2;
+    roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
+    ctx.stroke();
+    drawHair(ctx, u, headTop, app.hair ?? "short", hairC, "up");
+    drawHatPixel(ctx, u, headTop, app.hat, top);
   } else {
   ctx.fillStyle = skin;
   roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, robot ? 3 : 6);

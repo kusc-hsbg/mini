@@ -2588,7 +2588,7 @@ export default function GameClient({
 
       {starhallExhibit && exhibitCardPos && (
         <div
-          className="absolute z-20 overflow-y-auto rounded-xl border border-amber-200/25 bg-[#101720]/94 shadow-2xl backdrop-blur-xl"
+          className="absolute z-20 overflow-y-auto rounded-[24px] border-4 border-white bg-white/92 shadow-2xl backdrop-blur-xl"
           style={{
             left: exhibitCardPos.left,
             top: exhibitCardPos.top,
@@ -2597,14 +2597,14 @@ export default function GameClient({
           }}
         >
           <div
-            className="h-1.5"
+            className="h-2"
             style={{ background: starhallExhibit.props?.color ?? "linear-gradient(90deg,#facc15,#67e8f9)" }}
           />
           <div className="p-3">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-amber-100/70">STAR HALL</div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.28em] text-amber-500">⭐ STAR HALL</div>
             <div className="mt-3 flex gap-3">
               {starhallExhibit.props?.image && (
-                <div className="h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-white/15 bg-slate-950">
+                <div className="h-28 w-28 shrink-0 overflow-hidden rounded-2xl border-2 border-stone-100 bg-white">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={starhallExhibit.props.image}
@@ -2614,15 +2614,17 @@ export default function GameClient({
                 </div>
               )}
               <div className="min-w-0">
-                <div className="text-[11px] font-medium text-cyan-100">{starhallExhibit.props?.filename}</div>
-                <div className="mt-1 text-lg font-semibold text-stone-700">{starhallExhibit.name}</div>
+                <div className="text-[11px] font-bold text-cyan-600">{starhallExhibit.props?.filename}</div>
+                <div className="mt-1 text-lg font-black text-stone-800">{starhallExhibit.name}</div>
                 {starhallExhibit.props?.sourceUrl && (
                   <div className="mt-1 truncate text-[11px] text-stone-400">{starhallExhibit.props.sourceUrl}</div>
                 )}
               </div>
             </div>
             {starhallExhibit.props?.text && (
-              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-stone-500">{starhallExhibit.props.text}</p>
+              <p className="mt-3 whitespace-pre-wrap rounded-2xl bg-white/85 p-3 text-sm font-medium leading-relaxed text-stone-700 shadow-inner ring-1 ring-stone-100">
+                {starhallExhibit.props.text}
+              </p>
             )}
           </div>
         </div>

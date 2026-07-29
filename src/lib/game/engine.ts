@@ -416,41 +416,41 @@ export class GameEngine {
     this.ground = cv;
   }
 
-  // 길(산책로/흙/모래/도로)과 잔디가 만나는 볼록 모서리를 잔디색으로 깎아 둥글게 만든다.
+  // 서로 다른 두 땅 타입이 만나는 볼록 모서리를 이웃색으로 깎아 둥글게 만든다(계단식 각짐 제거).
   private roundGround(g: CanvasRenderingContext2D, tiles: string[]) {
     const isGrass = (ch?: string) => ch === "," || ch === ";";
-    const roundable = (ch?: string) =>
-      ch === "-" || ch === "d" || ch === "s" || ch === "=";
+    // 라운딩 대상 야외 땅 타입 (같은 그룹끼리는 경계 없음).
+    const GROUND = new Set([",", ";", "d", "s", "-", "=", "p"]);
     const at = (r: number, c: number) => tiles[r]?.[c];
     const R = 13;
     for (let r = 0; r < tiles.length; r++) {
       for (let c = 0; c < tiles[r].length; c++) {
         const ch = tiles[r][c];
-        if (!roundable(ch)) continue;
+        if (!GROUND.has(ch)) continue;
         const x = c * TILE;
         const y = r * TILE;
-        const pathColor = TILE_INFO[ch]?.color ?? "#e8d3a6";
+        const selfColor = TILE_INFO[ch]?.color ?? "#e8d3a6";
         const U = at(r - 1, c), D = at(r + 1, c), L = at(r, c - 1), Rt = at(r, c + 1);
-        // 볼록(바깥) 모서리: 두 직교 이웃이 모두 잔디일 때 그 모서리를 라운딩.
+        // 볼록 모서리: 두 직교 이웃이 서로 같고( self와 다른) 땅 타입일 때 그 모서리를 라운딩.
         const carve = (
           sqx: number,
           sqy: number,
           discx: number,
           discy: number,
-          grassCh?: string
+          nb?: string
         ) => {
-          const grass = TILE_INFO[grassCh === ";" ? ";" : ","].color;
-          g.fillStyle = grass;
+          if (!nb || !GROUND.has(nb) || nb === ch) return;
+          g.fillStyle = TILE_INFO[nb]?.color ?? selfColor;
           g.fillRect(sqx, sqy, R, R);
-          g.fillStyle = pathColor;
+          g.fillStyle = selfColor;
           g.beginPath();
           g.arc(discx, discy, R, 0, Math.PI * 2);
           g.fill();
         };
-        if (isGrass(U) && isGrass(L)) carve(x, y, x + R, y + R, U);
-        if (isGrass(U) && isGrass(Rt)) carve(x + TILE - R, y, x + TILE - R, y + R, U);
-        if (isGrass(D) && isGrass(L)) carve(x, y + TILE - R, x + R, y + TILE - R, D);
-        if (isGrass(D) && isGrass(Rt)) carve(x + TILE - R, y + TILE - R, x + TILE - R, y + TILE - R, D);
+        if (U === L) carve(x, y, x + R, y + R, U);
+        if (U === Rt) carve(x + TILE - R, y, x + TILE - R, y + R, U);
+        if (D === L) carve(x, y + TILE - R, x + R, y + TILE - R, D);
+        if (D === Rt) carve(x + TILE - R, y + TILE - R, x + TILE - R, y + TILE - R, D);
       }
     }
     // 잔디 위에 귀여운 꽃 점을 드문드문 흩뿌린다.
