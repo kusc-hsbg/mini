@@ -2290,24 +2290,10 @@ export default function GameClient({
             ←
           </Link>
           <div className="flex min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-[#101720]/80 px-3 py-2 shadow-xl backdrop-blur-xl">
+            {/* 맵 이동은 포탈로만 — 상단 방 선택 드롭다운 제거 */}
             <span className="max-w-[150px] truncate text-xs font-semibold text-white sm:max-w-[220px]">{space.name}</span>
-            {/* 레이싱장에서는 상단 맵 종류(방 선택) 드롭다운을 숨긴다 */}
-            {!liveMap.race && (
-              <>
-                <span className="h-4 w-px bg-white/10" />
-                <select
-                  value={room.id}
-                  onChange={(e) => router.push(`/s/${space.id}/${e.target.value}`)}
-                  className="max-w-[150px] cursor-pointer rounded-md bg-transparent text-xs text-stone-500 outline-none hover:text-white sm:max-w-[220px]"
-                >
-                  {rooms.map((r) => (
-                    <option key={r.id} value={r.id} className="bg-panel">
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
-              </>
-            )}
+            <span className="h-4 w-px bg-white/10" />
+            <span className="max-w-[150px] truncate text-xs text-stone-400 sm:max-w-[220px]">{room.name}</span>
           </div>
           {(isOwner || role === "admin") && (
             <Link
@@ -3322,7 +3308,7 @@ function CollectionModal({
           ].map(([icon, label, val]) => (
             <div key={label as string} className="rounded-xl bg-panel2 p-3 text-center">
               <div className="text-2xl">{icon as string}</div>
-              <div className="mt-1 text-lg font-bold text-white">{val as number}</div>
+              <div className="mt-1 text-lg font-bold text-stone-800">{val as number}</div>
               <div className="text-xs text-stone-400">{label as string}</div>
             </div>
           ))}
@@ -3380,8 +3366,8 @@ function QuestModal({
             <li key={i} className="flex items-center gap-3 rounded-xl bg-panel2/60 p-2.5">
               <span className="text-xl">{s.icon}</span>
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-white">{s.title}</div>
-                <div className="text-xs text-stone-400">{s.desc}</div>
+                <div className="text-sm font-bold text-stone-700">{s.title}</div>
+                <div className="text-xs text-stone-500">{s.desc}</div>
               </div>
               {s.action && (
                 <button
@@ -3494,7 +3480,7 @@ function WarpModal({
                   <RoomThumb templateKey={r.template_key} />
                 </div>
                 <div className="px-2 py-1.5">
-                  <div className="truncate text-sm font-medium text-white">{r.name}</div>
+                  <div className="truncate text-sm font-medium text-stone-700">{r.name}</div>
                   <div className="text-[10px] text-stone-400">
                     {isCurrent ? "현재 위치" : isSel ? `워프 중... ${Math.round(progress * 100)}%` : "선택"}
                   </div>
@@ -3544,9 +3530,9 @@ function ExhibitModal({ obj, onClose }: { obj: MapObject; onClose: () => void })
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-lg font-bold text-white">{obj.name}</div>
+            <div className="text-lg font-bold text-stone-800">{obj.name}</div>
             {obj.props?.filename && (
-              <div className="mt-0.5 text-xs text-cyan-100">{obj.props.filename}</div>
+              <div className="mt-0.5 text-xs text-cyan-600">{obj.props.filename}</div>
             )}
             {obj.props?.title && !obj.props?.filename && (
               <div className="mt-0.5 inline-block rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-300">

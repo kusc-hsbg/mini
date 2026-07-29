@@ -2490,20 +2490,30 @@ export function drawCharacter(
   const headImg = !robot ? getImage(headImgUrl(resolveHeadImgKey(app.headImg))) : null;
 
   if (headImg && dir !== "up") {
-    // 이미지 얼굴 — 좌우 이동 시 옆모습처럼 보이도록 진행 방향으로 살짝 밀고 미러링.
+    // 이미지 얼굴. 좌우 이동 시엔 진행 방향으로 밀고 가로로 살짝 압축해 "고개를 돌린 옆모습"으로.
     const S = 72;
+    const profile = dir === "left" || dir === "right";
     ctx.save();
     if (dir === "left") ctx.scale(-1, 1);
-    // 옆을 볼 땐 얼굴을 바깥쪽으로 조금 이동해 측면 느낌.
-    const profileShift = dir === "left" || dir === "right" ? 5 : 0;
     ctx.imageSmoothingEnabled = true;
     ctx.shadowColor = "rgba(62,48,98,0.20)";
     ctx.shadowBlur = 4;
     ctx.shadowOffsetY = 1;
-    ctx.drawImage(headImg, -S / 2 + profileShift, headTop - 33, S, S);
+    if (profile) {
+      // 귀/뒤통수 볼륨: 진행 반대쪽에 살짝 깔아 측면 실루엣을 만든다.
+      ctx.save();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = skin;
+      roundRect(ctx, -5.5 * u, headTop + 1 * u, 4 * u, 6 * u, 4);
+      ctx.fill();
+      ctx.restore();
+      ctx.translate(5, 0);
+      ctx.scale(0.82, 1);
+    }
+    ctx.drawImage(headImg, -S / 2, headTop - 33, S, S);
     ctx.restore();
   } else if (headImg && dir === "up") {
-    // 위로 이동 = 뒷모습. 얼굴 이미지 대신 뒤통수(민머리 두상 + 머리카락 + 모자).
+    // 위로 이동 = 뒷모습. 얼굴 이미지 대신 뒤통수 — 머리카락으로 두상을 충분히 덮는다.
     ctx.fillStyle = skin;
     roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
     ctx.fill();
@@ -2511,7 +2521,19 @@ export function drawCharacter(
     ctx.lineWidth = 1.2;
     roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
     ctx.stroke();
-    drawHair(ctx, u, headTop, app.hair ?? "short", hairC, "up");
+    // 뒤통수를 꽉 채우는 머리카락 덩어리 (뒷목 살짝만 남김)
+    const hairStyle = app.hair ?? "short";
+    if (hairStyle !== "none") {
+      ctx.fillStyle = hairC;
+      roundRect(ctx, -5.7 * u, headTop - 0.7 * u, 11.4 * u, 8.6 * u, 6);
+      ctx.fill();
+      // 정수리 하이라이트로 입체감
+      ctx.fillStyle = lighten(hairC, 0.18);
+      roundRect(ctx, -3.5 * u, headTop + 0.4 * u, 4 * u, 2 * u, 3);
+      ctx.fill();
+    }
+    // 스타일별 뒷머리 디테일(긴머리/포니테일 등)
+    drawHair(ctx, u, headTop, hairStyle, hairC, "up");
     drawHatPixel(ctx, u, headTop, app.hat, top);
   } else {
   ctx.fillStyle = skin;
