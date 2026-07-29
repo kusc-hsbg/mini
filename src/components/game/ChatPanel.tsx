@@ -3,6 +3,7 @@
 // 채팅 패널 — 방 전체 / 현재 영역(그룹) / DM 탭.
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessage, PlayerState } from "@/lib/game/types";
+import { PanelShell } from "./ui";
 
 export type ChatTab = { kind: "room" } | { kind: "area" } | { kind: "dm"; to: string };
 
@@ -56,22 +57,28 @@ export default function ChatPanel({
   }
 
   return (
-    <div className="flex h-full w-80 max-w-[92vw] flex-col overflow-hidden rounded-[28px] border-4 border-white bg-panel/95 shadow-2xl backdrop-blur">
-      <div className="relative overflow-hidden bg-gradient-to-r from-sky-300 via-cyan-200 to-emerald-200 px-4 py-3">
-        <div className="pointer-events-none absolute -right-4 -top-6 h-16 w-16 rounded-full bg-white/25 blur-lg" />
-        <div className="relative flex items-center justify-between">
-          <h3 className="font-extrabold text-white drop-shadow-sm">💬 채팅</h3>
-          <button
-            onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-full border-2 border-white/70 bg-white/20 font-bold text-white hover:bg-white/40"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
-
+    <PanelShell
+      emoji="💬"
+      title="채팅"
+      tone="sky"
+      onClose={onClose}
+      footer={
+        <form onSubmit={submit} className="flex gap-2">
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            maxLength={300}
+            placeholder={
+              tab.kind === "room" ? "모두에게 메시지" : tab.kind === "area" ? "영역 채팅" : "DM 보내기"
+            }
+            className="input rounded-full bg-panel2 text-sm"
+          />
+          <button type="submit" className="btn-primary shrink-0 px-4 text-sm">전송</button>
+        </form>
+      }
+    >
       {/* 탭 */}
-      <div className="flex flex-wrap gap-1.5 border-b-2 border-stone-100 p-2.5">
+      <div className="mb-2 flex flex-wrap gap-1.5">
         <TabBtn active={tab.kind === "room"} onClick={() => onTab({ kind: "room" })}>
           🌐 전체
         </TabBtn>
@@ -94,7 +101,7 @@ export default function ChatPanel({
         ))}
       </div>
 
-      <div ref={listRef} className="min-h-0 flex-1 space-y-2 overflow-auto p-3">
+      <div ref={listRef} className="max-h-full space-y-2">
         {visible.length === 0 && (
           <p className="py-6 text-center text-xs text-stone-400">
             {tab.kind === "dm"
@@ -107,10 +114,10 @@ export default function ChatPanel({
         {visible.map((m) => (
           <div key={m.id} className={`flex ${m.from === selfId ? "justify-end" : "justify-start"}`}>
             <div
-              className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm shadow-sm ${
+              className={`max-w-[85%] rounded-3xl px-3.5 py-2 text-sm shadow-sm ${
                 m.from === selfId
-                  ? "rounded-tr-sm bg-gradient-to-br from-pink-200 to-amber-100 text-stone-700"
-                  : "rounded-tl-sm bg-white/90 text-stone-600"
+                  ? "rounded-br-md bg-gradient-to-br from-pink-200 to-amber-100 text-stone-700"
+                  : "rounded-bl-md bg-white text-stone-600"
               }`}
             >
               {m.from !== selfId && (
@@ -124,20 +131,7 @@ export default function ChatPanel({
           </div>
         ))}
       </div>
-
-      <form onSubmit={submit} className="flex gap-2 border-t-2 border-stone-100 p-2.5">
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          maxLength={300}
-          placeholder={
-            tab.kind === "room" ? "모두에게 메시지" : tab.kind === "area" ? "영역 채팅" : "DM 보내기"
-          }
-          className="input rounded-full bg-panel2 text-sm"
-        />
-        <button type="submit" className="btn-primary shrink-0 px-4 text-sm">전송</button>
-      </form>
-    </div>
+    </PanelShell>
   );
 }
 
@@ -156,8 +150,8 @@ function TabBtn({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-full px-2.5 py-1 text-xs font-semibold transition disabled:opacity-40 ${
-        active ? "bg-accent text-white shadow-sm" : "bg-panel2 text-stone-500 hover:bg-stone-100"
+      className={`rounded-full border-2 border-white px-3 py-1.5 text-xs font-bold transition hover:scale-105 disabled:opacity-40 ${
+        active ? "bg-accent text-white shadow-md" : "bg-white text-stone-500 shadow-sm hover:bg-stone-50"
       }`}
     >
       {children}

@@ -9,6 +9,7 @@ import {
   type FriendEntry,
 } from "@/app/actions";
 import type { PlayerState } from "@/lib/game/types";
+import { PanelShell } from "./ui";
 
 export default function FriendsPanel({
   players,
@@ -51,20 +52,8 @@ export default function FriendsPanel({
   }
 
   return (
-    <div className="flex h-full w-72 max-w-[92vw] flex-col overflow-hidden rounded-[28px] border-4 border-white bg-panel/95 shadow-2xl backdrop-blur">
-      <div className="relative overflow-hidden bg-gradient-to-r from-amber-200 via-orange-200 to-rose-200 px-4 py-3">
-        <div className="pointer-events-none absolute -right-4 -top-6 h-16 w-16 rounded-full bg-white/25 blur-lg" />
-        <div className="relative flex items-center justify-between">
-          <h3 className="font-extrabold text-white drop-shadow-sm">🤝 친구 ({accepted.length})</h3>
-          <button
-            onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-full border-2 border-white/70 bg-white/20 font-bold text-white hover:bg-white/40"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
-      <div className="min-h-0 flex-1 overflow-auto p-2.5 text-sm">
+    <PanelShell emoji="🤝" title={`친구 ${accepted.length}`} tone="peach" width="w-72" onClose={onClose}>
+      <div className="text-sm">
         {loading && <p className="p-3 text-stone-400">불러오는 중...</p>}
 
         {!loading && incoming.length > 0 && (
@@ -118,7 +107,7 @@ export default function FriendsPanel({
           </Section>
         )}
       </div>
-    </div>
+    </PanelShell>
   );
 }
 

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { STATUS_META } from "@/lib/game/constants";
 import type { PlayerState } from "@/lib/game/types";
 import type { RoomJob } from "@/lib/realtime/protocol";
+import { PanelShell } from "./ui";
 
 export default function ParticipantsPanel({
   players,
@@ -59,20 +60,8 @@ export default function ParticipantsPanel({
   );
 
   return (
-    <div className="flex h-full w-72 max-w-[92vw] flex-col overflow-hidden rounded-[28px] border-4 border-white bg-panel/95 shadow-2xl backdrop-blur">
-      <div className="relative overflow-hidden bg-gradient-to-r from-violet-300 via-purple-200 to-pink-200 px-4 py-3">
-        <div className="pointer-events-none absolute -right-4 -top-6 h-16 w-16 rounded-full bg-white/25 blur-lg" />
-        <div className="relative flex items-center justify-between">
-          <h3 className="font-extrabold text-white drop-shadow-sm">👥 참가자 ({players.length})</h3>
-          <button
-            onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-full border-2 border-white/70 bg-white/20 font-bold text-white hover:bg-white/40"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
-      <div className="min-h-0 flex-1 space-y-1.5 overflow-auto p-2.5">
+    <PanelShell emoji="👥" title={`참가자 ${players.length}`} tone="grape" width="w-72" onClose={onClose}>
+      <div className="space-y-1.5">
         {sorted.map((p) => {
           const isSelf = p.id === selfId;
           const meta = STATUS_META[p.status] ?? STATUS_META.available;
@@ -167,7 +156,7 @@ export default function ParticipantsPanel({
           );
         })}
       </div>
-    </div>
+    </PanelShell>
   );
 }
 
@@ -185,12 +174,12 @@ function Btn({
   return (
     <button
       onClick={onClick}
-      className={`rounded-lg px-2 py-1 text-xs transition ${
+      className={`rounded-full border-2 border-white px-2.5 py-1 text-xs font-bold transition hover:scale-105 ${
         active
-          ? "bg-accent text-white"
+          ? "bg-accent text-white shadow-md"
           : danger
             ? "bg-red-100 text-red-500 hover:bg-red-200"
-            : "bg-white/70 text-stone-500 hover:bg-stone-100"
+            : "bg-white text-stone-500 shadow-sm hover:bg-stone-50"
       }`}
     >
       {children}

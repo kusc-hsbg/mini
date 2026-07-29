@@ -2,6 +2,113 @@
 
 import { useEffect } from "react";
 
+// ─────────────────────────────────────────────────────────────
+// 공용 디자인 시스템 — 동글동글 유아틱 테마.
+// 모든 패널/모달이 이 프리미티브를 통해 같은 외형을 공유한다.
+// ─────────────────────────────────────────────────────────────
+
+// 헤더 배너 색조 (파스텔 그라데이션)
+export type ShellTone = "sky" | "pink" | "grape" | "peach" | "mint" | "rainbow";
+const TONE: Record<ShellTone, string> = {
+  sky: "from-sky-300 via-cyan-200 to-teal-200",
+  pink: "from-pink-300 via-rose-200 to-orange-200",
+  grape: "from-violet-300 via-purple-200 to-fuchsia-200",
+  peach: "from-amber-200 via-orange-200 to-rose-200",
+  mint: "from-emerald-300 via-teal-200 to-cyan-200",
+  rainbow: "from-amber-200 via-pink-200 to-sky-200",
+};
+
+// 떠 있는 둥근 패널 셸 — 헤더(이모지+제목) + 스크롤 본문.
+export function PanelShell({
+  emoji,
+  title,
+  tone = "rainbow",
+  width = "w-80",
+  onClose,
+  footer,
+  children,
+}: {
+  emoji: string;
+  title: string;
+  tone?: ShellTone;
+  width?: string;
+  onClose: () => void;
+  footer?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={`flex h-full ${width} max-w-[92vw] flex-col overflow-hidden rounded-[34px] border-[5px] border-white bg-panel/95 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.35)] backdrop-blur`}
+    >
+      <div className={`relative overflow-hidden bg-gradient-to-r ${TONE[tone]} px-4 py-3.5`}>
+        <div className="pointer-events-none absolute -right-3 -top-7 h-16 w-16 rounded-full bg-white/30 blur-lg" />
+        <div className="pointer-events-none absolute -left-5 bottom-0 h-12 w-12 rounded-full bg-white/20 blur-md" />
+        <div className="relative flex items-center gap-2.5">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/70 text-lg shadow-sm">
+            {emoji}
+          </span>
+          <h3 className="flex-1 truncate text-lg font-black text-white drop-shadow-sm">{title}</h3>
+          <button
+            onClick={onClose}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border-[3px] border-white/70 bg-white/25 text-lg font-black text-white transition hover:scale-110 hover:bg-white/45"
+            title="닫기"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto p-3">{children}</div>
+      {footer && <div className="border-t-2 border-dashed border-stone-200/70 p-3">{footer}</div>}
+    </div>
+  );
+}
+
+// 둥근 알약 버튼
+export function Pill({
+  children,
+  onClick,
+  tone = "plain",
+  disabled,
+  className = "",
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  tone?: "plain" | "active" | "danger" | "accent";
+  disabled?: boolean;
+  className?: string;
+}) {
+  const styles = {
+    plain: "bg-white text-stone-500 shadow-sm hover:bg-stone-50",
+    active: "bg-accent text-white shadow-md",
+    danger: "bg-red-100 text-red-500 hover:bg-red-200",
+    accent: "bg-gradient-to-r from-pink-300 to-amber-300 text-white shadow-md hover:brightness-105",
+  }[tone];
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`rounded-full border-2 border-white px-3 py-1.5 text-xs font-bold transition hover:scale-105 disabled:opacity-40 disabled:hover:scale-100 ${styles} ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+// 본문 카드 (목록 행)
+export function Bubble({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`rounded-3xl border-2 border-white bg-white/80 p-3 shadow-sm ${className}`}>
+      {children}
+    </div>
+  );
+}
+
 // 공용 모달 셸 — ESC 로 닫힘.
 export function Modal({
   title,
@@ -30,17 +137,17 @@ export function Modal({
       }}
     >
       <div
-        className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-[28px] border-4 border-white bg-panel shadow-2xl ${
+        className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-[34px] border-[5px] border-white bg-panel shadow-2xl ${
           wide ? "max-w-4xl" : "max-w-lg"
         }`}
       >
-        <div className="relative overflow-hidden bg-gradient-to-r from-amber-200 via-pink-200 to-sky-200 px-4 py-3">
-          <div className="pointer-events-none absolute -right-4 -top-6 h-16 w-16 rounded-full bg-white/25 blur-lg" />
+        <div className="relative overflow-hidden bg-gradient-to-r from-amber-200 via-pink-200 to-sky-200 px-4 py-3.5">
+          <div className="pointer-events-none absolute -right-4 -top-6 h-16 w-16 rounded-full bg-white/30 blur-lg" />
           <div className="relative flex items-center justify-between">
-            <h3 className="font-extrabold text-white drop-shadow-sm">{title}</h3>
+            <h3 className="text-lg font-black text-white drop-shadow-sm">{title}</h3>
             <button
               onClick={onClose}
-              className="grid h-8 w-8 place-items-center rounded-full border-2 border-white/70 bg-white/20 font-bold text-white hover:bg-white/40"
+              className="grid h-9 w-9 place-items-center rounded-full border-[3px] border-white/70 bg-white/25 text-lg font-black text-white transition hover:scale-110 hover:bg-white/45"
             >
               ✕
             </button>

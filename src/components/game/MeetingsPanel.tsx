@@ -7,6 +7,7 @@ import { createMeeting, deleteMeeting } from "@/app/actions";
 import { downloadIcs } from "@/lib/ics";
 import { resolveMap } from "@/lib/game/maps";
 import type { MeetingRecord, RoomRecord } from "@/lib/game/types";
+import { PanelShell } from "./ui";
 
 export default function MeetingsPanel({
   spaceId,
@@ -97,22 +98,92 @@ export default function MeetingsPanel({
 
   const now = Date.now();
 
-  return (
-    <div className="flex h-full w-80 max-w-[92vw] flex-col overflow-hidden rounded-[28px] border-4 border-white bg-panel/95 shadow-2xl backdrop-blur">
-      <div className="relative overflow-hidden bg-gradient-to-r from-emerald-200 via-teal-200 to-sky-200 px-4 py-3">
-        <div className="pointer-events-none absolute -right-4 -top-6 h-16 w-16 rounded-full bg-white/25 blur-lg" />
-        <div className="relative flex items-center justify-between">
-          <h3 className="font-extrabold text-white drop-shadow-sm">📅 회의 일정</h3>
+  const footer = !loggedIn ? (
+    <p className="text-center text-xs text-stone-400">로그인하면 회의를 예약할 수 있습니다.</p>
+  ) : !showForm ? (
+    <button onClick={() => setShowForm(true)} className="btn-primary w-full text-sm">
+      + 회의 예약
+    </button>
+  ) : (
+    <div className="space-y-2">
+      <input
+        className="input bg-panel2 text-sm"
+        placeholder="회의 제목"
+        value={title}
+        maxLength={60}
+        onChange={(e) => setTitle(e.target.value)}
+      />
+      <select
+        className="input bg-panel2 text-sm"
+        value={roomId}
+        onChange={(e) => setRoomId(e.target.value)}
+      >
+        {rooms.map((r) => (
+          <option key={r.id} value={r.id}>{r.name}</option>
+        ))}
+      </select>
+      <div className="flex gap-1.5">
+        {(
+          [
+            ["area", "회의 영역"],
+            ["desk", "내 데스크"],
+            ["spawn", "스폰 위치"],
+          ] as const
+        ).map(([k, label]) => (
           <button
-            onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-full border-2 border-white/70 bg-white/20 font-bold text-white hover:bg-white/40"
+            key={k}
+            onClick={() => setLocKind(k)}
+            disabled={k === "desk" && !myDeskObjectId}
+            className={`flex-1 rounded-full px-2 py-1 text-xs font-semibold ${
+              locKind === k ? "bg-accent text-white" : "bg-panel2 text-stone-500"
+            } disabled:opacity-40`}
           >
-            ✕
+            {label}
           </button>
-        </div>
+        ))}
       </div>
+      {locKind === "area" && (
+        <select
+          className="input bg-panel2 text-sm"
+          value={locRef}
+          onChange={(e) => setLocRef(e.target.value)}
+        >
+          {roomAreas.map((a) => (
+            <option key={a.id} value={a.id}>{a.name}</option>
+          ))}
+        </select>
+      )}
+      <div className="flex gap-2">
+        <input
+          type="datetime-local"
+          className="input bg-panel2 text-sm"
+          value={startsAt}
+          onChange={(e) => setStartsAt(e.target.value)}
+        />
+        <select
+          className="input w-24 shrink-0 bg-panel2 text-sm"
+          value={duration}
+          onChange={(e) => setDuration(Number(e.target.value))}
+        >
+          {[15, 30, 45, 60, 90, 120].map((d) => (
+            <option key={d} value={d}>{d}분</option>
+          ))}
+        </select>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={submit} disabled={pending} className="btn-primary flex-1 text-sm">
+          예약
+        </button>
+        <button onClick={() => setShowForm(false)} className="btn-ghost text-sm">
+          취소
+        </button>
+      </div>
+    </div>
+  );
 
-      <div className="min-h-0 flex-1 space-y-2 overflow-auto p-3">
+  return (
+    <PanelShell emoji="📅" title="회의 일정" tone="mint" onClose={onClose} footer={footer}>
+      <div className="space-y-2">
         {meetings.length === 0 && (
           <p className="py-6 text-center text-sm text-stone-400">예정된 회의가 없습니다.</p>
         )}
@@ -177,92 +248,7 @@ export default function MeetingsPanel({
           );
         })}
       </div>
-
-      <div className="border-t border-stone-100 p-3">
-        {!loggedIn ? (
-          <p className="text-center text-xs text-stone-400">로그인하면 회의를 예약할 수 있습니다.</p>
-        ) : !showForm ? (
-          <button onClick={() => setShowForm(true)} className="btn-primary w-full text-sm">
-            + 회의 예약
-          </button>
-        ) : (
-          <div className="space-y-2">
-            <input
-              className="input bg-panel2 text-sm"
-              placeholder="회의 제목"
-              value={title}
-              maxLength={60}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-            <select
-              className="input bg-panel2 text-sm"
-              value={roomId}
-              onChange={(e) => setRoomId(e.target.value)}
-            >
-              {rooms.map((r) => (
-                <option key={r.id} value={r.id}>{r.name}</option>
-              ))}
-            </select>
-            <div className="flex gap-1.5">
-              {(
-                [
-                  ["area", "회의 영역"],
-                  ["desk", "내 데스크"],
-                  ["spawn", "스폰 위치"],
-                ] as const
-              ).map(([k, label]) => (
-                <button
-                  key={k}
-                  onClick={() => setLocKind(k)}
-                  disabled={k === "desk" && !myDeskObjectId}
-                  className={`flex-1 rounded-full px-2 py-1 text-xs font-semibold ${
-                    locKind === k ? "bg-accent text-white" : "bg-panel2 text-stone-500"
-                  } disabled:opacity-40`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {locKind === "area" && (
-              <select
-                className="input bg-panel2 text-sm"
-                value={locRef}
-                onChange={(e) => setLocRef(e.target.value)}
-              >
-                {roomAreas.map((a) => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
-                ))}
-              </select>
-            )}
-            <div className="flex gap-2">
-              <input
-                type="datetime-local"
-                className="input bg-panel2 text-sm"
-                value={startsAt}
-                onChange={(e) => setStartsAt(e.target.value)}
-              />
-              <select
-                className="input w-24 shrink-0 bg-panel2 text-sm"
-                value={duration}
-                onChange={(e) => setDuration(Number(e.target.value))}
-              >
-                {[15, 30, 45, 60, 90, 120].map((d) => (
-                  <option key={d} value={d}>{d}분</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={submit} disabled={pending} className="btn-primary flex-1 text-sm">
-                예약
-              </button>
-              <button onClick={() => setShowForm(false)} className="btn-ghost text-sm">
-                취소
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+    </PanelShell>
   );
 }
 
