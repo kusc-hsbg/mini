@@ -2755,9 +2755,9 @@ export default function GameClient({
         />
       </div>
 
-      {/* ---------- 우측 패널 ---------- */}
+      {/* ---------- 우측 패널 (플로팅 카드) ---------- */}
       {panel && identity && (
-        <div className="absolute bottom-0 right-0 top-0 z-30">
+        <div className="absolute bottom-24 right-3 top-3 z-30">
           {panel === "participants" && (
             <ParticipantsPanel
               players={players}

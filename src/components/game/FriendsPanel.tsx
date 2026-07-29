@@ -51,18 +51,26 @@ export default function FriendsPanel({
   }
 
   return (
-    <div className="flex h-full w-72 flex-col border-l border-stone-200 bg-panel/95 backdrop-blur">
-      <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
-        <h3 className="font-bold text-stone-700">🤝 친구 ({accepted.length})</h3>
-        <button onClick={onClose} className="text-stone-400 hover:text-stone-700">✕</button>
+    <div className="flex h-full w-72 max-w-[92vw] flex-col overflow-hidden rounded-[28px] border-4 border-white bg-panel/95 shadow-2xl backdrop-blur">
+      <div className="relative overflow-hidden bg-gradient-to-r from-amber-200 via-orange-200 to-rose-200 px-4 py-3">
+        <div className="pointer-events-none absolute -right-4 -top-6 h-16 w-16 rounded-full bg-white/25 blur-lg" />
+        <div className="relative flex items-center justify-between">
+          <h3 className="font-extrabold text-white drop-shadow-sm">🤝 친구 ({accepted.length})</h3>
+          <button
+            onClick={onClose}
+            className="grid h-8 w-8 place-items-center rounded-full border-2 border-white/70 bg-white/20 font-bold text-white hover:bg-white/40"
+          >
+            ✕
+          </button>
+        </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-2 text-sm">
+      <div className="min-h-0 flex-1 overflow-auto p-2.5 text-sm">
         {loading && <p className="p-3 text-stone-400">불러오는 중...</p>}
 
         {!loading && incoming.length > 0 && (
           <Section title={`받은 요청 (${incoming.length})`}>
             {incoming.map((f) => (
-              <div key={f.rowId} className="mb-1 flex items-center gap-2 rounded-xl bg-panel2/60 px-3 py-2">
+              <div key={f.rowId} className="mb-1.5 flex items-center gap-2 rounded-2xl border-2 border-white bg-white/70 px-3 py-2 shadow-sm">
                 <span className="min-w-0 flex-1 truncate text-stone-600">{f.name}</span>
                 <Btn onClick={() => respond(f.rowId, true)} accent>수락</Btn>
                 <Btn onClick={() => respond(f.rowId, false)} danger>거절</Btn>
@@ -81,7 +89,7 @@ export default function FriendsPanel({
             {accepted.map((f) => {
               const here = online.has(f.id);
               return (
-                <div key={f.rowId} className="mb-1 rounded-xl bg-panel2/60 px-3 py-2">
+                <div key={f.rowId} className="mb-1.5 rounded-2xl border-2 border-white bg-white/70 px-3 py-2 shadow-sm">
                   <div className="flex items-center gap-2">
                     <span className={`h-2 w-2 shrink-0 rounded-full ${here ? "bg-emerald-400" : "bg-slate-600"}`} />
                     <span className="min-w-0 flex-1 truncate text-stone-600">{f.name}</span>
@@ -101,7 +109,7 @@ export default function FriendsPanel({
         {!loading && outgoing.length > 0 && (
           <Section title={`보낸 요청 (${outgoing.length})`}>
             {outgoing.map((f) => (
-              <div key={f.rowId} className="mb-1 flex items-center gap-2 rounded-xl bg-panel2/40 px-3 py-2">
+              <div key={f.rowId} className="mb-1.5 flex items-center gap-2 rounded-2xl border-2 border-stone-100 bg-white/40 px-3 py-2">
                 <span className="min-w-0 flex-1 truncate text-stone-400">{f.name}</span>
                 <span className="text-[10px] text-stone-400">대기중</span>
                 <Btn onClick={() => remove(f.rowId)} danger>취소</Btn>
@@ -140,7 +148,7 @@ function Btn({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-lg px-2 py-1 text-xs transition disabled:opacity-40 ${
+      className={`rounded-full px-2.5 py-1 text-xs font-semibold transition disabled:opacity-40 ${
         accent
           ? "bg-accent text-white hover:brightness-110"
           : danger

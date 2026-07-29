@@ -32,7 +32,7 @@ export default function Toolbar(props: {
   const meta = STATUS_META[props.status];
 
   return (
-    <div className="pointer-events-auto relative flex items-center gap-1.5 rounded-2xl bg-panel/85 p-2 backdrop-blur">
+    <div className="pointer-events-auto relative flex items-center gap-1.5 rounded-full border-4 border-white bg-panel/90 p-2 shadow-2xl backdrop-blur">
       {/* 손들기 */}
       {props.multiplayer && (
         <>
@@ -47,14 +47,14 @@ export default function Toolbar(props: {
       <div className="relative">
         <button
           onClick={() => setStatusOpen((v) => !v)}
-          className="flex items-center gap-1.5 rounded-xl bg-panel2 px-2.5 py-2 text-sm text-stone-500 hover:bg-stone-100"
+          className="flex items-center gap-1.5 rounded-full bg-panel2 px-3 py-2 text-sm font-semibold text-stone-500 hover:bg-stone-100"
           title="상태 변경"
         >
           <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: meta.color }} />
           <span className="hidden sm:inline">{meta.label}</span>
         </button>
         {statusOpen && (
-          <div className="absolute bottom-full left-0 mb-2 w-56 rounded-xl border border-stone-200 bg-panel p-2 shadow-xl">
+          <div className="absolute bottom-full left-0 mb-2 w-56 rounded-2xl border-2 border-white bg-panel p-2 shadow-2xl">
             {(Object.keys(STATUS_META) as UserStatus[]).map((s) => (
               <button
                 key={s}
@@ -97,7 +97,7 @@ export default function Toolbar(props: {
           😀
         </IconBtn>
         {emojiOpen && (
-          <div className="absolute bottom-full left-1/2 mb-2 flex -translate-x-1/2 gap-1 rounded-xl border border-stone-200 bg-panel p-1.5 shadow-xl">
+          <div className="absolute bottom-full left-1/2 mb-2 flex -translate-x-1/2 gap-1 rounded-full border-2 border-white bg-panel p-1.5 shadow-2xl">
             {EMOJIS.map((e) => (
               <button
                 key={e}
@@ -169,8 +169,8 @@ function IconBtn({
     <button
       onClick={onClick}
       title={title}
-      className={`grid h-9 w-9 place-items-center rounded-xl text-lg transition ${
-        on ? "bg-accent/30 ring-1 ring-accent" : "bg-panel2 hover:bg-stone-100"
+      className={`grid h-9 w-9 place-items-center rounded-full text-lg transition hover:scale-110 ${
+        on ? "bg-accent text-white shadow-md" : "bg-panel2 hover:bg-stone-100"
       }`}
     >
       {children}
@@ -179,5 +179,5 @@ function IconBtn({
 }
 
 function Divider() {
-  return <div className="mx-0.5 h-6 w-px bg-stone-100" />;
+  return <div className="mx-0.5 h-6 w-px rounded-full bg-stone-200" />;
 }

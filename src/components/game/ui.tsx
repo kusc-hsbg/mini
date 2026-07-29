@@ -30,18 +30,21 @@ export function Modal({
       }}
     >
       <div
-        className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-stone-200 bg-panel shadow-2xl ${
+        className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-[28px] border-4 border-white bg-panel shadow-2xl ${
           wide ? "max-w-4xl" : "max-w-lg"
         }`}
       >
-        <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
-          <h3 className="font-bold text-stone-700">{title}</h3>
-          <button
-            onClick={onClose}
-            className="rounded-lg px-2 py-1 text-stone-400 transition hover:bg-stone-100 hover:text-stone-700"
-          >
-            ✕
-          </button>
+        <div className="relative overflow-hidden bg-gradient-to-r from-amber-200 via-pink-200 to-sky-200 px-4 py-3">
+          <div className="pointer-events-none absolute -right-4 -top-6 h-16 w-16 rounded-full bg-white/25 blur-lg" />
+          <div className="relative flex items-center justify-between">
+            <h3 className="font-extrabold text-white drop-shadow-sm">{title}</h3>
+            <button
+              onClick={onClose}
+              className="grid h-8 w-8 place-items-center rounded-full border-2 border-white/70 bg-white/20 font-bold text-white hover:bg-white/40"
+            >
+              ✕
+            </button>
+          </div>
         </div>
         <div className="min-h-0 flex-1 overflow-auto p-4">{children}</div>
       </div>
@@ -63,13 +66,13 @@ export function ToastStack({
       {toasts.map((t) => (
         <div
           key={t.id}
-          className="pointer-events-auto flex items-center gap-3 rounded-xl border border-stone-200 bg-panel/95 px-4 py-3 text-sm text-stone-600 shadow-xl backdrop-blur"
+          className="pointer-events-auto flex items-center gap-3 rounded-full border-2 border-white bg-panel/95 px-4 py-3 text-sm text-stone-600 shadow-xl backdrop-blur"
         >
           <span className="flex-1">{t.text}</span>
           {t.actionLabel && (
             <button
               onClick={() => onAction(t)}
-              className="shrink-0 rounded-lg bg-accent px-2.5 py-1 text-xs font-medium text-white hover:brightness-110"
+              className="shrink-0 rounded-full bg-accent px-2.5 py-1 text-xs font-bold text-white hover:brightness-110"
             >
               {t.actionLabel}
             </button>

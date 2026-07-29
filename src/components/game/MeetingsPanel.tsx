@@ -98,10 +98,18 @@ export default function MeetingsPanel({
   const now = Date.now();
 
   return (
-    <div className="flex h-full w-80 flex-col border-l border-stone-200 bg-panel/95 backdrop-blur">
-      <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
-        <h3 className="font-bold text-stone-700">📅 회의 일정</h3>
-        <button onClick={onClose} className="text-stone-400 hover:text-stone-700">✕</button>
+    <div className="flex h-full w-80 max-w-[92vw] flex-col overflow-hidden rounded-[28px] border-4 border-white bg-panel/95 shadow-2xl backdrop-blur">
+      <div className="relative overflow-hidden bg-gradient-to-r from-emerald-200 via-teal-200 to-sky-200 px-4 py-3">
+        <div className="pointer-events-none absolute -right-4 -top-6 h-16 w-16 rounded-full bg-white/25 blur-lg" />
+        <div className="relative flex items-center justify-between">
+          <h3 className="font-extrabold text-white drop-shadow-sm">📅 회의 일정</h3>
+          <button
+            onClick={onClose}
+            className="grid h-8 w-8 place-items-center rounded-full border-2 border-white/70 bg-white/20 font-bold text-white hover:bg-white/40"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 space-y-2 overflow-auto p-3">
@@ -114,8 +122,8 @@ export default function MeetingsPanel({
           return (
             <div
               key={m.id}
-              className={`rounded-xl border p-3 ${
-                active ? "border-accent2/40 bg-accent2/5" : "border-stone-100 bg-panel2"
+              className={`rounded-2xl border-2 p-3 shadow-sm ${
+                active ? "border-accent2/40 bg-accent2/5" : "border-white bg-white/70"
               }`}
             >
               <div className="flex items-start justify-between gap-2">
@@ -207,7 +215,7 @@ export default function MeetingsPanel({
                   key={k}
                   onClick={() => setLocKind(k)}
                   disabled={k === "desk" && !myDeskObjectId}
-                  className={`flex-1 rounded-lg px-2 py-1 text-xs ${
+                  className={`flex-1 rounded-full px-2 py-1 text-xs font-semibold ${
                     locKind === k ? "bg-accent text-white" : "bg-panel2 text-stone-500"
                   } disabled:opacity-40`}
                 >

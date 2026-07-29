@@ -59,12 +59,20 @@ export default function ParticipantsPanel({
   );
 
   return (
-    <div className="flex h-full w-72 flex-col border-l border-stone-200 bg-panel/95 backdrop-blur">
-      <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
-        <h3 className="font-bold text-stone-700">👥 참가자 ({players.length})</h3>
-        <button onClick={onClose} className="text-stone-400 hover:text-stone-700">✕</button>
+    <div className="flex h-full w-72 max-w-[92vw] flex-col overflow-hidden rounded-[28px] border-4 border-white bg-panel/95 shadow-2xl backdrop-blur">
+      <div className="relative overflow-hidden bg-gradient-to-r from-violet-300 via-purple-200 to-pink-200 px-4 py-3">
+        <div className="pointer-events-none absolute -right-4 -top-6 h-16 w-16 rounded-full bg-white/25 blur-lg" />
+        <div className="relative flex items-center justify-between">
+          <h3 className="font-extrabold text-white drop-shadow-sm">👥 참가자 ({players.length})</h3>
+          <button
+            onClick={onClose}
+            className="grid h-8 w-8 place-items-center rounded-full border-2 border-white/70 bg-white/20 font-bold text-white hover:bg-white/40"
+          >
+            ✕
+          </button>
+        </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-2">
+      <div className="min-h-0 flex-1 space-y-1.5 overflow-auto p-2.5">
         {sorted.map((p) => {
           const isSelf = p.id === selfId;
           const meta = STATUS_META[p.status] ?? STATUS_META.available;
@@ -75,18 +83,20 @@ export default function ParticipantsPanel({
             : null;
           const inMyParty = instructorParty.includes(p.id);
           return (
-            <div key={p.id} className="mb-1 rounded-xl bg-panel2/60">
+            <div key={p.id} className="rounded-2xl border-2 border-white bg-white/70 shadow-sm">
               <button
                 onClick={() => setOpen(expanded ? null : p.id)}
-                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left hover:bg-stone-100"
+                className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-left hover:bg-white"
               >
                 <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-bold text-white shadow-sm"
                   style={{ backgroundColor: meta.color }}
                   title={meta.label}
-                />
+                >
+                  {p.name.slice(0, 1)}
+                </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm text-stone-600">
+                  <span className="block truncate text-sm font-semibold text-stone-600">
                     {p.name}
                     {isSelf && <span className="text-stone-400"> (나)</span>}
                     {p.guest && <span className="ml-1 text-xs text-amber-600">게스트</span>}

@@ -56,14 +56,22 @@ export default function ChatPanel({
   }
 
   return (
-    <div className="flex h-full w-80 flex-col border-l border-stone-200 bg-panel/95 backdrop-blur">
-      <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
-        <h3 className="font-bold text-stone-700">💬 채팅</h3>
-        <button onClick={onClose} className="text-stone-400 hover:text-stone-700">✕</button>
+    <div className="flex h-full w-80 max-w-[92vw] flex-col overflow-hidden rounded-[28px] border-4 border-white bg-panel/95 shadow-2xl backdrop-blur">
+      <div className="relative overflow-hidden bg-gradient-to-r from-sky-300 via-cyan-200 to-emerald-200 px-4 py-3">
+        <div className="pointer-events-none absolute -right-4 -top-6 h-16 w-16 rounded-full bg-white/25 blur-lg" />
+        <div className="relative flex items-center justify-between">
+          <h3 className="font-extrabold text-white drop-shadow-sm">💬 채팅</h3>
+          <button
+            onClick={onClose}
+            className="grid h-8 w-8 place-items-center rounded-full border-2 border-white/70 bg-white/20 font-bold text-white hover:bg-white/40"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       {/* 탭 */}
-      <div className="flex flex-wrap gap-1 border-b border-stone-100 p-2">
+      <div className="flex flex-wrap gap-1.5 border-b-2 border-stone-100 p-2.5">
         <TabBtn active={tab.kind === "room"} onClick={() => onTab({ kind: "room" })}>
           🌐 전체
         </TabBtn>
@@ -80,13 +88,13 @@ export default function ChatPanel({
             active={tab.kind === "dm" && tab.to === p.id}
             onClick={() => onTab({ kind: "dm", to: p.id })}
           >
-            {unreadDms.has(p.id) && <span className="mr-0.5 text-accent2">●</span>}
+            {unreadDms.has(p.id) && <span className="mr-0.5 text-pink-400">●</span>}
             ✉️ {p.name.slice(0, 6)}
           </TabBtn>
         ))}
       </div>
 
-      <div ref={listRef} className="min-h-0 flex-1 space-y-1.5 overflow-auto p-3">
+      <div ref={listRef} className="min-h-0 flex-1 space-y-2 overflow-auto p-3">
         {visible.length === 0 && (
           <p className="py-6 text-center text-xs text-stone-400">
             {tab.kind === "dm"
@@ -99,12 +107,14 @@ export default function ChatPanel({
         {visible.map((m) => (
           <div key={m.id} className={`flex ${m.from === selfId ? "justify-end" : "justify-start"}`}>
             <div
-              className={`max-w-[85%] rounded-xl px-3 py-1.5 text-sm ${
-                m.from === selfId ? "bg-accent/25 text-stone-600" : "bg-panel2 text-stone-500"
+              className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm shadow-sm ${
+                m.from === selfId
+                  ? "rounded-tr-sm bg-gradient-to-br from-pink-200 to-amber-100 text-stone-700"
+                  : "rounded-tl-sm bg-white/90 text-stone-600"
               }`}
             >
               {m.from !== selfId && (
-                <div className="text-[10px] font-medium text-accent2">{m.fromName}</div>
+                <div className="text-[10px] font-bold text-sky-500">{m.fromName}</div>
               )}
               <div className="whitespace-pre-wrap break-words">{m.text}</div>
               <div className="mt-0.5 text-right text-[9px] text-stone-400">
@@ -115,7 +125,7 @@ export default function ChatPanel({
         ))}
       </div>
 
-      <form onSubmit={submit} className="flex gap-2 border-t border-stone-100 p-2">
+      <form onSubmit={submit} className="flex gap-2 border-t-2 border-stone-100 p-2.5">
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -123,9 +133,9 @@ export default function ChatPanel({
           placeholder={
             tab.kind === "room" ? "모두에게 메시지" : tab.kind === "area" ? "영역 채팅" : "DM 보내기"
           }
-          className="input bg-panel2 text-sm"
+          className="input rounded-full bg-panel2 text-sm"
         />
-        <button type="submit" className="btn-primary shrink-0 px-3 text-sm">전송</button>
+        <button type="submit" className="btn-primary shrink-0 px-4 text-sm">전송</button>
       </form>
     </div>
   );
@@ -146,8 +156,8 @@ function TabBtn({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-lg px-2 py-1 text-xs transition disabled:opacity-40 ${
-        active ? "bg-accent text-white" : "bg-panel2 text-stone-500 hover:bg-stone-100"
+      className={`rounded-full px-2.5 py-1 text-xs font-semibold transition disabled:opacity-40 ${
+        active ? "bg-accent text-white shadow-sm" : "bg-panel2 text-stone-500 hover:bg-stone-100"
       }`}
     >
       {children}
