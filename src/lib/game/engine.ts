@@ -17,6 +17,7 @@ import {
   spawnPoint,
   spotlightAtPx,
   waterTileAt,
+  TILE_INFO,
 } from "./maps";
 import { OBJECT_DEFS } from "./objects";
 import { drawCharacter, drawObject, drawObjectTop, drawTile } from "./sprites";
@@ -403,13 +404,78 @@ export class GameEngine {
     cv.width = w;
     cv.height = h;
     const g = cv.getContext("2d")!;
-    for (let r = 0; r < this.map.tiles.length; r++) {
-      const line = this.map.tiles[r];
+    const tiles = this.map.tiles;
+    for (let r = 0; r < tiles.length; r++) {
+      const line = tiles[r];
       for (let c = 0; c < line.length; c++) {
         drawTile(g, line[c], c, r);
       }
     }
+    // 2차 패스: 격자를 지우고 땅을 둥글둥글하게 — 길·잔디 경계 모서리를 라운딩.
+    this.roundGround(g, tiles);
     this.ground = cv;
+  }
+
+  // 길(산책로/흙/모래/도로)과 잔디가 만나는 볼록 모서리를 잔디색으로 깎아 둥글게 만든다.
+  private roundGround(g: CanvasRenderingContext2D, tiles: string[]) {
+    const isGrass = (ch?: string) => ch === "," || ch === ";";
+    const roundable = (ch?: string) =>
+      ch === "-" || ch === "d" || ch === "s" || ch === "=";
+    const at = (r: number, c: number) => tiles[r]?.[c];
+    const R = 13;
+    for (let r = 0; r < tiles.length; r++) {
+      for (let c = 0; c < tiles[r].length; c++) {
+        const ch = tiles[r][c];
+        if (!roundable(ch)) continue;
+        const x = c * TILE;
+        const y = r * TILE;
+        const pathColor = TILE_INFO[ch]?.color ?? "#e8d3a6";
+        const U = at(r - 1, c), D = at(r + 1, c), L = at(r, c - 1), Rt = at(r, c + 1);
+        // 볼록(바깥) 모서리: 두 직교 이웃이 모두 잔디일 때 그 모서리를 라운딩.
+        const carve = (
+          sqx: number,
+          sqy: number,
+          discx: number,
+          discy: number,
+          grassCh?: string
+        ) => {
+          const grass = TILE_INFO[grassCh === ";" ? ";" : ","].color;
+          g.fillStyle = grass;
+          g.fillRect(sqx, sqy, R, R);
+          g.fillStyle = pathColor;
+          g.beginPath();
+          g.arc(discx, discy, R, 0, Math.PI * 2);
+          g.fill();
+        };
+        if (isGrass(U) && isGrass(L)) carve(x, y, x + R, y + R, U);
+        if (isGrass(U) && isGrass(Rt)) carve(x + TILE - R, y, x + TILE - R, y + R, U);
+        if (isGrass(D) && isGrass(L)) carve(x, y + TILE - R, x + R, y + TILE - R, D);
+        if (isGrass(D) && isGrass(Rt)) carve(x + TILE - R, y + TILE - R, x + TILE - R, y + TILE - R, D);
+      }
+    }
+    // 잔디 위에 귀여운 꽃 점을 드문드문 흩뿌린다.
+    const FLOWER = ["#f9a8d4", "#fca5a5", "#fcd34d", "#c4b5fd", "#93c5fd"];
+    for (let r = 0; r < tiles.length; r++) {
+      for (let c = 0; c < tiles[r].length; c++) {
+        if (!isGrass(tiles[r][c])) continue;
+        const seed = (c * 73856093) ^ (r * 19349663);
+        if ((seed >>> 4) % 11 !== 0) continue;
+        const fx = c * TILE + 8 + ((seed >>> 2) % 16);
+        const fy = r * TILE + 8 + ((seed >>> 6) % 16);
+        const col = FLOWER[(seed >>> 8) % FLOWER.length];
+        g.fillStyle = col;
+        for (let p = 0; p < 5; p++) {
+          const a = (p / 5) * Math.PI * 2;
+          g.beginPath();
+          g.arc(fx + Math.cos(a) * 2.4, fy + Math.sin(a) * 2.4, 1.8, 0, Math.PI * 2);
+          g.fill();
+        }
+        g.fillStyle = "#fffbeb";
+        g.beginPath();
+        g.arc(fx, fy, 1.6, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
   }
 
   // ---------- 외부 API ----------
