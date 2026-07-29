@@ -693,7 +693,8 @@ function buildCircuit(): MapData {
     g.set(44, r, "F");
     g.set(45, r, "F");
   }
-  g.rect(39, 11, 10, 1, "b");
+  // 카트 탑승 패드 — 상하 일열(세로 한 줄)로 배치
+  g.rect(42, 8, 1, 6, "b");
 
   // ---- 부스트 패드 ----
   const boosts: [number, number][] = [
@@ -706,7 +707,8 @@ function buildCircuit(): MapData {
 
   // ---- 피트레인 (아일랜드 상단) ----
   g.rect(28, 16, 32, 7, "-");
-  for (let i = 0; i < 8; i++) g.set(31 + i * 3, 18, "b");
+  // 피트 탑승 패드 — 상하 일열(세로 한 줄)
+  for (let i = 0; i < 6; i++) g.set(34, 16 + i, "b");
   add(c, "counter", 29, 20);
   add(c, "counter", 30, 20);
   add(c, "coffee", 31, 20);
@@ -1359,8 +1361,8 @@ function buildRingRace(theme: "sea" | "sky"): MapData {
     g.set(39, r, "F");
     g.set(40, r, "F");
   }
-  // 카트 패드(출발, 6인 이상 탑승 가능) + 부스트
-  g.rect(33, 11, 12, 1, "b");
+  // 카트 패드(출발) — 상하 일열(세로 한 줄) + 부스트
+  g.rect(37, 8, 1, 6, "b");
   const boosts: [number, number][] = [
     [W - 11, 24], [W - 11, 25], [24, H - 11], [25, H - 11], [10, 24], [10, 25], [55, 9], [56, 9],
   ];

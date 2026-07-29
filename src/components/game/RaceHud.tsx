@@ -72,8 +72,8 @@ export default function RaceHud({
         )}
       </div>
 
-      {/* 리더보드 (파스텔) */}
-      {sorted.length > 0 && (
+      {/* 리더보드 (파스텔) — 승부가 나면(레이스 종료·완주 기록이 있을 때)만 노출 */}
+      {!state.active && countdownSec <= 0 && sorted.length > 0 && (
         <div className="rounded-[22px] border-4 border-white/80 bg-gradient-to-b from-sky-100/95 to-indigo-100/95 p-3 shadow-lg backdrop-blur">
           <div className="mb-1.5 text-xs font-black text-indigo-500">🏆 리더보드 (완주 기록)</div>
           <ol className="space-y-0.5">

@@ -55,7 +55,10 @@ export default async function Landing({
               <Link href="/login" className="btn-primary px-7 py-3 text-lg">
                 {configured ? "로그인하고 시작" : "둘러보기"} <span aria-hidden>→</span>
               </Link>
-              <Link href="/spaces" className="btn-ghost px-7 py-3 text-lg">
+              <Link
+                href="/spaces"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-white/25 bg-white/10 px-7 py-3 text-lg font-bold text-white transition hover:bg-white/20"
+              >
                 게스트로 입장
               </Link>
             </>
