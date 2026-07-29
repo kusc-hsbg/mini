@@ -2284,21 +2284,22 @@ export default function GameClient({
         <div className="pointer-events-auto flex min-w-0 items-center gap-2">
           <Link
             href="/spaces"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/10 bg-[#101720]/80 text-lg text-stone-500 shadow-xl backdrop-blur-xl transition hover:border-white/25 hover:bg-white/10"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border-[3px] border-white bg-panel/90 text-lg font-black text-stone-500 shadow-lg backdrop-blur transition hover:scale-105 hover:text-pink-500"
             title="나가기"
           >
             ←
           </Link>
-          <div className="flex min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-[#101720]/80 px-3 py-2 shadow-xl backdrop-blur-xl">
+          <div className="flex min-w-0 items-center gap-2 rounded-full border-[3px] border-white bg-panel/90 py-1.5 pl-2 pr-4 shadow-lg backdrop-blur">
             {/* 맵 이동은 포탈로만 — 상단 방 선택 드롭다운 제거 */}
-            <span className="max-w-[150px] truncate text-xs font-semibold text-white sm:max-w-[220px]">{space.name}</span>
-            <span className="h-4 w-px bg-white/10" />
-            <span className="max-w-[150px] truncate text-xs text-stone-400 sm:max-w-[220px]">{room.name}</span>
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-pink-300 to-amber-200 text-sm shadow-sm">🏠</span>
+            <span className="max-w-[130px] truncate text-xs font-black text-stone-700 sm:max-w-[200px]">{space.name}</span>
+            <span className="h-3.5 w-px bg-stone-200" />
+            <span className="max-w-[130px] truncate text-xs font-semibold text-stone-400 sm:max-w-[200px]">{room.name}</span>
           </div>
           {(isOwner || role === "admin") && (
             <Link
               href={`/s/${space.id}/settings`}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/10 bg-[#101720]/80 text-stone-500 shadow-xl backdrop-blur-xl transition hover:border-white/25 hover:bg-white/10"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full border-[3px] border-white bg-panel/90 text-stone-500 shadow-lg backdrop-blur transition hover:scale-105"
               title="스페이스 설정"
             >
               ⚙️
@@ -2312,10 +2313,10 @@ export default function GameClient({
                 setRoomClosedAction(room.id, next);
                 addToast(next ? "🚪 이 방의 방문을 닫았어요 (멤버/관리자만 입장)" : "🚪 이 방의 방문을 열었어요");
               }}
-              className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg border shadow-xl backdrop-blur-xl transition ${
+              className={`grid h-10 w-10 shrink-0 place-items-center rounded-full border-[3px] shadow-lg backdrop-blur transition hover:scale-105 ${
                 roomClosed
-                  ? "border-amber-300/40 bg-amber-300/15 text-amber-100"
-                  : "border-white/10 bg-[#101720]/80 text-stone-500 hover:border-white/25 hover:bg-white/10"
+                  ? "border-amber-300 bg-amber-100 text-amber-600"
+                  : "border-white bg-panel/90 text-stone-500"
               }`}
               title={roomClosed ? "방문 열기" : "방문 닫기"}
             >
@@ -2325,13 +2326,13 @@ export default function GameClient({
         </div>
 
         <div className="pointer-events-auto flex min-w-0 items-center gap-2">
-          <div className="hidden items-center overflow-hidden rounded-lg border border-white/10 bg-[#101720]/80 shadow-xl backdrop-blur-xl sm:flex">
-            <span className="border-r border-white/10 px-3 py-2 text-xs font-semibold text-pink-200">
+          <div className="hidden items-center gap-1 rounded-full border-[3px] border-white bg-panel/90 px-1 py-1 shadow-lg backdrop-blur sm:flex">
+            <span className="rounded-full bg-pink-100 px-2.5 py-1 text-xs font-black text-pink-500">
               💗 {wallet.hearts.toLocaleString()}
             </span>
-            <span className="px-3 py-2 text-xs font-semibold text-amber-200">🪙 {wallet.coins.toLocaleString()}</span>
+            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-600">🪙 {wallet.coins.toLocaleString()}</span>
           </div>
-          <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#101720]/80 p-1 shadow-xl backdrop-blur-xl">
+          <div className="flex items-center gap-1 rounded-full border-[3px] border-white bg-panel/90 p-1 shadow-lg backdrop-blur">
           <HudIconButton
             active={panel === "store"}
             onClick={() => setPanel((cur) => (cur === "store" ? null : "store"))}
@@ -2449,13 +2450,13 @@ export default function GameClient({
             ·
           </HudIconButton>
           </div>
-          <div className="hidden h-10 items-center rounded-lg border border-white/10 bg-[#101720]/80 px-3 text-xs shadow-xl backdrop-blur-xl lg:flex">
+          <div className="hidden h-10 items-center rounded-full border-[3px] border-white bg-panel/90 px-3.5 text-xs font-black shadow-lg backdrop-blur lg:flex">
             {multiplayer ? (
-              <span className={channel.ready ? "text-emerald-200" : "text-amber-200"}>
+              <span className={channel.ready ? "text-emerald-500" : "text-amber-500"}>
                 ● {channel.ready ? Math.max(channel.online, players.length) : "..."}
               </span>
             ) : (
-              <span className="text-amber-200">● solo</span>
+              <span className="text-amber-500">● solo</span>
             )}
           </div>
         </div>
@@ -3608,10 +3609,10 @@ function HudIconButton({
     <button
       onClick={onClick}
       title={title}
-      className={`grid h-9 min-w-9 place-items-center rounded-md px-2 text-sm font-semibold transition ${
+      className={`grid h-9 min-w-9 place-items-center rounded-full px-2 text-sm font-black transition hover:scale-110 ${
         active
-          ? "bg-cyan-300 text-slate-950 shadow-[0_0_18px_rgba(103,232,249,0.35)]"
-          : "text-stone-500 hover:bg-white/10 hover:text-white"
+          ? "bg-gradient-to-br from-pink-300 to-amber-300 text-white shadow-md"
+          : "text-stone-500 hover:bg-stone-100"
       }`}
     >
       {children}
