@@ -8,10 +8,10 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#0e1525",
-        panel: "#161e31",
-        panel2: "#1f2940",
-        accent: "#6c8cff",
+        ink: "#5b4636",
+        panel: "#fffaf2",
+        panel2: "#ffe9d6",
+        accent: "#ff8fab",
         accent2: "#34d399",
       },
       fontFamily: {

@@ -37,6 +37,18 @@ export function lighten(hex: string, amt: number): string {
   return `rgb(${r},${g},${b})`;
 }
 
+// 참고 이미지(파스텔 몽글몽글 나무)용 팔레트 — 위치 기반 고정 랜덤 선택.
+const TREE_PALETTES = [
+  { canopy: "#bae6fd", canopy2: "#7dd3fc", light: "#e0f2fe" }, // 하늘색
+  { canopy: "#fbcfe8", canopy2: "#f9a8d4", light: "#fce7f3" }, // 핑크
+  { canopy: "#bbf7d0", canopy2: "#86efac", light: "#dcfce7" }, // 민트
+  { canopy: "#ddd6fe", canopy2: "#c4b5fd", light: "#ede9fe" }, // 라벤더
+  { canopy: "#a7f3d0", canopy2: "#5eead4", light: "#ccfbf1" }, // 터콰이즈
+];
+export function treePalette(ox: number, oy: number) {
+  return TREE_PALETTES[Math.floor(hash2(ox, oy) * TREE_PALETTES.length)];
+}
+
 function roundRect(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -549,15 +561,17 @@ export function drawObject(
     }
     case "tree": {
       // 본체(줄기 + 하단 잎) — 상단 캐노피는 drawObjectTop 에서.
-      ctx.fillStyle = "rgba(0,0,0,0.2)";
+      const tp = treePalette(o.x, o.y);
+      ctx.fillStyle = "rgba(0,0,0,0.16)";
       ctx.beginPath();
       ctx.ellipse(x + TILE, y + h - 4, 16, 5, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = "#6b4226";
-      ctx.fillRect(x + TILE - 5, y + TILE, 10, TILE - 6);
-      ctx.fillStyle = "#59371f";
-      ctx.fillRect(x + TILE - 5, y + TILE, 3, TILE - 6);
-      ctx.fillStyle = "#276b40";
+      ctx.fillStyle = "#b98d5e";
+      roundRect(ctx, x + TILE - 4, y + TILE, 8, TILE - 6, 4);
+      ctx.fill();
+      ctx.fillStyle = "#a67a4c";
+      ctx.fillRect(x + TILE - 4, y + TILE, 2, TILE - 6);
+      ctx.fillStyle = tp.canopy2;
       ctx.beginPath();
       ctx.arc(x + TILE, y + TILE - 2, 20, 0, Math.PI * 2);
       ctx.fill();
@@ -1521,16 +1535,17 @@ export function drawObjectTop(
   const y = o.y * TILE;
   if (o.type === "tree") {
     const cx = x + TILE;
-    ctx.fillStyle = "#2e7d49";
+    const tp = treePalette(o.x, o.y);
+    ctx.fillStyle = tp.canopy2;
     ctx.beginPath();
     ctx.arc(cx, y + 8, 22, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#3c9b5d";
+    ctx.fillStyle = tp.canopy;
     ctx.beginPath();
     ctx.arc(cx - 8, y + 2, 13, 0, Math.PI * 2);
     ctx.arc(cx + 9, y + 6, 11, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#4fb872";
+    ctx.fillStyle = tp.light;
     ctx.beginPath();
     ctx.arc(cx - 4, y - 2, 7, 0, Math.PI * 2);
     ctx.fill();

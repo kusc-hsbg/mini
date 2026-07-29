@@ -59,10 +59,10 @@ export default function ParticipantsPanel({
   );
 
   return (
-    <div className="flex h-full w-72 flex-col border-l border-white/10 bg-panel/95 backdrop-blur">
-      <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
-        <h3 className="font-semibold text-white">👥 참가자 ({players.length})</h3>
-        <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
+    <div className="flex h-full w-72 flex-col border-l border-stone-200 bg-panel/95 backdrop-blur">
+      <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
+        <h3 className="font-bold text-stone-700">👥 참가자 ({players.length})</h3>
+        <button onClick={onClose} className="text-stone-400 hover:text-stone-700">✕</button>
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-2">
         {sorted.map((p) => {
@@ -78,7 +78,7 @@ export default function ParticipantsPanel({
             <div key={p.id} className="mb-1 rounded-xl bg-panel2/60">
               <button
                 onClick={() => setOpen(expanded ? null : p.id)}
-                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left hover:bg-white/5"
+                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left hover:bg-stone-100"
               >
                 <span
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -86,12 +86,12 @@ export default function ParticipantsPanel({
                   title={meta.label}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm text-slate-100">
+                  <span className="block truncate text-sm text-stone-600">
                     {p.name}
-                    {isSelf && <span className="text-slate-500"> (나)</span>}
-                    {p.guest && <span className="ml-1 text-xs text-amber-300/70">게스트</span>}
+                    {isSelf && <span className="text-stone-400"> (나)</span>}
+                    {p.guest && <span className="ml-1 text-xs text-amber-600">게스트</span>}
                   </span>
-                  <span className="block truncate text-xs text-slate-500">
+                  <span className="block truncate text-xs text-stone-400">
                     {p.statusMsg || meta.label}
                     {p.areaId && ` · 📍영역`}
                     {p.spotlight && " · 🎤"}
@@ -179,8 +179,8 @@ function Btn({
         active
           ? "bg-accent text-white"
           : danger
-            ? "bg-red-500/10 text-red-300 hover:bg-red-500/20"
-            : "bg-white/5 text-slate-300 hover:bg-white/10"
+            ? "bg-red-100 text-red-500 hover:bg-red-200"
+            : "bg-white/70 text-stone-500 hover:bg-stone-100"
       }`}
     >
       {children}

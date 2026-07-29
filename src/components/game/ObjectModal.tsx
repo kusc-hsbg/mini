@@ -28,7 +28,7 @@ export default function ObjectModal({
         <div className="flex h-[70vh] flex-col gap-2">
           <iframe
             src={url}
-            className="min-h-0 w-full flex-1 rounded-lg border border-white/10 bg-white"
+            className="min-h-0 w-full flex-1 rounded-lg border border-stone-200 bg-white"
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock"
             allow="fullscreen"
           />
@@ -57,7 +57,7 @@ export default function ObjectModal({
       body = embed ? (
         <iframe
           src={embed}
-          className="aspect-video w-full rounded-lg border border-white/10"
+          className="aspect-video w-full rounded-lg border border-stone-200"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
         />
       ) : (
@@ -82,7 +82,7 @@ export default function ObjectModal({
       wide = false;
       body = (
         <div className="space-y-4 text-center">
-          <p className="text-slate-300">외부 화상회의로 연결합니다 (Zoom / Meet / Teams / Webex 등).</p>
+          <p className="text-stone-500">외부 화상회의로 연결합니다 (Zoom / Meet / Teams / Webex 등).</p>
           {url ? (
             <a href={url} target="_blank" rel="noreferrer" className="btn-primary inline-flex">
               🎥 회의 참여하기 ↗
@@ -98,11 +98,11 @@ export default function ObjectModal({
     default: {
       wide = false;
       body = (
-        <div className="whitespace-pre-wrap rounded-lg bg-panel2 p-4 text-sm leading-relaxed text-slate-200">
+        <div className="whitespace-pre-wrap rounded-lg bg-panel2 p-4 text-sm leading-relaxed text-stone-500">
           {subtitle && (
-            <div className="mb-3 border-b border-white/10 pb-3">
+            <div className="mb-3 border-b border-stone-200 pb-3">
               <div className="text-xs text-accent2">전시 프로필</div>
-              <div className="mt-1 text-base font-semibold text-white">{subtitle}</div>
+              <div className="mt-1 text-base font-bold text-stone-700">{subtitle}</div>
             </div>
           )}
           {obj.props?.text || "내용이 없습니다."}
@@ -120,7 +120,7 @@ export default function ObjectModal({
 }
 
 function Empty({ text }: { text: string }) {
-  return <p className="py-8 text-center text-sm text-slate-400">{text}</p>;
+  return <p className="py-8 text-center text-sm text-stone-400">{text}</p>;
 }
 
 function iconOf(kind: InteractionKind): string {

@@ -55,11 +55,11 @@ export default function DeskModal({
     <Modal title={`💻 ${title}`} onClose={onClose}>
       <div className="space-y-4">
         {desk ? (
-          <p className="text-sm text-slate-300">
-            <b className="text-white">{desk.owner_name}</b> 님의 데스크입니다.
+          <p className="text-sm text-stone-500">
+            <b className="text-stone-700">{desk.owner_name}</b> 님의 데스크입니다.
           </p>
         ) : (
-          <p className="text-sm text-slate-400">아직 주인이 없는 자리입니다.</p>
+          <p className="text-sm text-stone-400">아직 주인이 없는 자리입니다.</p>
         )}
 
         {/* 자리 지정 */}
@@ -73,14 +73,14 @@ export default function DeskModal({
           </button>
         )}
         {!desk && !loggedIn && (
-          <p className="text-xs text-slate-500">로그인하면 자리를 지정할 수 있습니다.</p>
+          <p className="text-xs text-stone-400">로그인하면 자리를 지정할 수 있습니다.</p>
         )}
 
         {/* 내 데스크 관리 */}
         {isMine && (
           <div className="space-y-3 rounded-xl bg-panel2 p-3">
             <div>
-              <div className="mb-1.5 text-xs text-slate-400">러그 색 (자리 꾸미기)</div>
+              <div className="mb-1.5 text-xs text-stone-400">러그 색 (자리 꾸미기)</div>
               <div className="flex gap-2">
                 {RUGS.map((c) => (
                   <button
@@ -96,7 +96,7 @@ export default function DeskModal({
                 ))}
               </div>
             </div>
-            <label className="flex items-center gap-2 text-sm text-slate-300">
+            <label className="flex items-center gap-2 text-sm text-stone-500">
               <input
                 type="checkbox"
                 checked={!!desk?.decor?.plant}
@@ -112,7 +112,7 @@ export default function DeskModal({
             <button
               disabled={pending}
               onClick={() => run(() => releaseDesk(spaceId))}
-              className="btn-ghost w-full text-sm text-red-300"
+              className="btn-ghost w-full text-sm text-red-500"
             >
               자리 해제하기
             </button>
@@ -122,7 +122,7 @@ export default function DeskModal({
         {/* 남의 데스크: 쪽지/선물 */}
         {desk && !isMine && loggedIn && (
           <div className="space-y-2 rounded-xl bg-panel2 p-3">
-            <div className="text-sm font-medium text-slate-200">💌 쪽지/선물 남기기 (비동기)</div>
+            <div className="text-sm font-medium text-stone-500">💌 쪽지/선물 남기기 (비동기)</div>
             <textarea
               className="input min-h-[60px] resize-none bg-panel"
               placeholder={`${desk.owner_name}님에게 메시지를 남겨보세요`}
@@ -136,7 +136,7 @@ export default function DeskModal({
                   key={g}
                   onClick={() => setGift(gift === g ? null : g)}
                   className={`rounded-lg px-2 py-1 text-lg transition ${
-                    gift === g ? "bg-accent/30 ring-1 ring-accent" : "hover:bg-white/10"
+                    gift === g ? "bg-accent/30 ring-1 ring-accent" : "hover:bg-stone-100"
                   }`}
                 >
                   {g}
@@ -171,7 +171,7 @@ export default function DeskModal({
           </div>
         )}
         {desk && !isMine && !loggedIn && (
-          <p className="text-xs text-slate-500">로그인하면 쪽지를 남길 수 있습니다.</p>
+          <p className="text-xs text-stone-400">로그인하면 쪽지를 남길 수 있습니다.</p>
         )}
 
         {error && <p className="text-sm text-red-400">{error}</p>}

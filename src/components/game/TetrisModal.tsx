@@ -188,24 +188,24 @@ export default function TetrisModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="🕹️ 테트리스" onClose={onClose}>
       <div className="flex flex-col items-center gap-3">
-        <div className="flex w-full items-center justify-between text-sm text-slate-300">
+        <div className="flex w-full items-center justify-between text-sm text-stone-500">
           <span>
-            점수 <b className="text-white">{score}</b> · 줄 <b className="text-white">{lines}</b>
+            점수 <b className="text-stone-700">{score}</b> · 줄 <b className="text-stone-700">{lines}</b>
           </span>
-          <span className="text-xs text-slate-500">←→ 이동 · ↑ 회전 · ↓ 소프트드롭 · Space 하드드롭</span>
+          <span className="text-xs text-stone-400">←→ 이동 · ↑ 회전 · ↓ 소프트드롭 · Space 하드드롭</span>
         </div>
         <div className="relative">
           <canvas
             ref={canvasRef}
             width={COLS * CELL}
             height={ROWS * CELL}
-            className="rounded-lg border border-white/10"
+            className="rounded-lg border border-stone-200"
           />
           {over && (
             <div className="absolute inset-0 grid place-items-center rounded-lg bg-black/70">
               <div className="text-center">
-                <p className="text-lg font-bold text-white">게임 오버!</p>
-                <p className="mt-1 text-sm text-slate-300">점수: {score}</p>
+                <p className="text-lg font-bold text-stone-700">게임 오버!</p>
+                <p className="mt-1 text-sm text-stone-500">점수: {score}</p>
                 <button
                   onClick={() => {
                     setScore(0);

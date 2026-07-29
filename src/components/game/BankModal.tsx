@@ -90,7 +90,7 @@ export default function BankModal({
           <span className="text-pink-400">지갑 💗 {hearts.toLocaleString()}</span>
           <span className="text-emerald-400">예치금 🏦 {bank.toLocaleString()}</span>
         </div>
-        <p className="text-xs text-slate-500">예치금은 하루 1% 복리 이자가 붙어요 (접속/거래 시 정산).</p>
+        <p className="text-xs text-stone-400">예치금은 하루 1% 복리 이자가 붙어요 (접속/거래 시 정산).</p>
 
         <div className="flex gap-1.5">
           {([["bank", "예치/출금"], ["send", "송금"]] as [typeof tab, string][]).map(([k, l]) => (
@@ -98,7 +98,7 @@ export default function BankModal({
               key={k}
               onClick={() => setTab(k)}
               className={`rounded-lg px-3 py-1.5 text-sm transition ${
-                tab === k ? "bg-accent text-white" : "bg-panel2 text-slate-300 hover:bg-panel2/70"
+                tab === k ? "bg-accent text-white" : "bg-panel2 text-stone-500 hover:bg-panel2/70"
               }`}
             >
               {l}
@@ -127,7 +127,7 @@ export default function BankModal({
         ) : (
           <div className="space-y-2">
             {friends.length === 0 ? (
-              <p className="text-sm text-slate-400">송금하려면 먼저 친구를 추가하세요.</p>
+              <p className="text-sm text-stone-400">송금하려면 먼저 친구를 추가하세요.</p>
             ) : (
               <>
                 <select
@@ -149,7 +149,7 @@ export default function BankModal({
           </div>
         )}
 
-        {msg && <div className="rounded-lg bg-panel2 px-3 py-2 text-sm text-slate-200">{msg}</div>}
+        {msg && <div className="rounded-lg bg-panel2 px-3 py-2 text-sm text-stone-500">{msg}</div>}
       </div>
     </Modal>
   );

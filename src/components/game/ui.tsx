@@ -30,15 +30,15 @@ export function Modal({
       }}
     >
       <div
-        className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-panel shadow-2xl ${
+        className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl border border-stone-200 bg-panel shadow-2xl ${
           wide ? "max-w-4xl" : "max-w-lg"
         }`}
       >
-        <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
-          <h3 className="font-semibold text-white">{title}</h3>
+        <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
+          <h3 className="font-bold text-stone-700">{title}</h3>
           <button
             onClick={onClose}
-            className="rounded-lg px-2 py-1 text-slate-400 transition hover:bg-white/10 hover:text-white"
+            className="rounded-lg px-2 py-1 text-stone-400 transition hover:bg-stone-100 hover:text-stone-700"
           >
             ✕
           </button>
@@ -63,7 +63,7 @@ export function ToastStack({
       {toasts.map((t) => (
         <div
           key={t.id}
-          className="pointer-events-auto flex items-center gap-3 rounded-xl border border-white/10 bg-panel/95 px-4 py-3 text-sm text-slate-100 shadow-xl backdrop-blur"
+          className="pointer-events-auto flex items-center gap-3 rounded-xl border border-stone-200 bg-panel/95 px-4 py-3 text-sm text-stone-600 shadow-xl backdrop-blur"
         >
           <span className="flex-1">{t.text}</span>
           {t.actionLabel && (
@@ -76,7 +76,7 @@ export function ToastStack({
           )}
           <button
             onClick={() => onDismiss(t.id)}
-            className="shrink-0 text-slate-500 hover:text-white"
+            className="shrink-0 text-stone-400 hover:text-stone-700"
           >
             ✕
           </button>
@@ -100,7 +100,7 @@ export function RaceToastStack({ toasts }: { toasts: ToastItem[] }) {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className="race-toast rounded-lg border border-white/10 bg-panel/90 px-3 py-1.5 text-xs font-medium text-slate-100 shadow-lg backdrop-blur"
+          className="race-toast rounded-lg border border-stone-200 bg-panel/90 px-3 py-1.5 text-xs font-medium text-stone-600 shadow-lg backdrop-blur"
         >
           {t.text}
         </div>

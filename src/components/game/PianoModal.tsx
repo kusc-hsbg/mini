@@ -74,9 +74,9 @@ export default function PianoModal({
   return (
     <Modal title={`🎹 ${title}`} onClose={onClose}>
       <div className="space-y-3">
-        <p className="text-sm text-slate-400">
-          건반을 클릭하거나 키보드 <b className="text-slate-200">A S D F G H J K L ;</b>(흰건반),{" "}
-          <b className="text-slate-200">W E T Y U O P</b>(검은건반)로 연주하세요. 근처에 있는
+        <p className="text-sm text-stone-400">
+          건반을 클릭하거나 키보드 <b className="text-stone-500">A S D F G H J K L ;</b>(흰건반),{" "}
+          <b className="text-stone-500">W E T Y U O P</b>(검은건반)로 연주하세요. 근처에 있는
           사람들에게도 들려요.
         </p>
 
@@ -90,7 +90,7 @@ export default function PianoModal({
               }`}
               style={{ left: i * whiteW, width: whiteW - 2, height: 150 }}
             >
-              <span className="absolute inset-x-0 bottom-1 text-center text-[10px] text-slate-500">
+              <span className="absolute inset-x-0 bottom-1 text-center text-[10px] text-stone-400">
                 {NOTE_NAMES[midi % 12]}
               </span>
             </button>

@@ -98,15 +98,15 @@ export default function MeetingsPanel({
   const now = Date.now();
 
   return (
-    <div className="flex h-full w-80 flex-col border-l border-white/10 bg-panel/95 backdrop-blur">
-      <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
-        <h3 className="font-semibold text-white">📅 회의 일정</h3>
-        <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
+    <div className="flex h-full w-80 flex-col border-l border-stone-200 bg-panel/95 backdrop-blur">
+      <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
+        <h3 className="font-bold text-stone-700">📅 회의 일정</h3>
+        <button onClick={onClose} className="text-stone-400 hover:text-stone-700">✕</button>
       </div>
 
       <div className="min-h-0 flex-1 space-y-2 overflow-auto p-3">
         {meetings.length === 0 && (
-          <p className="py-6 text-center text-sm text-slate-500">예정된 회의가 없습니다.</p>
+          <p className="py-6 text-center text-sm text-stone-400">예정된 회의가 없습니다.</p>
         )}
         {meetings.map((m) => {
           const active = new Date(m.starts_at).getTime() <= now && now <= new Date(m.ends_at).getTime();
@@ -115,19 +115,19 @@ export default function MeetingsPanel({
             <div
               key={m.id}
               className={`rounded-xl border p-3 ${
-                active ? "border-accent2/40 bg-accent2/5" : "border-white/5 bg-panel2"
+                active ? "border-accent2/40 bg-accent2/5" : "border-stone-100 bg-panel2"
               }`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <div className="text-sm font-medium text-white">
+                  <div className="text-sm font-medium text-stone-700">
                     {active && <span className="mr-1 text-accent2">●</span>}
                     {m.title}
                   </div>
-                  <div className="mt-0.5 text-xs text-slate-400">
+                  <div className="mt-0.5 text-xs text-stone-400">
                     {fmtRange(m.starts_at, m.ends_at)}
                   </div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-stone-400">
                     {room?.name ?? "?"} ·{" "}
                     {m.location_kind === "area"
                       ? `영역 ${m.location_ref ?? ""}`
@@ -159,7 +159,7 @@ export default function MeetingsPanel({
                         load();
                       })
                     }
-                    className="btn-ghost px-2 py-1 text-xs text-red-300"
+                    className="btn-ghost px-2 py-1 text-xs text-red-500"
                   >
                     🗑
                   </button>
@@ -170,9 +170,9 @@ export default function MeetingsPanel({
         })}
       </div>
 
-      <div className="border-t border-white/5 p-3">
+      <div className="border-t border-stone-100 p-3">
         {!loggedIn ? (
-          <p className="text-center text-xs text-slate-500">로그인하면 회의를 예약할 수 있습니다.</p>
+          <p className="text-center text-xs text-stone-400">로그인하면 회의를 예약할 수 있습니다.</p>
         ) : !showForm ? (
           <button onClick={() => setShowForm(true)} className="btn-primary w-full text-sm">
             + 회의 예약
@@ -208,7 +208,7 @@ export default function MeetingsPanel({
                   onClick={() => setLocKind(k)}
                   disabled={k === "desk" && !myDeskObjectId}
                   className={`flex-1 rounded-lg px-2 py-1 text-xs ${
-                    locKind === k ? "bg-accent text-white" : "bg-panel2 text-slate-300"
+                    locKind === k ? "bg-accent text-white" : "bg-panel2 text-stone-500"
                   } disabled:opacity-40`}
                 >
                   {label}

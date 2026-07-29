@@ -89,7 +89,7 @@ export default function WhiteboardModal({
   return (
     <Modal title={`🖊️ ${title}`} onClose={onClose} wide>
       {initialOps === null ? (
-        <p className="py-10 text-center text-slate-400">보드 불러오는 중...</p>
+        <p className="py-10 text-center text-stone-400">보드 불러오는 중...</p>
       ) : (
         <div className="space-y-3">
           <WhiteboardCanvas ref={boardRef} initialOps={initialOps} onOp={handleOp} />
@@ -111,7 +111,7 @@ export default function WhiteboardModal({
               💾 PNG 내보내기
             </button>
             {!canPersist && (
-              <span className="text-xs text-slate-500">(게스트: 실시간만, 저장 안 됨)</span>
+              <span className="text-xs text-stone-400">(게스트: 실시간만, 저장 안 됨)</span>
             )}
           </div>
         </div>

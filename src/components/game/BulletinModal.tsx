@@ -97,19 +97,19 @@ export default function BulletinModal({
             </div>
           </div>
         ) : (
-          <p className="text-sm text-slate-400">로그인하면 글을 게시할 수 있습니다.</p>
+          <p className="text-sm text-stone-400">로그인하면 글을 게시할 수 있습니다.</p>
         )}
 
         {posts === null ? (
-          <p className="py-6 text-center text-slate-400">불러오는 중...</p>
+          <p className="py-6 text-center text-stone-400">불러오는 중...</p>
         ) : posts.length === 0 ? (
-          <p className="py-6 text-center text-slate-400">아직 게시물이 없습니다.</p>
+          <p className="py-6 text-center text-stone-400">아직 게시물이 없습니다.</p>
         ) : (
           <ul className="space-y-2">
             {posts.map((p) => (
               <li key={p.id} className="rounded-xl bg-panel2 p-3">
-                <div className="flex items-center justify-between text-xs text-slate-400">
-                  <span className="font-medium text-slate-300">{p.author_name}</span>
+                <div className="flex items-center justify-between text-xs text-stone-400">
+                  <span className="font-medium text-stone-500">{p.author_name}</span>
                   <span className="flex items-center gap-2">
                     {new Date(p.created_at).toLocaleString("ko-KR", {
                       month: "short",
@@ -125,14 +125,14 @@ export default function BulletinModal({
                             load();
                           })
                         }
-                        className="text-red-400 hover:text-red-300"
+                        className="text-red-400 hover:text-red-500"
                       >
                         삭제
                       </button>
                     )}
                   </span>
                 </div>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-100">{p.content}</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-stone-600">{p.content}</p>
                 {p.url && (
                   <a
                     href={p.url}

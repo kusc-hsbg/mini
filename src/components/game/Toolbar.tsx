@@ -47,14 +47,14 @@ export default function Toolbar(props: {
       <div className="relative">
         <button
           onClick={() => setStatusOpen((v) => !v)}
-          className="flex items-center gap-1.5 rounded-xl bg-panel2 px-2.5 py-2 text-sm text-slate-200 hover:bg-white/10"
+          className="flex items-center gap-1.5 rounded-xl bg-panel2 px-2.5 py-2 text-sm text-stone-500 hover:bg-stone-100"
           title="상태 변경"
         >
           <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: meta.color }} />
           <span className="hidden sm:inline">{meta.label}</span>
         </button>
         {statusOpen && (
-          <div className="absolute bottom-full left-0 mb-2 w-56 rounded-xl border border-white/10 bg-panel p-2 shadow-xl">
+          <div className="absolute bottom-full left-0 mb-2 w-56 rounded-xl border border-stone-200 bg-panel p-2 shadow-xl">
             {(Object.keys(STATUS_META) as UserStatus[]).map((s) => (
               <button
                 key={s}
@@ -62,8 +62,8 @@ export default function Toolbar(props: {
                   props.onStatus(s, msg);
                   setStatusOpen(false);
                 }}
-                className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-white/10 ${
-                  props.status === s ? "text-white" : "text-slate-300"
+                className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-stone-100 ${
+                  props.status === s ? "text-stone-700 font-semibold" : "text-stone-500"
                 }`}
               >
                 <span
@@ -71,7 +71,7 @@ export default function Toolbar(props: {
                   style={{ backgroundColor: STATUS_META[s].color }}
                 />
                 {STATUS_META[s].label}
-                {s === "dnd" && <span className="text-[10px] text-slate-500">(웨이브 알림 차단)</span>}
+                {s === "dnd" && <span className="text-[10px] text-stone-400">(웨이브 알림 차단)</span>}
               </button>
             ))}
             <input
@@ -97,7 +97,7 @@ export default function Toolbar(props: {
           😀
         </IconBtn>
         {emojiOpen && (
-          <div className="absolute bottom-full left-1/2 mb-2 flex -translate-x-1/2 gap-1 rounded-xl border border-white/10 bg-panel p-1.5 shadow-xl">
+          <div className="absolute bottom-full left-1/2 mb-2 flex -translate-x-1/2 gap-1 rounded-xl border border-stone-200 bg-panel p-1.5 shadow-xl">
             {EMOJIS.map((e) => (
               <button
                 key={e}
@@ -105,7 +105,7 @@ export default function Toolbar(props: {
                   props.onEmoji(e);
                   setEmojiOpen(false);
                 }}
-                className="rounded-lg p-1 text-xl transition hover:scale-125 hover:bg-white/10"
+                className="rounded-lg p-1 text-xl transition hover:scale-125 hover:bg-stone-100"
               >
                 {e}
               </button>
@@ -170,7 +170,7 @@ function IconBtn({
       onClick={onClick}
       title={title}
       className={`grid h-9 w-9 place-items-center rounded-xl text-lg transition ${
-        on ? "bg-accent/30 ring-1 ring-accent" : "bg-panel2 hover:bg-white/10"
+        on ? "bg-accent/30 ring-1 ring-accent" : "bg-panel2 hover:bg-stone-100"
       }`}
     >
       {children}
@@ -179,5 +179,5 @@ function IconBtn({
 }
 
 function Divider() {
-  return <div className="mx-0.5 h-6 w-px bg-white/10" />;
+  return <div className="mx-0.5 h-6 w-px bg-stone-100" />;
 }

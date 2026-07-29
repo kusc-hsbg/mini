@@ -157,11 +157,11 @@ const WhiteboardCanvas = forwardRef<
             style={{ backgroundColor: c }}
           />
         ))}
-        <div className="mx-1 h-6 w-px bg-white/10" />
+        <div className="mx-1 h-6 w-px bg-stone-100" />
         <button
           onClick={() => setTool("eraser")}
           className={`rounded-lg px-2.5 py-1 text-sm ${
-            tool === "eraser" ? "bg-accent text-white" : "bg-panel2 text-slate-300"
+            tool === "eraser" ? "bg-accent text-white" : "bg-panel2 text-stone-500"
           }`}
         >
           🧽 지우개
@@ -169,7 +169,7 @@ const WhiteboardCanvas = forwardRef<
         <button
           onClick={() => setTool("text")}
           className={`rounded-lg px-2.5 py-1 text-sm ${
-            tool === "text" ? "bg-accent text-white" : "bg-panel2 text-slate-300"
+            tool === "text" ? "bg-accent text-white" : "bg-panel2 text-stone-500"
           }`}
         >
           🔤 텍스트
@@ -177,7 +177,7 @@ const WhiteboardCanvas = forwardRef<
         <select
           value={size}
           onChange={(e) => setSize(Number(e.target.value))}
-          className="rounded-lg bg-panel2 px-2 py-1 text-sm text-slate-300"
+          className="rounded-lg bg-panel2 px-2 py-1 text-sm text-stone-500"
         >
           <option value={2}>가늘게</option>
           <option value={4}>보통</option>
@@ -188,14 +188,14 @@ const WhiteboardCanvas = forwardRef<
           onClick={() => {
             if (confirm("화이트보드를 모두 지울까요?")) localOp({ kind: "clear" });
           }}
-          className="rounded-lg bg-panel2 px-2.5 py-1 text-sm text-red-300 hover:bg-red-500/20"
+          className="rounded-lg bg-panel2 px-2.5 py-1 text-sm text-red-500 hover:bg-red-200"
         >
           전체 지우기
         </button>
       </div>
       <div
         className={`relative w-full overflow-hidden rounded-xl ${
-          transparent ? "min-h-0 flex-1" : "border border-white/10"
+          transparent ? "min-h-0 flex-1" : "border border-stone-200"
         }`}
         style={transparent ? undefined : { height }}
       >

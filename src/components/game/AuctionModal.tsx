@@ -91,7 +91,7 @@ export default function AuctionModal({
               <button
                 key={k}
                 onClick={() => setTab(k)}
-                className={`rounded-lg px-3 py-1.5 text-sm ${tab === k ? "bg-accent text-white" : "bg-panel2 text-slate-300"}`}
+                className={`rounded-lg px-3 py-1.5 text-sm ${tab === k ? "bg-accent text-white" : "bg-panel2 text-stone-500"}`}
               >
                 {l}
               </button>
@@ -100,11 +100,11 @@ export default function AuctionModal({
           <span className="text-sm text-pink-400">💗 {wallet.hearts.toLocaleString()}</span>
         </div>
 
-        {msg && <div className="rounded-lg bg-panel2 px-3 py-2 text-sm text-slate-200">{msg}</div>}
+        {msg && <div className="rounded-lg bg-panel2 px-3 py-2 text-sm text-stone-500">{msg}</div>}
 
         {tab === "browse" && (
           <div className="max-h-[52vh] space-y-1.5 overflow-y-auto pr-1">
-            {listings.length === 0 && <p className="py-8 text-center text-sm text-slate-400">등록된 경매가 없어요.</p>}
+            {listings.length === 0 && <p className="py-8 text-center text-sm text-stone-400">등록된 경매가 없어요.</p>}
             {listings.map((l) => {
               const item = SHOP_MAP[l.itemKey];
               if (!item) return null;
@@ -112,18 +112,18 @@ export default function AuctionModal({
                 <div key={l.id} className="flex items-center gap-2 rounded-xl bg-panel2/60 px-3 py-2">
                   <span className="text-xl">{item.icon}</span>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm text-white">{item.name}</div>
-                    <div className="text-xs text-slate-400">판매자 {l.sellerName} · 💗 {l.price.toLocaleString()}</div>
+                    <div className="truncate text-sm text-stone-700">{item.name}</div>
+                    <div className="text-xs text-stone-400">판매자 {l.sellerName} · 💗 {l.price.toLocaleString()}</div>
                   </div>
                   {l.mine ? (
-                    <button onClick={() => doCancel(l)} disabled={pending} className="rounded bg-red-500/15 px-2 py-1 text-xs text-red-300">
+                    <button onClick={() => doCancel(l)} disabled={pending} className="rounded bg-red-500/15 px-2 py-1 text-xs text-red-500">
                       취소
                     </button>
                   ) : (
                     <button
                       onClick={() => doBuy(l)}
                       disabled={pending || wallet.hearts < l.price || wallet.inventory.includes(l.itemKey)}
-                      className="rounded bg-accent px-2 py-1 text-xs text-white disabled:bg-slate-700 disabled:text-slate-500"
+                      className="rounded bg-accent px-2 py-1 text-xs text-white disabled:bg-stone-200 disabled:text-stone-400"
                     >
                       {wallet.inventory.includes(l.itemKey) ? "보유중" : "구매"}
                     </button>
@@ -136,10 +136,10 @@ export default function AuctionModal({
 
         {tab === "sell" && (
           <div className="space-y-3">
-            <p className="text-xs text-slate-400">보유 아이템을 시중가의 90%~100% 사이 하트로 판매해요. (최대 3개, 등록 시 장착 해제)</p>
-            <div className="text-xs text-slate-400">내 판매 등록: {myListings.length}/3</div>
+            <p className="text-xs text-stone-400">보유 아이템을 시중가의 90%~100% 사이 하트로 판매해요. (최대 3개, 등록 시 장착 해제)</p>
+            <div className="text-xs text-stone-400">내 판매 등록: {myListings.length}/3</div>
             {sellable.length === 0 ? (
-              <p className="rounded-xl bg-panel2/60 p-3 text-sm text-slate-500">판매 가능한 아이템이 없어요.</p>
+              <p className="rounded-xl bg-panel2/60 p-3 text-sm text-stone-400">판매 가능한 아이템이 없어요.</p>
             ) : (
               <>
                 <select value={sellItem} onChange={(e) => setSellItem(e.target.value)} className="input bg-panel2">
@@ -151,7 +151,7 @@ export default function AuctionModal({
                   ))}
                 </select>
                 {selItem && (
-                  <div className="text-xs text-slate-400">
+                  <div className="text-xs text-stone-400">
                     시중가 💗{base.toLocaleString()} · 판매 가능 범위 {minPrice.toLocaleString()}~{base.toLocaleString()}
                   </div>
                 )}
@@ -169,15 +169,15 @@ export default function AuctionModal({
             )}
             {myListings.length > 0 && (
               <div>
-                <div className="mb-1 text-sm text-slate-300">내 판매 목록</div>
+                <div className="mb-1 text-sm text-stone-500">내 판매 목록</div>
                 {myListings.map((l) => {
                   const item = SHOP_MAP[l.itemKey];
                   return (
                     <div key={l.id} className="mb-1 flex items-center gap-2 rounded-xl bg-panel2/60 px-3 py-2">
                       <span>{item?.icon}</span>
-                      <span className="min-w-0 flex-1 truncate text-sm text-white">{item?.name}</span>
-                      <span className="text-xs text-slate-400">💗{l.price.toLocaleString()}</span>
-                      <button onClick={() => doCancel(l)} disabled={pending} className="rounded bg-red-500/15 px-2 py-1 text-xs text-red-300">
+                      <span className="min-w-0 flex-1 truncate text-sm text-stone-700">{item?.name}</span>
+                      <span className="text-xs text-stone-400">💗{l.price.toLocaleString()}</span>
+                      <button onClick={() => doCancel(l)} disabled={pending} className="rounded bg-red-500/15 px-2 py-1 text-xs text-red-500">
                         취소
                       </button>
                     </div>

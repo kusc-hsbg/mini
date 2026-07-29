@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html,
@@ -12,13 +12,13 @@ body {
 }
 
 body {
-  @apply bg-ink text-slate-100 antialiased;
+  @apply bg-[#fff6ea] text-stone-700 antialiased;
   background-image: radial-gradient(
       1200px 600px at 50% -10%,
-      rgba(108, 140, 255, 0.12),
+      rgba(255, 182, 217, 0.28),
       transparent
     ),
-    radial-gradient(900px 500px at 100% 100%, rgba(52, 211, 153, 0.08), transparent);
+    radial-gradient(900px 500px at 100% 100%, rgba(125, 211, 252, 0.22), transparent);
 }
 
 /* ---------- 브랜드 / 랜딩 ---------- */
@@ -54,16 +54,16 @@ body {
 .fade-up { animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .shop-float { animation: shopFloat 3.2s ease-in-out infinite; }
 .glass {
-  background: rgba(22, 30, 49, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
 /* 은은한 격자 배경 (레이어) */
 .grid-bg {
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    linear-gradient(rgba(120, 90, 60, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 90, 60, 0.05) 1px, transparent 1px);
   background-size: 40px 40px;
   mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, #000 40%, transparent 100%);
   -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, #000 40%, transparent 100%);
@@ -77,25 +77,25 @@ body {
 }
 
 .btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 font-medium transition;
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 font-bold transition;
 }
 .btn-primary {
   @apply btn text-white active:scale-[0.98];
-  background: linear-gradient(135deg, #6c8cff, #7c5cff);
-  box-shadow: 0 8px 24px -8px rgba(108, 140, 255, 0.7);
+  background: linear-gradient(135deg, #ff8fab, #ffb37b);
+  box-shadow: 0 8px 24px -8px rgba(255, 143, 171, 0.6);
 }
 .btn-primary:hover {
-  filter: brightness(1.08);
-  box-shadow: 0 10px 30px -8px rgba(108, 140, 255, 0.85);
+  filter: brightness(1.06);
+  box-shadow: 0 10px 30px -8px rgba(255, 143, 171, 0.75);
 }
 .btn-ghost {
-  @apply btn border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10;
+  @apply btn border-2 border-stone-200 bg-white/70 text-stone-500 hover:bg-white hover:border-amber-200;
 }
 .card {
-  @apply rounded-2xl border border-white/5 bg-panel/80 p-5 shadow-xl backdrop-blur;
+  @apply rounded-3xl border-2 border-white bg-panel/90 p-5 shadow-lg backdrop-blur;
 }
 .input {
-  @apply w-full rounded-lg border border-white/10 bg-panel2 px-3 py-2 text-slate-100 outline-none focus:border-accent;
+  @apply w-full rounded-xl border-2 border-stone-200 bg-panel2 px-3 py-2 text-stone-700 outline-none focus:border-accent;
 }
 .swatch {
   @apply h-8 w-8 cursor-pointer rounded-full border-2 border-transparent transition hover:scale-110;

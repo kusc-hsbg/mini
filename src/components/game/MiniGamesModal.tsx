@@ -20,7 +20,7 @@ export default function MiniGamesModal({
     <Modal title="🎮 미니게임" onClose={onClose}>
       {game === "hub" && (
         <div className="space-y-2">
-          <p className="text-sm text-slate-400">플레이하고 하트를 획득하세요! (게임당 최대 30💗)</p>
+          <p className="text-sm text-stone-400">플레이하고 하트를 획득하세요! (게임당 최대 30💗)</p>
           {([
             ["fishing", "🎣 낚시", "물고기가 물면 타이밍 맞춰 낚아채기"],
             ["rhythm", "🎵 리듬", "화면의 방향키를 순서대로 정확히"],
@@ -33,8 +33,8 @@ export default function MiniGamesModal({
             >
               <span className="text-2xl">{title.split(" ")[0]}</span>
               <div>
-                <div className="text-sm font-medium text-white">{title.split(" ")[1]}</div>
-                <div className="text-xs text-slate-400">{desc}</div>
+                <div className="text-sm font-medium text-stone-700">{title.split(" ")[1]}</div>
+                <div className="text-xs text-stone-400">{desc}</div>
               </div>
             </button>
           ))}
@@ -50,7 +50,7 @@ export default function MiniGamesModal({
 function BackBar({ onBack, right }: { onBack: () => void; right?: React.ReactNode }) {
   return (
     <div className="mb-2 flex items-center justify-between">
-      <button onClick={onBack} className="text-sm text-slate-400 hover:text-white">← 목록</button>
+      <button onClick={onBack} className="text-sm text-stone-400 hover:text-stone-700">← 목록</button>
       {right}
     </div>
   );
@@ -114,7 +114,7 @@ function Fishing({ onReward, onBack }: { onReward: (h: number) => void; onBack: 
         <div className={`text-5xl transition ${phase === "bite" ? "animate-bounce" : ""}`}>
           {phase === "bite" ? "❗" : "🎣"}
         </div>
-        <p className="text-sm text-slate-200">{msg}</p>
+        <p className="text-sm text-stone-500">{msg}</p>
       </div>
       <div className="mt-3 flex gap-2">
         {phase === "idle" && (
@@ -191,16 +191,16 @@ function Rhythm({ onReward, onBack }: { onReward: (h: number) => void; onBack: (
           <>
             <div className="mb-3 flex justify-center gap-2 text-3xl">
               {seq.slice(idx, idx + 5).map((a, i) => (
-                <span key={i} className={i === 0 ? "text-white" : "text-slate-600"}>
+                <span key={i} className={i === 0 ? "text-stone-700 font-bold" : "text-stone-300"}>
                   {ARROWS[a]}
                 </span>
               ))}
             </div>
-            <p className="text-xs text-slate-400">방향키 또는 W/A/S/D 로 첫 화살표를 입력하세요</p>
+            <p className="text-xs text-stone-400">방향키 또는 W/A/S/D 로 첫 화살표를 입력하세요</p>
           </>
         ) : (
           <div className="py-4">
-            <p className="text-lg font-bold text-white">🎵 완료! {score}/{seq.length}</p>
+            <p className="text-lg font-bold text-stone-700">🎵 완료! {score}/{seq.length}</p>
           </div>
         )}
       </div>
@@ -210,7 +210,7 @@ function Rhythm({ onReward, onBack }: { onReward: (h: number) => void; onBack: (
             key={i}
             onClick={() => press(i)}
             disabled={done}
-            className="rounded-lg bg-panel2 py-3 text-xl text-white hover:bg-panel2/70 disabled:opacity-40"
+            className="rounded-lg bg-panel2 py-3 text-xl text-stone-700 hover:bg-panel2/70 disabled:opacity-40"
           >
             {a}
           </button>
@@ -268,7 +268,7 @@ function Farming({ onReward, onBack }: { onReward: (h: number) => void; onBack: 
   return (
     <div>
       <BackBar onBack={onBack} right={<span className="text-sm text-pink-400">수확 {harvested}💗</span>} />
-      <p className="mb-2 text-center text-xs text-slate-400">빈 밭을 눌러 심고, 🌾가 되면 눌러 수확하세요!</p>
+      <p className="mb-2 text-center text-xs text-stone-400">빈 밭을 눌러 심고, 🌾가 되면 눌러 수확하세요!</p>
       <div className="mx-auto grid w-fit grid-cols-3 gap-2">
         {plots.map((p, i) => (
           <button

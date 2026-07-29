@@ -22,10 +22,10 @@ export interface TileInfo {
 }
 
 export const TILE_INFO: Record<string, TileInfo> = {
-  ",": { color: "#3e7d3a", solid: false, accent: "#468a41", outdoor: true },
-  ";": { color: "#376f33", solid: false, accent: "#3e7d3a", outdoor: true },
-  d: { color: "#8a6f4d", solid: false, accent: "#96794f", outdoor: true },
-  s: { color: "#d9c07f", solid: false, accent: "#e2cb8f", outdoor: true },
+  ",": { color: "#6cc464", solid: false, accent: "#78d06f", outdoor: true },
+  ";": { color: "#5cb355", solid: false, accent: "#6cc464", outdoor: true },
+  d: { color: "#e4c98d", solid: false, accent: "#edd7a2", outdoor: true },
+  s: { color: "#f3dea1", solid: false, accent: "#f8e6b6", outdoor: true },
   "-": { color: "#9aa0ab", solid: false, accent: "#8a909b", outdoor: true },
   "=": { color: "#4a5058", solid: false, accent: "#5a616b", outdoor: true },
   "~": { color: "#2f6db3", solid: true, accent: "#4a86c9", outdoor: true },

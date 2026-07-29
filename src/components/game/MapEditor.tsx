@@ -365,10 +365,10 @@ export default function MapEditor({
   const needsProps = mode.kind === "object";
 
   return (
-    <div className="pointer-events-auto flex h-full w-72 flex-col border-r border-white/10 bg-panel/95 text-sm backdrop-blur">
-      <div className="flex items-center justify-between border-b border-white/5 px-3 py-2.5">
-        <h3 className="font-semibold text-white">🛠️ 맵 에디터</h3>
-        <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
+    <div className="pointer-events-auto flex h-full w-72 flex-col border-r border-stone-200 bg-panel/95 text-sm backdrop-blur">
+      <div className="flex items-center justify-between border-b border-stone-100 px-3 py-2.5">
+        <h3 className="font-bold text-stone-700">🛠️ 맵 에디터</h3>
+        <button onClick={onClose} className="text-stone-400 hover:text-stone-700">✕</button>
       </div>
 
       <div className="min-h-0 flex-1 space-y-3 overflow-auto p-3" key={seq}>
@@ -392,7 +392,7 @@ export default function MapEditor({
 
         {/* 타일 팔레트 */}
         <div>
-          <div className="mb-1 text-xs font-medium text-slate-400">바닥/벽 타일 (드래그로 칠하기)</div>
+          <div className="mb-1 text-xs font-medium text-stone-400">바닥/벽 타일 (드래그로 칠하기)</div>
           <div className="grid grid-cols-4 gap-1">
             {TILE_PALETTE.map((t) => (
               <button
@@ -401,7 +401,7 @@ export default function MapEditor({
                 className={`flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-[10px] ${
                   mode.kind === "tile" && mode.ch === t.ch
                     ? "bg-accent/30 ring-1 ring-accent"
-                    : "bg-panel2 hover:bg-white/10"
+                    : "bg-panel2 hover:bg-stone-100"
                 }`}
               >
                 <span
@@ -416,10 +416,10 @@ export default function MapEditor({
 
         {/* 오브젝트 피커 */}
         <div>
-          <div className="mb-1 text-xs font-medium text-slate-400">오브젝트</div>
+          <div className="mb-1 text-xs font-medium text-stone-400">오브젝트</div>
           {[...objectsByCategory.entries()].map(([cat, kinds]) => (
             <div key={cat} className="mb-1.5">
-              <div className="mb-0.5 text-[10px] text-slate-500">{cat}</div>
+              <div className="mb-0.5 text-[10px] text-stone-400">{cat}</div>
               <div className="flex flex-wrap gap-1">
                 {kinds.map((k) => (
                   <button
@@ -428,7 +428,7 @@ export default function MapEditor({
                     className={`rounded-lg px-2 py-1 text-[11px] ${
                       mode.kind === "object" && mode.type === k
                         ? "bg-accent text-white"
-                        : "bg-panel2 text-slate-300 hover:bg-white/10"
+                        : "bg-panel2 text-stone-500 hover:bg-stone-100"
                     }`}
                   >
                     {OBJECT_DEFS[k].label}
@@ -442,7 +442,7 @@ export default function MapEditor({
         {/* 오브젝트 속성 */}
         {needsProps && (
           <div className="space-y-1.5 rounded-xl bg-panel2 p-2">
-            <div className="text-xs font-medium text-slate-300">배치 옵션</div>
+            <div className="text-xs font-medium text-stone-500">배치 옵션</div>
             <input className="input bg-panel text-xs" placeholder="이름 (선택)" value={objName} onChange={(e) => setObjName(e.target.value)} />
             <input className="input bg-panel text-xs" placeholder="URL (웹/영상/이미지/사운드/커스텀)" value={objUrl} onChange={(e) => setObjUrl(e.target.value)} />
             <textarea className="input min-h-[40px] resize-none bg-panel text-xs" placeholder="노트 내용 (note 오브젝트)" value={objText} onChange={(e) => setObjText(e.target.value)} />
@@ -474,7 +474,7 @@ export default function MapEditor({
         </button>
       </div>
 
-      <div className="border-t border-white/5 p-3">
+      <div className="border-t border-stone-100 p-3">
         <button onClick={save} disabled={saving || !dirty} className="btn-primary w-full disabled:opacity-40">
           {saving ? "저장 중..." : dirty ? "💾 맵 저장 (모두에게 적용)" : "변경 사항 없음"}
         </button>
@@ -496,7 +496,7 @@ function Tool({
     <button
       onClick={onClick}
       className={`rounded-lg px-1.5 py-1.5 text-[11px] ${
-        active ? "bg-accent text-white" : "bg-panel2 text-slate-300 hover:bg-white/10"
+        active ? "bg-accent text-white" : "bg-panel2 text-stone-500 hover:bg-stone-100"
       }`}
     >
       {children}

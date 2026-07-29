@@ -2284,7 +2284,7 @@ export default function GameClient({
         <div className="pointer-events-auto flex min-w-0 items-center gap-2">
           <Link
             href="/spaces"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/10 bg-[#101720]/80 text-lg text-slate-200 shadow-xl backdrop-blur-xl transition hover:border-white/25 hover:bg-white/10"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/10 bg-[#101720]/80 text-lg text-stone-500 shadow-xl backdrop-blur-xl transition hover:border-white/25 hover:bg-white/10"
             title="나가기"
           >
             ←
@@ -2298,7 +2298,7 @@ export default function GameClient({
                 <select
                   value={room.id}
                   onChange={(e) => router.push(`/s/${space.id}/${e.target.value}`)}
-                  className="max-w-[150px] cursor-pointer rounded-md bg-transparent text-xs text-slate-300 outline-none hover:text-white sm:max-w-[220px]"
+                  className="max-w-[150px] cursor-pointer rounded-md bg-transparent text-xs text-stone-500 outline-none hover:text-white sm:max-w-[220px]"
                 >
                   {rooms.map((r) => (
                     <option key={r.id} value={r.id} className="bg-panel">
@@ -2312,7 +2312,7 @@ export default function GameClient({
           {(isOwner || role === "admin") && (
             <Link
               href={`/s/${space.id}/settings`}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/10 bg-[#101720]/80 text-slate-200 shadow-xl backdrop-blur-xl transition hover:border-white/25 hover:bg-white/10"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/10 bg-[#101720]/80 text-stone-500 shadow-xl backdrop-blur-xl transition hover:border-white/25 hover:bg-white/10"
               title="스페이스 설정"
             >
               ⚙️
@@ -2329,7 +2329,7 @@ export default function GameClient({
               className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg border shadow-xl backdrop-blur-xl transition ${
                 roomClosed
                   ? "border-amber-300/40 bg-amber-300/15 text-amber-100"
-                  : "border-white/10 bg-[#101720]/80 text-slate-200 hover:border-white/25 hover:bg-white/10"
+                  : "border-white/10 bg-[#101720]/80 text-stone-500 hover:border-white/25 hover:bg-white/10"
               }`}
               title={roomClosed ? "방문 열기" : "방문 닫기"}
             >
@@ -2480,7 +2480,7 @@ export default function GameClient({
           {!secretArmed ? (
             <button
               onClick={() => setSecretArmed(true)}
-              className="grid h-9 w-full place-items-center rounded-md border border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/10 hover:text-white"
+              className="grid h-9 w-full place-items-center rounded-md border border-white/10 bg-white/[0.04] text-stone-500 hover:bg-white/10 hover:text-white"
             >
               ·
             </button>
@@ -2512,13 +2512,13 @@ export default function GameClient({
       {currentArea && (
         <div className="pointer-events-auto absolute left-1/2 top-3 z-20 hidden -translate-x-1/2 items-center gap-2 rounded-xl border border-accent/30 bg-panel/90 px-3 py-1.5 text-sm backdrop-blur sm:flex">
           <span className="text-accent">📍 {currentArea.name}</span>
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-stone-400">
             {areaOccupancy}명{currentArea.maxOccupancy ? ` / 최대 ${currentArea.maxOccupancy}명` : ""}
           </span>
           {currentArea.lockable && (
             <button
               onClick={toggleAreaLock}
-              className="rounded-lg bg-panel2 px-2 py-0.5 text-xs text-slate-300 hover:text-white"
+              className="rounded-lg bg-panel2 px-2 py-0.5 text-xs text-stone-500 hover:text-white"
             >
               {lockedAreas.has(currentArea.id) ? "🔒 잠김 (해제)" : "🔓 잠그기"}
             </button>
@@ -2530,7 +2530,7 @@ export default function GameClient({
               );
               addToast("🔗 이 영역으로 바로 오는 링크를 복사했어요");
             }}
-            className="rounded-lg bg-panel2 px-2 py-0.5 text-xs text-slate-300 hover:text-white"
+            className="rounded-lg bg-panel2 px-2 py-0.5 text-xs text-stone-500 hover:text-white"
           >
             🔗
           </button>
@@ -2568,17 +2568,17 @@ export default function GameClient({
                   💗
                 </span>
                 <div className="min-w-0">
-                  <div className="truncate font-semibold text-white">{touchedPlayer.name}</div>
+                  <div className="truncate font-semibold text-stone-700">{touchedPlayer.name}</div>
                   <div className="text-xs" style={{ color: STATUS_META[touchedPlayer.status]?.color }}>
                     {STATUS_META[touchedPlayer.status]?.emoji} {STATUS_META[touchedPlayer.status]?.label}
                   </div>
                 </div>
               </div>
-              <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-200">
+              <p className="mt-2 whitespace-pre-wrap break-words text-sm text-stone-500">
                 {touchedPlayer.bio?.trim() ? (
                   touchedPlayer.bio
                 ) : (
-                  <span className="text-slate-500">아직 소개를 작성하지 않았어요.</span>
+                  <span className="text-stone-400">아직 소개를 작성하지 않았어요.</span>
                 )}
               </p>
             </div>
@@ -2615,14 +2615,14 @@ export default function GameClient({
               )}
               <div className="min-w-0">
                 <div className="text-[11px] font-medium text-cyan-100">{starhallExhibit.props?.filename}</div>
-                <div className="mt-1 text-lg font-semibold text-white">{starhallExhibit.name}</div>
+                <div className="mt-1 text-lg font-semibold text-stone-700">{starhallExhibit.name}</div>
                 {starhallExhibit.props?.sourceUrl && (
-                  <div className="mt-1 truncate text-[11px] text-slate-400">{starhallExhibit.props.sourceUrl}</div>
+                  <div className="mt-1 truncate text-[11px] text-stone-400">{starhallExhibit.props.sourceUrl}</div>
                 )}
               </div>
             </div>
             {starhallExhibit.props?.text && (
-              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{starhallExhibit.props.text}</p>
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-stone-500">{starhallExhibit.props.text}</p>
             )}
           </div>
         </div>
@@ -2631,8 +2631,8 @@ export default function GameClient({
       {/* OX 퀴즈 참가자 배너 */}
       {quiz && (
         <div className="pointer-events-none absolute left-1/2 top-16 z-20 w-[min(92vw,460px)] -translate-x-1/2 rounded-2xl border border-accent/40 bg-panel/95 p-3 text-center shadow-xl backdrop-blur">
-          <div className="text-xs text-slate-400">🅾️❌ {quiz.hostName}님의 OX 퀴즈</div>
-          <div className="mt-1 text-base font-semibold text-white">{quiz.text}</div>
+          <div className="text-xs text-stone-400">🅾️❌ {quiz.hostName}님의 OX 퀴즈</div>
+          <div className="mt-1 text-base font-semibold text-stone-700">{quiz.text}</div>
           {!quiz.correct ? (
             <div className="mt-1 text-sm text-accent2">O존(초록) 또는 X존(빨강)으로 이동하세요!</div>
           ) : (
@@ -2652,7 +2652,7 @@ export default function GameClient({
 
       {/* ---------- 상황별 상호작용 힌트 (조작 전체 설명은 ? 버튼/설정에서) ---------- */}
       {(hintObj || nearWater) && (
-        <div className="pointer-events-none absolute bottom-20 left-3 z-10 rounded-lg bg-panel/70 px-3 py-2 text-[11px] leading-relaxed text-slate-300 backdrop-blur">
+        <div className="pointer-events-none absolute bottom-20 left-3 z-10 rounded-lg bg-panel/70 px-3 py-2 text-[11px] leading-relaxed text-stone-500 backdrop-blur">
           {hintObj ? (
             <span>
               X — {hintObj.name ?? OBJECT_DEFS[hintObj.type]?.label ?? "오브젝트"}
@@ -2900,33 +2900,33 @@ export default function GameClient({
       {/* ---------- 조작법 / 설정 도움말 ---------- */}
       {modal?.kind === "help" && (
         <Modal title="조작법 · 도움말" onClose={() => setModal(null)}>
-          <div className="space-y-4 text-sm text-slate-200">
+          <div className="space-y-4 text-sm text-stone-500">
             <section>
-              <h4 className="mb-2 font-semibold text-white">🎮 기본 조작</h4>
-              <ul className="space-y-1 text-slate-300">
-                <li><b className="text-white">WASD / 방향키</b> — 이동</li>
-                <li><b className="text-white">더블클릭</b> — 클릭한 곳으로 자동 이동</li>
-                <li><b className="text-white">X</b> — 상호작용(오브젝트/의자 앉기/낚시)</li>
-                <li><b className="text-white">1~0</b> — 이모지 표현</li>
-                <li><b className="text-white">Z</b> — 춤 · <b className="text-white">G</b> — 고스트 모드 · <b className="text-white">M</b> — 미니맵</li>
-                <li><b className="text-white">F</b> — {liveMap.vehicle === "boat" ? "보트" : liveMap.vehicle === "plane" ? "비행기" : liveMap.vehicle === "kart" ? "카트" : "오토바이"} 탑승/하차</li>
+              <h4 className="mb-2 font-semibold text-stone-700">🎮 기본 조작</h4>
+              <ul className="space-y-1 text-stone-500">
+                <li><b className="text-stone-700">WASD / 방향키</b> — 이동</li>
+                <li><b className="text-stone-700">더블클릭</b> — 클릭한 곳으로 자동 이동</li>
+                <li><b className="text-stone-700">X</b> — 상호작용(오브젝트/의자 앉기/낚시)</li>
+                <li><b className="text-stone-700">1~0</b> — 이모지 표현</li>
+                <li><b className="text-stone-700">Z</b> — 춤 · <b className="text-stone-700">G</b> — 고스트 모드 · <b className="text-stone-700">M</b> — 미니맵</li>
+                <li><b className="text-stone-700">F</b> — {liveMap.vehicle === "boat" ? "보트" : liveMap.vehicle === "plane" ? "비행기" : liveMap.vehicle === "kart" ? "카트" : "오토바이"} 탑승/하차</li>
               </ul>
             </section>
             <section>
-              <h4 className="mb-2 font-semibold text-white">🏁 레이싱 · 보스전</h4>
-              <ul className="space-y-1 text-slate-300">
-                <li><b className="text-white">👹 보스 ON / 🕊️ 보스 OFF 발판</b>(가운데 라운지)에 서서 3초 → 트랙으로 이동해 레이스 시작</li>
-                <li>노란 패드에서 <b className="text-white">F</b>로 탑승 후 결승선 통과 → 랩 시작</li>
-                <li><b className="text-white">🎁 아이템 박스</b> — 터보·부스트·스타·쉴드·폭탄·바나나 등 랜덤</li>
-                <li><b className="text-white">스페이스/클릭</b> — 보스전에서 차지 화살 발사(탄막 요격)</li>
-                <li><b className="text-white">🛥️ 바다 서킷</b> — 물 위에서는 보트 없이 걸으면 70% 느려져요</li>
-                <li><b className="text-white">🐙 문어발</b>에 잡히면 화살을 빠르게 10발 쏴 탈출!</li>
+              <h4 className="mb-2 font-semibold text-stone-700">🏁 레이싱 · 보스전</h4>
+              <ul className="space-y-1 text-stone-500">
+                <li><b className="text-stone-700">👹 보스 ON / 🕊️ 보스 OFF 발판</b>(가운데 라운지)에 서서 3초 → 트랙으로 이동해 레이스 시작</li>
+                <li>노란 패드에서 <b className="text-stone-700">F</b>로 탑승 후 결승선 통과 → 랩 시작</li>
+                <li><b className="text-stone-700">🎁 아이템 박스</b> — 터보·부스트·스타·쉴드·폭탄·바나나 등 랜덤</li>
+                <li><b className="text-stone-700">스페이스/클릭</b> — 보스전에서 차지 화살 발사(탄막 요격)</li>
+                <li><b className="text-stone-700">🛥️ 바다 서킷</b> — 물 위에서는 보트 없이 걸으면 70% 느려져요</li>
+                <li><b className="text-stone-700">🐙 문어발</b>에 잡히면 화살을 빠르게 10발 쏴 탈출!</li>
               </ul>
             </section>
             <section>
-              <h4 className="mb-2 font-semibold text-white">💗 하트</h4>
-              <ul className="space-y-1 text-slate-300">
-                <li>친구와 <b className="text-white">닿으면</b> 하트가 충전돼요 (같은 상대 15초 쿨타임)</li>
+              <h4 className="mb-2 font-semibold text-stone-700">💗 하트</h4>
+              <ul className="space-y-1 text-stone-500">
+                <li>친구와 <b className="text-stone-700">닿으면</b> 하트가 충전돼요 (같은 상대 15초 쿨타임)</li>
                 <li>하트는 방을 이동해도 유지됩니다.</li>
               </ul>
             </section>
@@ -3132,7 +3132,7 @@ export default function GameClient({
       )}
 
       {!identity && (
-        <div className="absolute inset-0 z-50 grid place-items-center bg-ink/80 text-slate-300">
+        <div className="absolute inset-0 z-50 grid place-items-center bg-ink/80 text-stone-500">
           캐릭터 불러오는 중...
         </div>
       )}
@@ -3155,7 +3155,7 @@ function PortalPasswordModal({
   return (
     <Modal title="🔑 비밀번호 문" onClose={onClose}>
       <div className="space-y-3">
-        <p className="text-sm text-slate-300">{portal.label ?? "이 문은 비밀번호가 필요합니다."}</p>
+        <p className="text-sm text-stone-500">{portal.label ?? "이 문은 비밀번호가 필요합니다."}</p>
         <input
           className="input bg-panel2"
           type="password"
@@ -3206,13 +3206,13 @@ function NotesModal({
   return (
     <Modal title="💌 내 데스크 쪽지함" onClose={onClose}>
       {notes.length === 0 ? (
-        <p className="py-8 text-center text-sm text-slate-400">받은 쪽지가 없습니다.</p>
+        <p className="py-8 text-center text-sm text-stone-400">받은 쪽지가 없습니다.</p>
       ) : (
         <ul className="space-y-2">
           {notes.map((n) => (
             <li key={n.id} className="rounded-xl bg-panel2 p-3">
-              <div className="flex items-center justify-between text-xs text-slate-400">
-                <span className="font-medium text-slate-200">
+              <div className="flex items-center justify-between text-xs text-stone-400">
+                <span className="font-medium text-stone-500">
                   {n.gift && <span className="mr-1 text-lg">{n.gift}</span>}
                   {n.from_name}
                 </span>
@@ -3248,7 +3248,7 @@ function QuizModal({
   return (
     <Modal title="🅾️❌ OX 파티 퀴즈 진행" onClose={onClose}>
       <div className="space-y-3">
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-stone-400">
           문제를 내면 참가자들이 광장의 <b className="text-emerald-400">O존</b>/<b className="text-red-400">X존</b>으로 이동해요.
           정답을 공개하면 틀린 쪽이 탈락 처리됩니다.
         </p>
@@ -3321,14 +3321,14 @@ function CollectionModal({
             <div key={label as string} className="rounded-xl bg-panel2 p-3 text-center">
               <div className="text-2xl">{icon as string}</div>
               <div className="mt-1 text-lg font-bold text-white">{val as number}</div>
-              <div className="text-xs text-slate-400">{label as string}</div>
+              <div className="text-xs text-stone-400">{label as string}</div>
             </div>
           ))}
         </div>
         <div>
-          <div className="mb-1 text-sm text-slate-300">획득 칭호</div>
+          <div className="mb-1 text-sm text-stone-500">획득 칭호</div>
           {titles.length === 0 ? (
-            <p className="rounded-xl bg-panel2/60 p-3 text-sm text-slate-500">
+            <p className="rounded-xl bg-panel2/60 p-3 text-sm text-stone-400">
               아직 칭호가 없어요. 레이스 우승과 튜토리얼로 칭호를 모아보세요!
             </p>
           ) : (
@@ -3370,7 +3370,7 @@ function QuestModal({
   return (
     <Modal title="💬 안내원 삐삐" onClose={onClose}>
       <div className="space-y-3">
-        <p className="rounded-xl bg-panel2 p-3 text-sm text-slate-200">
+        <p className="rounded-xl bg-panel2 p-3 text-sm text-stone-500">
           어서 오세요! 처음이신가요? 아래를 하나씩 따라 해보면 금방 적응할 거예요. 다 둘러보면 보상을 드릴게요! 🎁
         </p>
         <ul className="space-y-2">
@@ -3379,7 +3379,7 @@ function QuestModal({
               <span className="text-xl">{s.icon}</span>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium text-white">{s.title}</div>
-                <div className="text-xs text-slate-400">{s.desc}</div>
+                <div className="text-xs text-stone-400">{s.desc}</div>
               </div>
               {s.action && (
                 <button
@@ -3404,7 +3404,7 @@ function QuestModal({
             🎁 튜토리얼 완료 보상 받기 (💗100)
           </button>
         ) : (
-          <p className="text-center text-xs text-slate-500">로그인하면 완료 보상을 받을 수 있어요.</p>
+          <p className="text-center text-xs text-stone-400">로그인하면 완료 보상을 받을 수 있어요.</p>
         )}
         {rewardMsg && <p className="text-center text-sm text-accent2">{rewardMsg}</p>}
       </div>
@@ -3468,7 +3468,7 @@ function WarpModal({
   return (
     <Modal title="🌀 워프 — 전체 지도" onClose={onClose}>
       <div className="space-y-3">
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-stone-400">
           이동할 장소를 선택하면 2.5초 게이지가 찬 뒤 워프합니다. (도중에 취소 가능)
         </p>
         <div className="grid max-h-[52vh] grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3">
@@ -3493,7 +3493,7 @@ function WarpModal({
                 </div>
                 <div className="px-2 py-1.5">
                   <div className="truncate text-sm font-medium text-white">{r.name}</div>
-                  <div className="text-[10px] text-slate-500">
+                  <div className="text-[10px] text-stone-400">
                     {isCurrent ? "현재 위치" : isSel ? `워프 중... ${Math.round(progress * 100)}%` : "선택"}
                   </div>
                 </div>
@@ -3553,7 +3553,7 @@ function ExhibitModal({ obj, onClose }: { obj: MapObject; onClose: () => void })
             )}
           </div>
         </div>
-        <p className="whitespace-pre-wrap rounded-xl bg-panel2 p-3 text-sm leading-relaxed text-slate-200">
+        <p className="whitespace-pre-wrap rounded-xl bg-panel2 p-3 text-sm leading-relaxed text-stone-500">
           {obj.props?.text ?? "소개가 준비 중입니다."}
         </p>
       </div>
@@ -3575,7 +3575,7 @@ function BioModal({
   return (
     <Modal title="📝 내 소개" onClose={onClose}>
       <div className="space-y-3">
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-stone-400">
           다른 사람이 나에게 가까이 닿으면 이 소개가 프로필 카드로 보여요. 계정에 영구 저장됩니다.
         </p>
         <textarea
@@ -3587,7 +3587,7 @@ function BioModal({
           onChange={(e) => setText(e.target.value)}
         />
         <div className="flex items-center justify-between">
-          <span className="text-xs text-slate-500">{text.length}/200</span>
+          <span className="text-xs text-stone-400">{text.length}/200</span>
           <div className="flex gap-2">
             <button onClick={onClose} className="btn-ghost px-4 py-2 text-sm">
               나중에
@@ -3623,7 +3623,7 @@ function HudIconButton({
       className={`grid h-9 min-w-9 place-items-center rounded-md px-2 text-sm font-semibold transition ${
         active
           ? "bg-cyan-300 text-slate-950 shadow-[0_0_18px_rgba(103,232,249,0.35)]"
-          : "text-slate-300 hover:bg-white/10 hover:text-white"
+          : "text-stone-500 hover:bg-white/10 hover:text-white"
       }`}
     >
       {children}
