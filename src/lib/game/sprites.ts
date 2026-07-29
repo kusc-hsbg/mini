@@ -115,49 +115,67 @@ export function drawTile(
   switch (ch) {
     case ",":
     case ";": {
-      // 잔디: 색 변화 + 풀잎
-      if (rnd > 0.75) {
-        ctx.fillStyle = lighten(info.color, 0.05);
-        ctx.fillRect(x, y, TILE, TILE);
+      // 잔디: 부드러운 얼룩(몽글몽글) + 은은한 풀 무더기 — 하드 타일 경계 없이 자연스럽게.
+      const blobs = 2 + Math.floor(rnd * 2);
+      for (let i = 0; i < blobs; i++) {
+        const bx = x + hash2(col * 7 + i, row * 3) * TILE;
+        const by = y + hash2(col * 3, row * 7 + i) * TILE;
+        const br = 5 + hash2(col + i, row - i) * 7;
+        ctx.fillStyle = hash2(col * 2 + i, row) > 0.5 ? lighten(info.color, 0.09) : darken(info.color, 0.06);
+        ctx.beginPath();
+        ctx.ellipse(bx, by, br, br * 0.7, 0, 0, Math.PI * 2);
+        ctx.fill();
       }
-      ctx.fillStyle = darken(info.color, 0.14);
-      for (let i = 0; i < 3; i++) {
-        const gx = x + 4 + Math.floor(hash2(col * 3 + i, row) * 24);
-        const gy = y + 4 + Math.floor(hash2(col, row * 3 + i) * 24);
-        ctx.fillRect(gx, gy, 2, 4);
+      // 작은 풀 무더기
+      if (rnd > 0.6) {
+        ctx.fillStyle = darken(info.color, 0.12);
+        const gx = x + 6 + hash2(col, row * 5) * 18;
+        const gy = y + 16 + hash2(col * 5, row) * 10;
+        for (let b = -2; b <= 2; b += 2) {
+          ctx.beginPath();
+          ctx.moveTo(gx + b, gy);
+          ctx.quadraticCurveTo(gx + b + 1, gy - 6, gx + b + 2, gy - 7);
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = darken(info.color, 0.12);
+          ctx.stroke();
+        }
       }
       break;
     }
     case "d": {
-      // 흙길: 자갈
-      ctx.fillStyle = darken(info.color, 0.12);
+      // 흙길/모랫길: 따뜻한 톤 + 부드러운 얼룩(자갈 대신 몽글 텍스처)
       for (let i = 0; i < 3; i++) {
-        const gx = x + Math.floor(hash2(col + i, row * 2) * 26);
-        const gy = y + Math.floor(hash2(col * 2, row + i) * 26);
-        ctx.fillRect(gx, gy, 3, 2);
+        const bx = x + hash2(col * 5 + i, row) * TILE;
+        const by = y + hash2(col, row * 5 + i) * TILE;
+        ctx.fillStyle = hash2(col + i, row * 2) > 0.5 ? lighten(info.color, 0.06) : darken(info.color, 0.07);
+        ctx.beginPath();
+        ctx.ellipse(bx, by, 4 + hash2(i, col) * 4, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
       }
       break;
     }
     case "s": {
-      ctx.fillStyle = darken(info.color, 0.08);
-      for (let i = 0; i < 4; i++) {
-        const gx = x + Math.floor(hash2(col + i, row) * 28);
-        const gy = y + Math.floor(hash2(col, row + i) * 28);
-        ctx.fillRect(gx, gy, 2, 2);
+      // 모래: 밝은 톤 + 잔잔한 알갱이
+      for (let i = 0; i < 3; i++) {
+        const bx = x + hash2(col * 6 + i, row) * TILE;
+        const by = y + hash2(col, row * 6 + i) * TILE;
+        ctx.fillStyle = lighten(info.color, 0.07);
+        ctx.beginPath();
+        ctx.ellipse(bx, by, 4, 2.5, 0, 0, Math.PI * 2);
+        ctx.fill();
       }
       break;
     }
     case "-": {
-      // 보도블럭
-      ctx.strokeStyle = "rgba(0,0,0,0.14)";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
-      ctx.beginPath();
-      ctx.moveTo(x + TILE / 2, y);
-      ctx.lineTo(x + TILE / 2, y + TILE / 2);
-      ctx.moveTo(x, y + TILE / 2);
-      ctx.lineTo(x + TILE, y + TILE / 2);
-      ctx.stroke();
+      // 산책로: 부드러운 크림 톤 + 은은한 얼룩 (딱딱한 격자선 제거)
+      for (let i = 0; i < 2; i++) {
+        const bx = x + hash2(col * 4 + i, row) * TILE;
+        const by = y + hash2(col, row * 4 + i) * TILE;
+        ctx.fillStyle = hash2(col + i, row) > 0.5 ? lighten(info.color, 0.05) : darken(info.color, 0.05);
+        ctx.beginPath();
+        ctx.ellipse(bx, by, 6, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
       break;
     }
     case "=": {
@@ -1536,18 +1554,27 @@ export function drawObjectTop(
   if (o.type === "tree") {
     const cx = x + TILE;
     const tp = treePalette(o.x, o.y);
+    const sway = Math.sin(t / 900 + o.x) * 1.5;
+    // 몽글몽글 캐노피 — 겹치는 원들로 구름형 실루엣.
     ctx.fillStyle = tp.canopy2;
     ctx.beginPath();
-    ctx.arc(cx, y + 8, 22, 0, Math.PI * 2);
+    ctx.arc(cx + sway, y + 8, 24, 0, Math.PI * 2);
+    ctx.arc(cx - 14 + sway, y + 12, 15, 0, Math.PI * 2);
+    ctx.arc(cx + 15 + sway, y + 12, 14, 0, Math.PI * 2);
+    ctx.arc(cx + sway, y - 6, 16, 0, Math.PI * 2);
     ctx.fill();
+    // 중간 톤 볼륨
     ctx.fillStyle = tp.canopy;
     ctx.beginPath();
-    ctx.arc(cx - 8, y + 2, 13, 0, Math.PI * 2);
-    ctx.arc(cx + 9, y + 6, 11, 0, Math.PI * 2);
+    ctx.arc(cx - 9 + sway, y + 2, 12, 0, Math.PI * 2);
+    ctx.arc(cx + 10 + sway, y + 5, 11, 0, Math.PI * 2);
+    ctx.arc(cx + sway, y + 10, 12, 0, Math.PI * 2);
     ctx.fill();
+    // 하이라이트
     ctx.fillStyle = tp.light;
     ctx.beginPath();
-    ctx.arc(cx - 4, y - 2, 7, 0, Math.PI * 2);
+    ctx.arc(cx - 6 + sway, y - 3, 8, 0, Math.PI * 2);
+    ctx.arc(cx + 3 + sway, y + 1, 5, 0, Math.PI * 2);
     ctx.fill();
   } else if (o.type === "lamp") {
     const glow = 0.12 + Math.sin(t / 600) * 0.04;

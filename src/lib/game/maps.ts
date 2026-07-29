@@ -26,7 +26,7 @@ export const TILE_INFO: Record<string, TileInfo> = {
   ";": { color: "#5cb355", solid: false, accent: "#6cc464", outdoor: true },
   d: { color: "#e4c98d", solid: false, accent: "#edd7a2", outdoor: true },
   s: { color: "#f3dea1", solid: false, accent: "#f8e6b6", outdoor: true },
-  "-": { color: "#9aa0ab", solid: false, accent: "#8a909b", outdoor: true },
+  "-": { color: "#e8d3a6", solid: false, accent: "#d8c090", outdoor: true },
   "=": { color: "#4a5058", solid: false, accent: "#5a616b", outdoor: true },
   "~": { color: "#2f6db3", solid: true, accent: "#4a86c9", outdoor: true },
   W: { color: "#2563a8", solid: false, accent: "#3f83c9", outdoor: true }, // 얕은 물(주행 가능, 보트 없으면 감속)
