@@ -10,8 +10,6 @@ import {
   BODY_COLORS,
   DEFAULT_HEAD_STYLE,
   FACES,
-  FACIAL_HAIRS,
-  GLASSES,
   HAIRS,
   HAIR_COLORS,
   HATS,
@@ -44,7 +42,7 @@ type TabKey = "base" | "clothing" | "accessory" | "face" | "special";
 const TABS: { key: TabKey; label: string }[] = [
   { key: "base", label: "🧑 베이스" },
   { key: "clothing", label: "👕 의류" },
-  { key: "accessory", label: "🕶️ 액세서리" },
+  { key: "accessory", label: "🎩 모자" },
   { key: "face", label: "😊 표정" },
   { key: "special", label: "✨ 스페셜" },
 ];
@@ -162,22 +160,21 @@ export default function CustomizeForm({
 
   function randomize() {
     const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
-    setApp({
-      skin: pick(SKIN_TONES),
+    setApp((a) => ({
+      ...a,
       color: pick(BODY_COLORS),
       topStyle: pick(TOP_STYLES).key as TopStyleType,
       pants: pick(PANTS_COLORS),
       shoes: pick(SHOES_COLORS),
       hair: pick(HAIRS).key as HairType,
       hairColor: pick(HAIR_COLORS),
-      facialHair: Math.random() < 0.25 ? (pick(FACIAL_HAIRS).key as FacialHairType) : "none",
-      hat: Math.random() < 0.4 ? (pick(HATS).key as HatType) : "none",
-      glasses: Math.random() < 0.35 ? (pick(GLASSES).key as GlassesType) : "none",
+      facialHair: "none",
+      glasses: "none",
       face: pick(FACES).key as FaceType,
       special: "none",
       headImg: pick(HEAD_STYLES).key,
-      nameAbove: app.nameAbove ?? false,
-    });
+      nameAbove: a.nameAbove ?? false,
+    }));
   }
 
   return (
@@ -274,11 +271,6 @@ export default function CustomizeForm({
               <p className="text-xs text-amber-300/80">
                 💡 PNG 캐릭터 헤드를 기본으로 사용해 더 둥글고 부드럽게 표시됩니다.
               </p>
-              <Section label="피부톤">
-                {SKIN_TONES.map((c) => (
-                  <Swatch key={c} color={c} active={app.skin === c} onClick={() => patch({ skin: c })} />
-                ))}
-              </Section>
               <Section label="헤어스타일">
                 {HAIRS.map((h) => (
                   <Chip key={h.key} active={app.hair === h.key} onClick={() => patch({ hair: h.key as HairType })}>
@@ -289,17 +281,6 @@ export default function CustomizeForm({
               <Section label="머리 색">
                 {HAIR_COLORS.map((c) => (
                   <Swatch key={c} color={c} active={app.hairColor === c} onClick={() => patch({ hairColor: c })} />
-                ))}
-              </Section>
-              <Section label="수염">
-                {FACIAL_HAIRS.map((f) => (
-                  <Chip
-                    key={f.key}
-                    active={app.facialHair === f.key}
-                    onClick={() => patch({ facialHair: f.key as FacialHairType })}
-                  >
-                    {f.label}
-                  </Chip>
                 ))}
               </Section>
             </>
@@ -337,26 +318,13 @@ export default function CustomizeForm({
           )}
 
           {tab === "accessory" && (
-            <>
-              <Section label="모자">
-                {HATS.map((h) => (
-                  <Chip key={h.key} active={app.hat === h.key} onClick={() => patch({ hat: h.key as HatType })}>
-                    {h.label}
-                  </Chip>
-                ))}
-              </Section>
-              <Section label="안경">
-                {GLASSES.map((g) => (
-                  <Chip
-                    key={g.key}
-                    active={app.glasses === g.key}
-                    onClick={() => patch({ glasses: g.key as GlassesType })}
-                  >
-                    {g.label}
-                  </Chip>
-                ))}
-              </Section>
-            </>
+            <Section label="모자">
+              {HATS.map((h) => (
+                <Chip key={h.key} active={app.hat === h.key} onClick={() => patch({ hat: h.key as HatType })}>
+                  {h.label}
+                </Chip>
+              ))}
+            </Section>
           )}
 
           {tab === "face" && (

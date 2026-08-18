@@ -14,12 +14,12 @@ export default async function LoginPage() {
       <div className="pointer-events-none absolute inset-0 grid-bg" />
 
       <div className="glass fade-up relative z-10 w-full max-w-sm rounded-2xl p-7 shadow-2xl">
-        <Link href="/" className="text-sm text-slate-400 transition hover:text-white">
+        <Link href="/" className="text-sm text-stone-500 transition hover:text-stone-800">
           ← 홈
         </Link>
         <div className="brand-title mt-4 text-3xl">AFFINITY</div>
-        <h1 className="mt-3 text-xl font-bold text-white">로그인</h1>
-        <p className="mt-1 mb-6 text-sm text-slate-400">
+        <h1 className="mt-3 text-xl font-bold text-stone-800">로그인</h1>
+        <p className="mt-1 mb-6 text-sm text-stone-500">
           내 캐릭터와 하트·아이템을 저장하고 어디서든 이어서 즐기세요.
         </p>
         <LoginButtons configured={configured} />

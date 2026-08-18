@@ -2,7 +2,7 @@
 import type { CharacterAppearance, Direction, PlayerCosmetics, UserStatus } from "./types";
 import { TILE_INFO, type MapObject } from "./maps";
 import { OBJECT_DEFS } from "./objects";
-import { STATUS_META, TILE, headImgUrl, resolveHeadImgKey } from "./constants";
+import { HEAD_HAIR_COLORS, LONG_BACK_HAIR_HEADS, STATUS_META, TILE, headImgUrl, resolveHeadImgKey } from "./constants";
 import { SHOP_MAP } from "./shop";
 
 // ---------- 유틸 ----------
@@ -2370,6 +2370,45 @@ export function drawCharacter(
   // 앉으면 다리가 접히므로 몸 전체가 3유닛 내려온다
   const bodyTop = (sitting ? -11 : -14) * u;
   const flap = moving || dancing ? Math.sin(t / 120) * 2 : Math.sin(t / 600) * 1;
+  const headTop = bodyTop - 9.5 * u;
+
+  // 특별 헤어 스타일: 얼굴+헤어 일체형 이미지가 픽셀 머리를 통째로 대체.
+  const headImgKey = resolveHeadImgKey(app.headImg);
+  const headImg = !robot ? getImage(headImgUrl(headImgKey)) : null;
+  // 뒤통수/옆머리 색은 PNG 앞머리 색과 맞춘다(픽셀 머리는 app.hairColor 그대로).
+  const headHairC = HEAD_HAIR_COLORS[headImgKey] ?? hairC;
+  // 긴 생머리 PNG는 몸통 뒤로 넘겨 그려 앞으로 흘러내리지 않게 한다.
+  const drawHeadBehind = !!headImg && dir !== "up" && LONG_BACK_HAIR_HEADS.has(headImgKey);
+
+  // 이미지 머리 렌더러 — 몸통 앞/뒤 어디서든 호출.
+  const drawImageHead = () => {
+    if (!headImg) return;
+    const S = 72;
+    const profile = dir === "left" || dir === "right";
+    ctx.save();
+    if (dir === "left") ctx.scale(-1, 1);
+    ctx.imageSmoothingEnabled = true;
+    ctx.shadowColor = "rgba(62,48,98,0.20)";
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetY = 1;
+    if (profile) {
+      // 뒤통수 볼륨(머리색) + 작은 귀(피부) — 측면 실루엣.
+      ctx.save();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = headHairC;
+      roundRect(ctx, -5.5 * u, headTop + 0.5 * u, 4 * u, 6.5 * u, 4);
+      ctx.fill();
+      ctx.fillStyle = skin;
+      roundRect(ctx, -2.6 * u, headTop + 3.2 * u, 2 * u, 2.6 * u, 2);
+      ctx.fill();
+      ctx.restore();
+      // 고개가 앞으로 빠지지 않도록(거북목 방지) 아주 살짝만 이동 + 가로 압축.
+      ctx.translate(1, 0);
+      ctx.scale(0.86, 1);
+    }
+    ctx.drawImage(headImg, -S / 2, headTop - 33, S, S);
+    ctx.restore();
+  };
 
   // ----- 망토 (몸 뒤) — 방향별로 올바른 자세 -----
   if (special === "cape" && !robot) {
@@ -2400,6 +2439,9 @@ export function drawCharacter(
     }
     // dir === "up"(뒷모습)은 몸을 그린 뒤에 등 전체를 덮도록 아래에서 그린다.
   }
+
+  // ----- 긴 생머리(이미지)는 몸통보다 먼저 그려 등 뒤로 넘긴다 -----
+  if (drawHeadBehind) drawImageHead();
 
   // ----- 다리 + 신발 (앉으면 접힌 짧은 다리) -----
   {
@@ -2496,54 +2538,28 @@ export function drawCharacter(
   }
 
   // ----- 머리 -----
-  const headTop = bodyTop - 9.5 * u;
-
-  // 특별 헤어 스타일: 얼굴+헤어 일체형 이미지가 픽셀 머리를 통째로 대체.
-  // (이미지 로딩 전에는 기존 픽셀 머리로 폴백)
-  const headImg = !robot ? getImage(headImgUrl(resolveHeadImgKey(app.headImg))) : null;
-
   if (headImg && dir !== "up") {
-    // 이미지 얼굴. 좌우 이동 시엔 진행 방향으로 밀고 가로로 살짝 압축해 "고개를 돌린 옆모습"으로.
-    const S = 72;
-    const profile = dir === "left" || dir === "right";
-    ctx.save();
-    if (dir === "left") ctx.scale(-1, 1);
-    ctx.imageSmoothingEnabled = true;
-    ctx.shadowColor = "rgba(62,48,98,0.20)";
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetY = 1;
-    if (profile) {
-      // 귀/뒤통수 볼륨: 진행 반대쪽에 살짝 깔아 측면 실루엣을 만든다.
-      ctx.save();
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = skin;
-      roundRect(ctx, -5.5 * u, headTop + 1 * u, 4 * u, 6 * u, 4);
-      ctx.fill();
-      ctx.restore();
-      ctx.translate(5, 0);
-      ctx.scale(0.82, 1);
-    }
-    ctx.drawImage(headImg, -S / 2, headTop - 33, S, S);
-    ctx.restore();
+    // 긴 생머리는 몸통 뒤에서 이미 그렸으니 여기선 건너뛴다.
+    if (!drawHeadBehind) drawImageHead();
   } else if (headImg && dir === "up") {
-    // 위로 이동 = 뒷모습. 뒤통수 전체를 머리카락 색으로 채운다(민머리 노출 없음).
-    const hairStyle = app.hair ?? "short";
-    const backColor = hairStyle === "none" ? skin : hairC;
-    ctx.fillStyle = backColor;
+    // 위로 이동 = 뒷모습. 뒤통수 전체를 PNG의 실제 머리색으로 채운다.
+    ctx.fillStyle = headHairC;
     roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
     ctx.fill();
     ctx.strokeStyle = OUTLINE;
     ctx.lineWidth = 1.2;
     roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
     ctx.stroke();
-    if (hairStyle !== "none") {
-      // 정수리 하이라이트로 입체감
-      ctx.fillStyle = lighten(hairC, 0.18);
-      roundRect(ctx, -3.5 * u, headTop + 0.6 * u, 4 * u, 2 * u, 3);
+    // 정수리 하이라이트로 입체감
+    ctx.fillStyle = lighten(headHairC, 0.18);
+    roundRect(ctx, -3.5 * u, headTop + 0.6 * u, 4 * u, 2 * u, 3);
+    ctx.fill();
+    // 긴 머리 PNG는 뒷모습에서도 등 아래로 흘러내리는 머릿단을 표현.
+    if (LONG_BACK_HAIR_HEADS.has(headImgKey)) {
+      ctx.fillStyle = headHairC;
+      roundRect(ctx, -6 * u, headTop + 6 * u, 12 * u, 9 * u, 5);
       ctx.fill();
     }
-    // 스타일별 뒷머리 디테일(긴머리/포니테일 등)
-    drawHair(ctx, u, headTop, hairStyle, hairC, "up");
     drawHatPixel(ctx, u, headTop, app.hat, top);
   } else {
   // 뒷모습(위로 이동)은 뒤통수를 머리카락 색으로 채워 얼굴이 보이지 않게 한다.

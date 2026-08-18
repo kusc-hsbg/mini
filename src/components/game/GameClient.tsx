@@ -224,7 +224,8 @@ export default function GameClient({
   const multiplayer = configured;
   const isOwner = profile?.id === space.owner_id;
   const isMod = isOwner || role === "admin" || role === "moderator";
-  const canEdit = isOwner || role === "admin" || role === "moderator" || role === "mapmaker";
+  // 일반 사용자(멤버 포함)도 맵을 편집하고 방을 추가할 수 있게 허용한다.
+  const canEdit = isOwner || role !== null;
 
   // ----- 신원 -----
   const [identity, setIdentity] = useState<Identity | null>(null);
@@ -2329,11 +2330,11 @@ export default function GameClient({
             <span className="h-3.5 w-px bg-stone-200" />
             <span className="max-w-[130px] truncate text-xs font-semibold text-stone-400 sm:max-w-[200px]">{room.name}</span>
           </div>
-          {(isOwner || role === "admin") && (
+          {(isOwner || isMember) && (
             <Link
               href={`/s/${space.id}/settings`}
               className="grid h-10 w-10 shrink-0 place-items-center rounded-full border-[3px] border-white bg-panel/90 text-stone-500 shadow-lg backdrop-blur transition hover:scale-105"
-              title="스페이스 설정"
+              title={isOwner || role === "admin" ? "스페이스 설정" : "방 추가 · 맵"}
             >
               ⚙️
             </Link>

@@ -33,11 +33,11 @@ export default async function InsightsPage({
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
       <header className="mb-6">
-        <Link href={`/s/${ctx.space.id}/settings`} className="text-sm text-slate-400 hover:text-white">
+        <Link href={`/s/${ctx.space.id}/settings`} className="text-sm text-stone-500 hover:text-stone-800">
           ← 설정
         </Link>
-        <h1 className="text-2xl font-bold text-white">📊 인사이트 — {ctx.space.name}</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <h1 className="text-2xl font-bold text-stone-800">📊 인사이트 — {ctx.space.name}</h1>
+        <p className="mt-1 text-sm text-stone-500">
           최근 30일. 온보딩·협업 패턴 파악용 지표입니다 (개인 감시용이 아니에요).
         </p>
       </header>

@@ -17,10 +17,10 @@ export default async function WhiteboardPage({
     <main className="mx-auto max-w-5xl px-6 py-8">
       <header className="mb-4 flex items-center justify-between">
         <div>
-          <Link href="/spaces" className="text-sm text-slate-400 hover:text-white">
+          <Link href="/spaces" className="text-sm text-stone-500 hover:text-stone-800">
             ← PixelTown
           </Link>
-          <h1 className="text-xl font-bold text-white">🖊️ 공유 화이트보드</h1>
+          <h1 className="text-xl font-bold text-stone-800">🖊️ 공유 화이트보드</h1>
         </div>
       </header>
       <WbPageClient boardKey={boardKey} configured={configured} loggedIn={!!userId} />

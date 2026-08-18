@@ -103,6 +103,31 @@ export const HEAD_STYLES: { key: string; label: string }[] = [
   { key: "g-hana", label: "하나" },
 ];
 
+// 각 이미지 머리(PNG)의 실제 머리카락 색 — 뒷모습/옆모습에서 코드로 그리는
+// 뒤통수 색이 PNG 앞머리 색과 어긋나지 않도록 매칭에 사용한다.
+export const HEAD_HAIR_COLORS: Record<string, string> = {
+  "b-lucian": "#f5c518",
+  "b-moses": "#2f4bf5",
+  "b-asher": "#f24fc8",
+  "b-eden": "#2e9e3f",
+  "b-uriel": "#f5751a",
+  "b-cross": "#141414",
+  "g-deborah": "#f5751a",
+  "g-lucia": "#f5c518",
+  "g-sarah": "#141414",
+  "g-ariel": "#2f4bf5",
+  "g-eve": "#2e9e3f",
+  "g-hana": "#ec3fb0",
+};
+
+// 긴 생머리라 앞으로 흘러내리는 머리 — 몸통 뒤(등 뒤)로 넘겨 그린다.
+export const LONG_BACK_HAIR_HEADS = new Set(["g-lucia", "g-sarah", "g-eve"]);
+
+// 이미지 머리의 머리카락 색을 돌려준다(미지정 시 폴백).
+export function headHairColor(key: string | null | undefined, fallback: string): string {
+  return HEAD_HAIR_COLORS[resolveHeadImgKey(key)] ?? fallback;
+}
+
 export const DEFAULT_HEAD_STYLE = "g-hana";
 
 export function resolveHeadImgKey(key: string | null | undefined): string {

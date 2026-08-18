@@ -89,7 +89,7 @@ export default function InsightsClient({ events }: { events: EventRow[] }) {
 
       {/* 일별 차트 */}
       <div className="card">
-        <h2 className="mb-3 font-semibold text-white">일별 활성 사용자 (최근 14일)</h2>
+        <h2 className="mb-3 font-semibold text-stone-800">일별 활성 사용자 (최근 14일)</h2>
         <BarChart
           days={agg.days}
           values={agg.days.map((d) => agg.dailyUsers.get(d)?.size ?? 0)}
@@ -97,7 +97,7 @@ export default function InsightsClient({ events }: { events: EventRow[] }) {
         />
       </div>
       <div className="card">
-        <h2 className="mb-3 font-semibold text-white">일별 대화 시간 (분)</h2>
+        <h2 className="mb-3 font-semibold text-stone-800">일별 대화 시간 (분)</h2>
         <BarChart
           days={agg.days}
           values={agg.days.map((d) => Math.round(agg.dailyConvMin.get(d) ?? 0))}
@@ -108,7 +108,7 @@ export default function InsightsClient({ events }: { events: EventRow[] }) {
       {/* 멤버별 테이블 */}
       <div className="card">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold text-white">멤버별 활동</h2>
+          <h2 className="font-semibold text-stone-800">멤버별 활동</h2>
           <button onClick={exportCsv} className="btn-ghost text-xs">
             📥 CSV 내보내기
           </button>
@@ -116,7 +116,7 @@ export default function InsightsClient({ events }: { events: EventRow[] }) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/10 text-left text-xs text-slate-400">
+              <tr className="border-b border-stone-200 text-left text-xs text-stone-500">
                 <th className="py-2">사용자</th>
                 <th>접속 수</th>
                 <th>채팅</th>
@@ -129,7 +129,7 @@ export default function InsightsClient({ events }: { events: EventRow[] }) {
                 .sort((a, b) => b.convMin - a.convMin)
                 .slice(0, 50)
                 .map((u, i) => (
-                  <tr key={i} className="border-b border-white/5 text-slate-200">
+                  <tr key={i} className="border-b border-stone-100 text-stone-700">
                     <td className="py-2">{u.name}</td>
                     <td>{u.joins}</td>
                     <td>{u.chat}</td>
@@ -140,7 +140,7 @@ export default function InsightsClient({ events }: { events: EventRow[] }) {
             </tbody>
           </table>
           {agg.perUser.size === 0 && (
-            <p className="py-6 text-center text-sm text-slate-500">
+            <p className="py-6 text-center text-sm text-stone-500">
               아직 데이터가 없습니다. 사용자들이 스페이스를 이용하면 자동으로 수집됩니다.
             </p>
           )}
@@ -154,8 +154,8 @@ function Stat({ label, value, icon }: { label: string; value: string; icon: stri
   return (
     <div className="card">
       <div className="text-2xl">{icon}</div>
-      <div className="mt-1 text-2xl font-bold text-white">{value}</div>
-      <div className="text-xs text-slate-400">{label}</div>
+      <div className="mt-1 text-2xl font-bold text-stone-800">{value}</div>
+      <div className="text-xs text-stone-500">{label}</div>
     </div>
   );
 }
@@ -166,16 +166,16 @@ function BarChart({ days, values, color }: { days: string[]; values: number[]; c
     <div className="flex h-36 items-end gap-1.5">
       {days.map((d, i) => (
         <div key={d} className="flex flex-1 flex-col items-center gap-1">
-          <span className="text-[9px] text-slate-500">{values[i] || ""}</span>
+          <span className="text-[9px] text-stone-500">{values[i] || ""}</span>
           <div
             className="w-full rounded-t"
             style={{
               height: `${(values[i] / max) * 100}%`,
               minHeight: values[i] ? 3 : 1,
-              backgroundColor: values[i] ? color : "rgba(255,255,255,0.06)",
+              backgroundColor: values[i] ? color : "rgba(0,0,0,0.06)",
             }}
           />
-          <span className="text-[9px] text-slate-600">{d.slice(5).replace("-", "/")}</span>
+          <span className="text-[9px] text-stone-500">{d.slice(5).replace("-", "/")}</span>
         </div>
       ))}
     </div>

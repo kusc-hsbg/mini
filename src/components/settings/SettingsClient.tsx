@@ -51,6 +51,7 @@ export default function SettingsClient({
   bans,
   guestLogs,
   myId,
+  isAdmin,
 }: {
   space: SpaceRecord;
   rooms: RoomRecord[];
@@ -58,6 +59,7 @@ export default function SettingsClient({
   bans: BanRow[];
   guestLogs: GuestLogRow[];
   myId: string;
+  isAdmin: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -90,25 +92,33 @@ export default function SettingsClient({
 
   return (
     <div className="space-y-6">
-      {msg && <div className="rounded-lg bg-panel2 px-4 py-2 text-sm text-slate-200">{msg}</div>}
+      {msg && <div className="rounded-lg bg-panel2 px-4 py-2 text-sm text-stone-700">{msg}</div>}
 
+      {!isAdmin && (
+        <div className="rounded-lg bg-panel2 px-4 py-2 text-sm text-stone-600">
+          이 스페이스의 방을 추가하거나 맵을 편집할 수 있어요. 이름 변경·삭제 등 관리 기능은 오너/관리자에게만 표시됩니다.
+        </div>
+      )}
+
+      {isAdmin && (
+        <>
       {/* ---------- 일반 ---------- */}
       <section className="card">
-        <h2 className="mb-3 font-semibold text-white">🏷️ 일반</h2>
+        <h2 className="mb-3 font-semibold text-stone-800">🏷️ 일반</h2>
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs text-slate-400">이름</label>
+            <label className="mb-1 block text-xs text-stone-500">이름</label>
             <input className="input" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} />
           </div>
           <div>
-            <label className="mb-1 block text-xs text-slate-400">설명</label>
+            <label className="mb-1 block text-xs text-stone-500">설명</label>
             <input className="input" value={description} maxLength={200} onChange={(e) => setDescription(e.target.value)} />
           </div>
-          <label className="flex items-center gap-2 text-sm text-slate-300">
+          <label className="flex items-center gap-2 text-sm text-stone-600">
             <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} className="h-4 w-4 accent-[#6c8cff]" />
             공개 스페이스 (로비 목록 표시 + 누구나 멤버 가입 가능)
           </label>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-stone-500">
             초대 링크: <code className="rounded bg-panel2 px-1.5 py-0.5">{typeof window !== "undefined" ? window.location.origin : ""}/s/{space.slug}</code>
           </p>
           <button
@@ -128,18 +138,18 @@ export default function SettingsClient({
 
       {/* ---------- 보안/접근 ---------- */}
       <section className="card">
-        <h2 className="mb-3 font-semibold text-white">🔐 보안 · 접근 제한</h2>
+        <h2 className="mb-3 font-semibold text-stone-800">🔐 보안 · 접근 제한</h2>
         <div className="space-y-3">
-          <label className="flex items-center gap-2 text-sm text-slate-300">
+          <label className="flex items-center gap-2 text-sm text-stone-600">
             <input type="checkbox" checked={requireLogin} onChange={(e) => setRequireLogin(e.target.checked)} className="h-4 w-4 accent-[#6c8cff]" />
             로그인한 사용자만 입장 허용
           </label>
-          <label className="flex items-center gap-2 text-sm text-slate-300">
+          <label className="flex items-center gap-2 text-sm text-stone-600">
             <input type="checkbox" checked={guestCheckin} onChange={(e) => setGuestCheckin(e.target.checked)} className="h-4 w-4 accent-[#6c8cff]" />
             게스트 체크인 (비멤버는 접속 중인 멤버의 승인 필요)
           </label>
           <div>
-            <label className="mb-1 block text-xs text-slate-400">
+            <label className="mb-1 block text-xs text-stone-500">
               이메일 도메인 제한 (쉼표 구분, 비우면 제한 없음 — 예: company.com, school.ac.kr)
             </label>
             <input className="input" value={domains} onChange={(e) => setDomains(e.target.value)} />
@@ -167,7 +177,7 @@ export default function SettingsClient({
           </button>
 
           <div className="border-t border-white/5 pt-3">
-            <label className="mb-1 block text-xs text-slate-400">
+            <label className="mb-1 block text-xs text-stone-500">
               스페이스 비밀번호 {space.has_password ? "(현재 설정됨)" : "(현재 없음)"}
             </label>
             <div className="flex gap-2">
@@ -201,21 +211,21 @@ export default function SettingsClient({
 
       {/* ---------- 멤버/역할 ---------- */}
       <section className="card">
-        <h2 className="mb-1 font-semibold text-white">👥 멤버 · 역할 ({members.length})</h2>
-        <p className="mb-3 text-xs text-slate-500">
+        <h2 className="mb-1 font-semibold text-stone-800">👥 멤버 · 역할 ({members.length})</h2>
+        <p className="mb-3 text-xs text-stone-500">
           공개 스페이스는 로비에서 누구나 &quot;+멤버&quot;로 가입할 수 있습니다. 역할별 권한: Admin=전체 관리 ·
           Moderator=모더레이션+맵 · Mapmaker=맵 편집 · Member=일반
         </p>
         <ul className="space-y-1.5">
           {members.map((m) => (
             <li key={m.user_id} className="flex items-center gap-2 rounded-xl bg-panel2 px-3 py-2">
-              <span className="min-w-0 flex-1 truncate text-sm text-slate-100">
+              <span className="min-w-0 flex-1 truncate text-sm text-stone-800">
                 {m.display_name}
                 {m.is_owner && <span className="ml-1.5 rounded bg-accent/20 px-1.5 py-0.5 text-[10px] text-accent">오너</span>}
-                {m.user_id === myId && <span className="ml-1 text-xs text-slate-500">(나)</span>}
+                {m.user_id === myId && <span className="ml-1 text-xs text-stone-500">(나)</span>}
               </span>
               {m.is_owner ? (
-                <span className="text-xs text-slate-400">Admin</span>
+                <span className="text-xs text-stone-500">Admin</span>
               ) : (
                 <>
                   <select
@@ -227,7 +237,7 @@ export default function SettingsClient({
                         "역할을 변경했습니다"
                       )
                     }
-                    className="rounded-lg bg-panel px-2 py-1 text-xs text-slate-200"
+                    className="rounded-lg bg-panel px-2 py-1 text-xs text-stone-700"
                   >
                     {ROLES.map((r) => (
                       <option key={r.key} value={r.key}>{r.label}</option>
@@ -249,16 +259,18 @@ export default function SettingsClient({
           ))}
         </ul>
       </section>
+        </>
+      )}
 
       {/* ---------- 방 관리 ---------- */}
       <section className="card">
-        <h2 className="mb-3 font-semibold text-white">🗺️ 방(맵) 관리</h2>
+        <h2 className="mb-3 font-semibold text-stone-800">🗺️ 방(맵) 관리</h2>
         <ul className="mb-4 space-y-1.5">
           {rooms.map((r) => (
             <li key={r.id} className="flex items-center gap-2 rounded-xl bg-panel2 px-3 py-2">
-              <span className="min-w-0 flex-1 truncate text-sm text-slate-100">
+              <span className="min-w-0 flex-1 truncate text-sm text-stone-800">
                 {r.name}
-                <span className="ml-2 text-xs text-slate-500">
+                <span className="ml-2 text-xs text-stone-500">
                   템플릿: {r.template_key}
                   {r.map_data ? " · 커스텀 수정됨" : ""}
                 </span>
@@ -269,11 +281,11 @@ export default function SettingsClient({
                   const n = prompt("새 이름:", r.name);
                   if (n) run(() => renameRoom(space.id, r.id, n), "이름을 변경했습니다");
                 }}
-                className="text-xs text-slate-300 hover:text-white"
+                className="text-xs text-stone-600 hover:text-stone-800"
               >
                 이름변경
               </button>
-              {rooms.length > 1 && (
+              {isAdmin && rooms.length > 1 && (
                 <button
                   disabled={pending}
                   onClick={() => {
@@ -319,18 +331,20 @@ export default function SettingsClient({
         </div>
       </section>
 
+      {isAdmin && (
+        <>
       {/* ---------- 밴 ---------- */}
       <section className="card">
-        <h2 className="mb-3 font-semibold text-white">⛔ 밴 목록 ({bans.length})</h2>
+        <h2 className="mb-3 font-semibold text-stone-800">⛔ 밴 목록 ({bans.length})</h2>
         {bans.length === 0 ? (
-          <p className="text-sm text-slate-500">밴된 사용자가 없습니다. (방 안 참가자 패널에서 밴할 수 있어요)</p>
+          <p className="text-sm text-stone-500">밴된 사용자가 없습니다. (방 안 참가자 패널에서 밴할 수 있어요)</p>
         ) : (
           <ul className="space-y-1.5">
             {bans.map((b) => (
               <li key={b.id} className="flex items-center gap-2 rounded-xl bg-panel2 px-3 py-2 text-sm">
-                <span className="min-w-0 flex-1 truncate text-slate-100">
+                <span className="min-w-0 flex-1 truncate text-stone-800">
                   {b.target_name || b.target_key.slice(0, 12)}
-                  {b.reason && <span className="ml-2 text-xs text-slate-500">{b.reason}</span>}
+                  {b.reason && <span className="ml-2 text-xs text-stone-500">{b.reason}</span>}
                 </span>
                 <button
                   disabled={pending}
@@ -347,18 +361,18 @@ export default function SettingsClient({
 
       {/* ---------- 게스트 로그 ---------- */}
       <section className="card">
-        <h2 className="mb-3 font-semibold text-white">🚪 게스트 체크인 로그</h2>
+        <h2 className="mb-3 font-semibold text-stone-800">🚪 게스트 체크인 로그</h2>
         {guestLogs.length === 0 ? (
-          <p className="text-sm text-slate-500">기록이 없습니다.</p>
+          <p className="text-sm text-stone-500">기록이 없습니다.</p>
         ) : (
           <ul className="max-h-56 space-y-1 overflow-auto text-sm">
             {guestLogs.map((g) => (
               <li key={g.id} className="flex justify-between rounded-lg bg-panel2 px-3 py-1.5">
-                <span className="text-slate-200">
+                <span className="text-stone-700">
                   {g.guest_name}
-                  {g.approved_by && <span className="ml-2 text-xs text-slate-500">승인: {g.approved_by}</span>}
+                  {g.approved_by && <span className="ml-2 text-xs text-stone-500">승인: {g.approved_by}</span>}
                 </span>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-stone-500">
                   {new Date(g.entered_at).toLocaleString("ko-KR")}
                 </span>
               </li>
@@ -370,7 +384,7 @@ export default function SettingsClient({
       {/* ---------- 삭제 ---------- */}
       <section className="card border-red-500/20">
         <h2 className="mb-2 font-semibold text-red-300">🗑️ 스페이스 삭제</h2>
-        <p className="mb-3 text-sm text-slate-400">모든 방, 멤버, 데이터가 영구 삭제됩니다.</p>
+        <p className="mb-3 text-sm text-stone-500">모든 방, 멤버, 데이터가 영구 삭제됩니다.</p>
         <button
           disabled={pending}
           onClick={() => {
@@ -386,6 +400,8 @@ export default function SettingsClient({
           스페이스 영구 삭제
         </button>
       </section>
+        </>
+      )}
     </div>
   );
 }

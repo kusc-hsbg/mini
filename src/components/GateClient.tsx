@@ -90,21 +90,21 @@ export default function GateClient({
   return (
     <main className="flex min-h-screen items-center justify-center px-6">
       <div className="card w-full max-w-md">
-        <Link href="/spaces" className="text-sm text-slate-400 hover:text-white">
+        <Link href="/spaces" className="text-sm text-stone-500 hover:text-white">
           ← 로비
         </Link>
-        <h1 className="mt-3 text-2xl font-bold text-white">{space.name}</h1>
-        <p className="mb-6 mt-1 text-sm text-slate-400">{space.description}</p>
+        <h1 className="mt-3 text-2xl font-bold text-stone-800">{space.name}</h1>
+        <p className="mb-6 mt-1 text-sm text-stone-500">{space.description}</p>
 
         {reason === "banned" && (
-          <p className="rounded-lg bg-red-500/10 p-3 text-sm text-red-300">
+          <p className="rounded-lg bg-red-500/10 p-3 text-sm text-red-600">
             ⛔ 이 스페이스에서 차단되었습니다.
           </p>
         )}
 
         {reason === "login" && (
           <div className="space-y-3">
-            <p className="rounded-lg bg-amber-500/10 p-3 text-sm text-amber-200">
+            <p className="rounded-lg bg-amber-500/10 p-3 text-sm text-amber-700">
               🔑 이 스페이스는 로그인한 사용자만 입장할 수 있습니다.
             </p>
             <Link href="/login" className="btn-primary w-full">
@@ -114,7 +114,7 @@ export default function GateClient({
         )}
 
         {reason === "domain" && (
-          <p className="rounded-lg bg-amber-500/10 p-3 text-sm text-amber-200">
+          <p className="rounded-lg bg-amber-500/10 p-3 text-sm text-amber-700">
             📧 허용된 이메일 도메인({space.allowed_domains?.join(", ")})의 계정만 입장할 수
             있습니다.{!loggedIn && " 먼저 로그인해주세요."}
           </p>
@@ -122,7 +122,7 @@ export default function GateClient({
 
         {reason === "password" && (
           <div className="space-y-3">
-            <p className="text-sm text-slate-300">🔑 이 스페이스는 비밀번호로 보호되어 있습니다.</p>
+            <p className="text-sm text-stone-600">🔑 이 스페이스는 비밀번호로 보호되어 있습니다.</p>
             <input
               type="password"
               className="input"
@@ -140,7 +140,7 @@ export default function GateClient({
 
         {reason === "checkin" && (
           <div className="space-y-3">
-            <p className="text-sm text-slate-300">
+            <p className="text-sm text-stone-600">
               🚪 게스트 체크인이 켜져 있습니다. 접속 중인 멤버가 승인하면 입장할 수 있어요.
             </p>
             {!loggedIn && (

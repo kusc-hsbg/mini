@@ -8,8 +8,8 @@ export default async function CustomizePage() {
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">캐릭터 꾸미기</h1>
-        <Link href="/spaces" className="text-sm text-slate-400 hover:text-white">
+        <h1 className="text-2xl font-bold text-stone-800">캐릭터 꾸미기</h1>
+        <Link href="/spaces" className="text-sm text-stone-500 hover:text-stone-800">
           건너뛰기 →
         </Link>
       </div>
