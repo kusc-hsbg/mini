@@ -199,7 +199,7 @@ export default function CustomizeForm({
 
       <div className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm text-slate-300">닉네임</label>
+          <label className="mb-1 block text-sm text-stone-600">닉네임</label>
           <input
             className="input"
             value={name}
@@ -207,7 +207,7 @@ export default function CustomizeForm({
             onChange={(e) => setName(e.target.value)}
             placeholder="표시될 이름"
           />
-          <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-slate-300">
+          <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-stone-600">
             <input
               type="checkbox"
               checked={!!app.nameAbove}
@@ -225,7 +225,7 @@ export default function CustomizeForm({
               key={t.key}
               onClick={() => setTab(t.key)}
               className={`rounded-lg px-3 py-1.5 text-sm transition ${
-                tab === t.key ? "bg-accent text-white" : "bg-panel2 text-slate-300 hover:bg-panel2/70"
+                tab === t.key ? "bg-accent text-white" : "bg-panel2 text-stone-600 hover:bg-panel2/70"
               }`}
             >
               {t.label}
@@ -242,7 +242,7 @@ export default function CustomizeForm({
                   className={`grid h-14 w-14 place-items-center rounded-xl px-1 text-center text-[10px] leading-tight transition ${
                     resolveHeadImgKey(app.headImg) === DEFAULT_HEAD_STYLE
                       ? "bg-accent text-white ring-2 ring-accent"
-                      : "bg-panel2 text-slate-300 hover:bg-panel2/70"
+                      : "bg-panel2 text-stone-600 hover:bg-panel2/70"
                   }`}
                 >
                   기본 캐릭터
@@ -268,7 +268,7 @@ export default function CustomizeForm({
                   </button>
                 ))}
               </Section>
-              <p className="text-xs text-amber-300/80">
+              <p className="text-xs text-amber-600">
                 💡 PNG 캐릭터 헤드를 기본으로 사용해 더 둥글고 부드럽게 표시됩니다.
               </p>
               <Section label="헤어스타일">
@@ -350,7 +350,7 @@ export default function CustomizeForm({
                   </Chip>
                 ))}
               </Section>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-stone-500">
                 💡 게임 안에서 <b>Z 키</b>를 누르면 춤을 출 수 있어요!
               </p>
             </>
@@ -362,7 +362,7 @@ export default function CustomizeForm({
             {pending ? "저장 중..." : "저장하고 입장 →"}
           </button>
           {saved && <span className="text-sm text-accent2">저장됨!</span>}
-          {!profile && <span className="text-xs text-slate-500">(게스트: 이 브라우저에만 저장)</span>}
+          {!profile && <span className="text-xs text-stone-500">(게스트: 이 브라우저에만 저장)</span>}
         </div>
         {saveError && (
           <p className="rounded-lg bg-red-500/10 p-3 text-sm text-red-300">
@@ -377,7 +377,7 @@ export default function CustomizeForm({
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="mb-2 text-sm text-slate-300">{label}</div>
+      <div className="mb-2 text-sm text-stone-600">{label}</div>
       <div className="flex flex-wrap gap-2">{children}</div>
     </div>
   );
@@ -415,7 +415,7 @@ function Chip({
     <button
       onClick={onClick}
       className={`rounded-lg px-3 py-1.5 text-sm transition ${
-        active ? "bg-accent text-white" : "bg-panel2 text-slate-300 hover:bg-panel2/70"
+        active ? "bg-accent text-white" : "bg-panel2 text-stone-600 hover:bg-panel2/70"
       }`}
     >
       {children}

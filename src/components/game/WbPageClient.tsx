@@ -73,7 +73,7 @@ export default function WbPageClient({
   );
 
   if (initialOps === null) {
-    return <p className="py-16 text-center text-slate-400">보드 불러오는 중...</p>;
+    return <p className="py-16 text-center text-stone-500">보드 불러오는 중...</p>;
   }
 
   return (

@@ -3242,7 +3242,7 @@ function NotesModal({
                   })}
                 </span>
               </div>
-              <p className="mt-1 whitespace-pre-wrap text-sm text-slate-100">{n.message}</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-stone-700">{n.message}</p>
             </li>
           ))}
         </ul>
