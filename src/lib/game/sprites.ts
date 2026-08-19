@@ -1672,7 +1672,8 @@ function drawKart(
     ctx.arc(2, -9, 4.5, 0, Math.PI * 2);
     ctx.fill();
   } else {
-    // 정면/후면: 넓은 카트 + 양쪽 바퀴
+    // 넓은 카트 + 양쪽 바퀴. 위로 갈 때(후면)와 아래로 갈 때(정면)를 다르게 그린다.
+    const rear = dir === "up";
     wheel(-13, -3, 6);
     wheel(13, -3, 6);
     ctx.fillStyle = darken(color, 0.15);
@@ -1681,12 +1682,28 @@ function drawKart(
     ctx.fillStyle = color;
     roundRect(ctx, -11, -16, 22, 7, 5);
     ctx.fill();
-    ctx.fillStyle = "#374151";
-    ctx.fillRect(-7, -19, 14, 4); // 범퍼/핸들
-    ctx.fillStyle = "#f9fafb";
-    ctx.beginPath();
-    ctx.arc(0, -8, 4.5, 0, Math.PI * 2);
-    ctx.fill();
+    if (rear) {
+      // 후면: 리어 윙 + 배기구 + 빨간 테일램프 (뒤통수가 보이는 방향)
+      ctx.fillStyle = darken(color, 0.4);
+      ctx.fillRect(-12, -19, 24, 4); // 리어 윙
+      ctx.fillStyle = "#1f2937";
+      ctx.fillRect(-5, -3, 3, 3);
+      ctx.fillRect(2, -3, 3, 3); // 배기구
+      ctx.fillStyle = "#f87171";
+      ctx.fillRect(-9, -6, 3, 2);
+      ctx.fillRect(6, -6, 3, 2); // 테일램프
+    } else {
+      // 정면: 범퍼/핸들 + 노란 헤드라이트 + 번호 원
+      ctx.fillStyle = "#374151";
+      ctx.fillRect(-7, -19, 14, 4); // 범퍼/핸들
+      ctx.fillStyle = "#fde68a";
+      ctx.fillRect(-9, -6, 3, 2);
+      ctx.fillRect(6, -6, 3, 2); // 헤드라이트
+      ctx.fillStyle = "#f9fafb";
+      ctx.beginPath();
+      ctx.arc(0, -8, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   ctx.restore();
 }
@@ -1865,13 +1882,26 @@ function drawBike(
     ctx.fillStyle = "#9ca3af";
     ctx.fillRect(11, -22, 3, 12);
   } else {
+    // 위로 갈 때(후면)와 아래로 갈 때(정면)를 다르게 그린다.
+    const rear = dir === "up";
     wheel(0);
     ctx.fillStyle = "#ef4444";
     roundRect(ctx, -9, -16, 18, 14, 5);
     ctx.fill();
-    ctx.fillStyle = "#9ca3af";
-    ctx.fillRect(-11, -16, 4, 4);
-    ctx.fillRect(7, -16, 4, 4);
+    if (rear) {
+      // 후면: 좌석/짐받이 + 빨간 테일램프
+      ctx.fillStyle = "#7f1d1d";
+      ctx.fillRect(-7, -18, 14, 3);
+      ctx.fillStyle = "#fca5a5";
+      ctx.fillRect(-2, -6, 4, 3); // 테일램프
+    } else {
+      // 정면: 좌우 핸들바 + 노란 헤드라이트
+      ctx.fillStyle = "#9ca3af";
+      ctx.fillRect(-11, -16, 4, 4);
+      ctx.fillRect(7, -16, 4, 4);
+      ctx.fillStyle = "#fde68a";
+      ctx.fillRect(-2, -6, 4, 3); // 헤드라이트
+    }
   }
   ctx.restore();
 }

@@ -26,8 +26,9 @@ import { useRoomChannel } from "@/hooks/useRoomChannel";
 import { useControlChannel, type ControlChannel } from "@/hooks/useControlChannel";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { logEvent } from "@/lib/analytics";
-import { banTarget, blockTarget, buyItem, claimAttendance, claimQuest, equipItem, grantHearts, incrementRaceWin, redeemSecretWallet, saveBio as saveBioAction, sendDm, sendFriendRequest, setRoomClosed as setRoomClosedAction, setStatus as setStatusAction, spendHearts, unblockTarget } from "@/app/actions";
+import { banTarget, blockTarget, buyItem, claimAttendance, claimQuest, equipItem, grantHearts, incrementRaceWin, redeemSecretWallet, saveBio as saveBioAction, saveProfile, sendDm, sendFriendRequest, setRoomClosed as setRoomClosedAction, setStatus as setStatusAction, spendHearts, unblockTarget } from "@/app/actions";
 import StoreModal, { type WalletState } from "./StoreModal";
+import OutfitModal from "./OutfitModal";
 import FriendsPanel from "./FriendsPanel";
 import MiniGamesModal from "./MiniGamesModal";
 import BankModal from "./BankModal";
@@ -189,6 +190,7 @@ type ModalState =
   | { kind: "collection" }
   | { kind: "auction" }
   | { kind: "quiz" }
+  | { kind: "outfit" }
   | { kind: "help" }
   | null;
 
@@ -276,6 +278,8 @@ export default function GameClient({
   const [unreadDms, setUnreadDms] = useState<Set<string>>(new Set());
   const [modal, setModal] = useState<ModalState>(null);
   const [panel, setPanel] = useState<PanelState>(null);
+  const [outfitSaving, setOutfitSaving] = useState(false);
+  const [outfitSavedMsg, setOutfitSavedMsg] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [roomJobs, setRoomJobs] = useState<Record<string, RoomJob>>({});
@@ -481,6 +485,50 @@ export default function GameClient({
     const self = engineRef.current?.getSelf();
     if (self && multiplayer) channelRef.current.track(self);
   }, [multiplayer]);
+
+  // 옷장: 변경을 즉시 내 아바타에 반영(재부팅 없이) + 주변에 전파.
+  const applyOutfitLive = useCallback(
+    (app: CharacterAppearance) => {
+      if (!identity) return;
+      identity.appearance = app;
+      engineRef.current?.updateAppearance(app, identity.name);
+      pushPresence();
+    },
+    [identity, pushPresence]
+  );
+
+  async function saveOutfit(app: CharacterAppearance) {
+    if (!identity) return;
+    applyOutfitLive(app);
+    setOutfitSavedMsg(null);
+    if (profile) {
+      setOutfitSaving(true);
+      const res = await saveProfile({
+        display_name: identity.name,
+        skin: app.skin,
+        color: app.color,
+        top_style: app.topStyle,
+        pants: app.pants,
+        shoes: app.shoes,
+        hair: app.hair,
+        hair_color: app.hairColor,
+        facial_hair: app.facialHair,
+        hat: app.hat,
+        glasses: app.glasses,
+        face: app.face,
+        special: app.special,
+        head_img: resolveHeadImgKey(app.headImg),
+        name_above: app.nameAbove ?? true,
+      });
+      setOutfitSaving(false);
+      setOutfitSavedMsg("error" in res ? `저장 실패: ${res.error}` : "저장됨!");
+    } else {
+      try {
+        localStorage.setItem(GUEST_KEY, JSON.stringify({ name: identity.name, ...app }));
+      } catch {}
+      setOutfitSavedMsg("저장됨!");
+    }
+  }
 
   const jobOf = useCallback(
     (id: string | null | undefined): RoomJob => {
@@ -2374,6 +2422,13 @@ export default function GameClient({
           >
             ◈
           </HudIconButton>
+          <HudIconButton
+            active={modal?.kind === "outfit"}
+            onClick={() => setModal((cur) => (cur?.kind === "outfit" ? null : { kind: "outfit" }))}
+            title="옷장 · 캐릭터 꾸미기"
+          >
+            👗
+          </HudIconButton>
           {profile && (
             <HudIconButton
               onClick={() => setModal({ kind: "auction" })}
@@ -3088,7 +3143,7 @@ export default function GameClient({
           loggedIn={!!profile}
           onGoto={(target) => {
             if (target === "customize") {
-              router.push("/customize");
+              setModal({ kind: "outfit" }); // 페이지 이동 없이 인게임 옷장 열기
               return;
             }
             if (target === "store") {
@@ -3145,6 +3200,21 @@ export default function GameClient({
             setModal(null);
           }}
           onClose={() => setModal(null)}
+        />
+      )}
+
+      {modal?.kind === "outfit" && identity && (
+        <OutfitModal
+          initial={identity.appearance}
+          name={identity.name}
+          onChange={applyOutfitLive}
+          onSave={saveOutfit}
+          onClose={() => {
+            setModal(null);
+            setOutfitSavedMsg(null);
+          }}
+          saving={outfitSaving}
+          savedMsg={outfitSavedMsg}
         />
       )}
 

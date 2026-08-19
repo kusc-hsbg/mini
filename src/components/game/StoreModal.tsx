@@ -166,7 +166,7 @@ export default function StoreModal({
               key={k}
               onClick={() => setTab(k)}
               className={`rounded-full px-2 py-1.5 text-[12px] font-bold transition ${
-                tab === k ? "bg-white text-pink-500 shadow-md scale-[1.02]" : "text-white/90 hover:bg-white/25"
+                tab === k ? "bg-white text-pink-500 shadow-md scale-[1.02]" : "text-stone-600 hover:bg-white/60"
               }`}
             >
               {label}
@@ -307,7 +307,7 @@ export default function StoreModal({
 function Balance({ label, value, tone }: { label: string; value: number; tone: string }) {
   return (
     <div className="rounded-2xl border-2 border-white/60 bg-white/50 px-3 py-2 shadow-sm">
-      <div className="text-[10px] font-bold tracking-[0.15em] text-white/90">{label}</div>
+      <div className="text-[10px] font-bold tracking-[0.15em] text-stone-600">{label}</div>
       <div className={`mt-0.5 text-lg font-extrabold ${tone} bg-white/70 rounded-lg px-1 -mx-1`}>{value.toLocaleString()}</div>
     </div>
   );
