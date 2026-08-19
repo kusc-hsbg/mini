@@ -9,10 +9,7 @@ import { saveProfile } from "@/app/actions";
 import {
   BODY_COLORS,
   DEFAULT_HEAD_STYLE,
-  FACES,
-  HAIRS,
   HAIR_COLORS,
-  HATS,
   HEAD_STYLES,
   PANTS_COLORS,
   SHOES_COLORS,
@@ -38,12 +35,10 @@ import type {
 
 const GUEST_KEY = "pixeltown:guest-appearance";
 
-type TabKey = "base" | "clothing" | "accessory" | "face" | "special";
+type TabKey = "base" | "clothing" | "special";
 const TABS: { key: TabKey; label: string }[] = [
   { key: "base", label: "🧑 베이스" },
   { key: "clothing", label: "👕 의류" },
-  { key: "accessory", label: "🎩 모자" },
-  { key: "face", label: "😊 표정" },
   { key: "special", label: "✨ 스페셜" },
 ];
 
@@ -77,7 +72,7 @@ export default function CustomizeForm({
       face: "smile",
       special: "none",
       headImg: DEFAULT_HEAD_STYLE,
-      nameAbove: false,
+      nameAbove: true,
     };
     if (profile) {
       return {
@@ -96,7 +91,8 @@ export default function CustomizeForm({
         face: profile.face as FaceType,
         special: normalizeSpecial(profile.special),
         headImg: resolveHeadImgKey(profile.head_img),
-        nameAbove: !!profile.name_above,
+        // 닉네임은 항상 머리 위로 (토글 제거 — 기본값 고정)
+        nameAbove: true,
       };
     }
     if (typeof window !== "undefined") {
@@ -106,6 +102,7 @@ export default function CustomizeForm({
           const g = { ...def, ...JSON.parse(raw) };
           g.special = normalizeSpecial(g.special);
           g.headImg = resolveHeadImgKey(g.headImg);
+          g.nameAbove = true; // 닉네임 머리 위 고정
           return g;
         }
       } catch {}
@@ -166,14 +163,11 @@ export default function CustomizeForm({
       topStyle: pick(TOP_STYLES).key as TopStyleType,
       pants: pick(PANTS_COLORS),
       shoes: pick(SHOES_COLORS),
-      hair: pick(HAIRS).key as HairType,
-      hairColor: pick(HAIR_COLORS),
       facialHair: "none",
       glasses: "none",
-      face: pick(FACES).key as FaceType,
       special: "none",
       headImg: pick(HEAD_STYLES).key,
-      nameAbove: a.nameAbove ?? false,
+      nameAbove: true,
     }));
   }
 
@@ -207,15 +201,6 @@ export default function CustomizeForm({
             onChange={(e) => setName(e.target.value)}
             placeholder="표시될 이름"
           />
-          <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-stone-600">
-            <input
-              type="checkbox"
-              checked={!!app.nameAbove}
-              onChange={(e) => patch({ nameAbove: e.target.checked })}
-              className="h-4 w-4 accent-accent"
-            />
-            닉네임을 머리카락 위로 올리기 (긴 머리 스타일이 가려지지 않아요)
-          </label>
         </div>
 
         {/* 카테고리 탭 */}
@@ -268,21 +253,6 @@ export default function CustomizeForm({
                   </button>
                 ))}
               </Section>
-              <p className="text-xs text-amber-600">
-                💡 PNG 캐릭터 헤드를 기본으로 사용해 더 둥글고 부드럽게 표시됩니다.
-              </p>
-              <Section label="헤어스타일">
-                {HAIRS.map((h) => (
-                  <Chip key={h.key} active={app.hair === h.key} onClick={() => patch({ hair: h.key as HairType })}>
-                    {h.label}
-                  </Chip>
-                ))}
-              </Section>
-              <Section label="머리 색">
-                {HAIR_COLORS.map((c) => (
-                  <Swatch key={c} color={c} active={app.hairColor === c} onClick={() => patch({ hairColor: c })} />
-                ))}
-              </Section>
             </>
           )}
 
@@ -315,26 +285,6 @@ export default function CustomizeForm({
                 ))}
               </Section>
             </>
-          )}
-
-          {tab === "accessory" && (
-            <Section label="모자">
-              {HATS.map((h) => (
-                <Chip key={h.key} active={app.hat === h.key} onClick={() => patch({ hat: h.key as HatType })}>
-                  {h.label}
-                </Chip>
-              ))}
-            </Section>
-          )}
-
-          {tab === "face" && (
-            <Section label="표정">
-              {FACES.map((f) => (
-                <Chip key={f.key} active={app.face === f.key} onClick={() => patch({ face: f.key as FaceType })}>
-                  {f.label}
-                </Chip>
-              ))}
-            </Section>
           )}
 
           {tab === "special" && (

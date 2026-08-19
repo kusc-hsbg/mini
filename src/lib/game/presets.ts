@@ -471,6 +471,31 @@ function buildOffice(): MapData {
   c.areas.push({ id: "lounge", name: "🛋️ 라운지", x: 53, y: 33, w: 20, h: 9 });
   c.labels.push({ x: 53, y: 32, text: "🛋️ 라운지 & 키친" });
 
+  // ---- 🎮 게임 라운지 (중앙 홀) — 쉬는 시간에 함께 노는 공간 ----
+  add(c, "rug", 25, 20, { props: { color: "#5b8def" } });
+  add(c, "arcade", 24, 19, { name: "테트리스" });
+  add(c, "arcade", 26, 19, { name: "테트리스 2" });
+  add(c, "roundtable", 29, 20, { name: "보드게임 테이블" });
+  add(c, "chair", 28, 21);
+  add(c, "chair", 31, 21);
+  add(c, "chair", 29, 22, { dir: "up" });
+  add(c, "minigame", 24, 24, { name: "미니게임 기기" });
+  add(c, "piano", 27, 24, { name: "게임 라운지 피아노" });
+  add(c, "speaker", 30, 24, { name: "게임 BGM" });
+  add(c, "plant", 32, 19);
+  add(c, "plant", 24, 26);
+  c.areas.push({ id: "of-gamelounge", name: "🎮 게임 라운지", x: 24, y: 18, w: 9, h: 9 });
+  c.labels.push({ x: 24, y: 17, text: "🎮 게임 라운지" });
+
+  // ---- 📚 북 라운지 (독서/휴식 코너) ----
+  add(c, "bookshelf", 50, 19, { name: "책장" });
+  add(c, "bookshelf", 52, 19, { name: "책장" });
+  add(c, "sofa", 49, 22);
+  add(c, "roundtable", 51, 23, { name: "티 테이블" });
+  add(c, "plant", 48, 19);
+  c.areas.push({ id: "of-booklounge", name: "📚 북 라운지", x: 48, y: 19, w: 6, h: 7 });
+  c.labels.push({ x: 48, y: 18, text: "📚 북 라운지" });
+
   // ---- 임원실 (멤버 전용 문) ----
   g.rect(18, 4, 6, 6, "k");
   g.border(18, 4, 6, 6, "#");
@@ -1299,6 +1324,16 @@ function buildCafe(): MapData {
   add(c, "plant", 7, 12);
   add(c, "plant", 42, 22);
   add(c, "minigame", 8, 24, { name: "미니게임 기기" });
+
+  // ---- 🎲 보드게임 & 오락 코너 (무대 아래 데크) ----
+  add(c, "arcade", 34, 20, { name: "테트리스" });
+  add(c, "arcade", 36, 20, { name: "테트리스 2" });
+  add(c, "roundtable", 38, 20, { name: "보드게임" });
+  add(c, "chair", 37, 21);
+  add(c, "chair", 40, 21);
+  add(c, "bookshelf", 34, 24, { name: "책 나눔장" });
+  add(c, "plant", 41, 24);
+  c.labels.push({ x: 34, y: 19, text: "🎲 보드게임 코너" });
 
   // ---- 게시판 + 안내 ----
   add(c, "bulletin", 30, 6, { name: "카페 게시판" });
