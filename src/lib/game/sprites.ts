@@ -97,6 +97,34 @@ function getImage(url: string): HTMLImageElement | null {
   return null;
 }
 
+// 이미지 실루엣(알파)을 단색으로 채운 캔버스 캐시.
+// 뒷모습 머리는 얼굴이 보이면 안 되므로, 머리 PNG의 실루엣을
+// 머리카락 색 하나로 통째로 칠해 "뒤통수"로 사용한다.
+const tintCache = new Map<string, HTMLCanvasElement | null>();
+function getTintedImage(url: string, color: string): HTMLCanvasElement | null {
+  const key = `${url}|${color}`;
+  const cached = tintCache.get(key);
+  if (cached !== undefined) return cached;
+  const img = getImage(url);
+  if (!img) return null; // 원본 아직 로딩 중 — 다음 프레임에 재시도
+  const w = img.naturalWidth || img.width;
+  const h = img.naturalHeight || img.height;
+  const cvs = document.createElement("canvas");
+  cvs.width = w;
+  cvs.height = h;
+  const ictx = cvs.getContext("2d");
+  if (!ictx) {
+    tintCache.set(key, null);
+    return null;
+  }
+  ictx.drawImage(img, 0, 0);
+  ictx.globalCompositeOperation = "source-in"; // 알파가 있는 픽셀만 단색으로
+  ictx.fillStyle = color;
+  ictx.fillRect(0, 0, w, h);
+  tintCache.set(key, cvs);
+  return cvs;
+}
+
 // ---------- 타일 ----------
 
 export function drawTile(
@@ -2572,23 +2600,36 @@ export function drawCharacter(
     // 긴 생머리는 몸통 뒤에서 이미 그렸으니 여기선 건너뛴다.
     if (!drawHeadBehind) drawImageHead();
   } else if (headImg && dir === "up") {
-    // 위로 이동 = 뒷모습. 뒤통수 전체를 PNG의 실제 머리색으로 채운다.
-    ctx.fillStyle = headHairC;
-    roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
-    ctx.fill();
-    ctx.strokeStyle = OUTLINE;
-    ctx.lineWidth = 1.2;
-    roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
-    ctx.stroke();
-    // 정수리 하이라이트로 입체감
-    ctx.fillStyle = lighten(headHairC, 0.18);
-    roundRect(ctx, -3.5 * u, headTop + 0.6 * u, 4 * u, 2 * u, 3);
-    ctx.fill();
-    // 긴 머리 PNG는 뒷모습에서도 등 아래로 흘러내리는 머릿단을 표현.
-    if (LONG_BACK_HAIR_HEADS.has(headImgKey)) {
-      ctx.fillStyle = headHairC;
-      roundRect(ctx, -6 * u, headTop + 6 * u, 12 * u, 9 * u, 5);
+    // 위로 이동 = 뒷모습. 머리 PNG 실루엣을 머리카락 색으로 통째로 칠해
+    // 뒤통수로 사용한다(얼굴이 보이지 않게). 헤어스타일 실루엣은 그대로 유지.
+    const tinted = getTintedImage(headImgUrl(headImgKey), headHairC);
+    if (tinted) {
+      const S = 72;
+      ctx.save();
+      ctx.imageSmoothingEnabled = true;
+      ctx.shadowColor = "rgba(62,48,98,0.20)";
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetY = 1;
+      ctx.drawImage(tinted, -S / 2, headTop - 33, S, S);
+      ctx.restore();
+      // 정수리 하이라이트로 입체감
+      ctx.fillStyle = lighten(headHairC, 0.2);
+      roundRect(ctx, -3 * u, headTop + 0.5 * u, 3.4 * u, 1.7 * u, 3);
       ctx.fill();
+    } else {
+      // 폴백: PNG 로딩 전 단색 뒤통수
+      ctx.fillStyle = headHairC;
+      roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
+      ctx.fill();
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = 1.2;
+      roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
+      ctx.stroke();
+      if (LONG_BACK_HAIR_HEADS.has(headImgKey)) {
+        ctx.fillStyle = headHairC;
+        roundRect(ctx, -6 * u, headTop + 6 * u, 12 * u, 9 * u, 5);
+        ctx.fill();
+      }
     }
     drawHatPixel(ctx, u, headTop, app.hat, top);
   } else {
