@@ -139,6 +139,32 @@ export function headImgUrl(key: string): string {
   return `/avatars/heads/${resolveHeadImgKey(key)}.png`;
 }
 
+// 옆모습(측면) 머리 PNG — 아티스트가 그린 진짜 옆얼굴. 원본은 모두 왼쪽을 바라보므로
+// 오른쪽을 볼 때는 좌우 반전한다.
+export function sideHeadImgUrl(key: string): string {
+  return `/avatars/heads/side/${resolveHeadImgKey(key)}.png`;
+}
+
+// 각 옆모습 머리를 몸에 정렬하기 위한 변환(얼굴 위치/크기를 정면과 맞춰 자동 산출).
+// 런타임: ctx.drawImage(img, ox, (headTop - 33) + oy, img.width * s, img.height * s)
+export const SIDE_HEAD_TF: Record<string, { s: number; ox: number; oy: number }> = {
+  "b-lucian": { s: 0.07397, ox: -15.34, oy: 19.86 },
+  "b-moses": { s: 0.07491, ox: -14.94, oy: 17.79 },
+  "b-asher": { s: 0.06957, ox: -15.25, oy: 22.65 },
+  "b-eden": { s: 0.06368, ox: -12.85, oy: 22.37 },
+  "b-uriel": { s: 0.0747, ox: -14.38, oy: 20.96 },
+  "b-cross": { s: 0.0765, ox: -16.14, oy: 17.99 },
+  "g-deborah": { s: 0.08566, ox: -15.32, oy: 13.67 },
+  "g-lucia": { s: 0.11533, ox: -14.96, oy: 3.93 },
+  "g-sarah": { s: 0.10356, ox: -14.85, oy: 12.42 },
+  "g-ariel": { s: 0.08449, ox: -14.73, oy: 16 },
+  "g-eve": { s: 0.07529, ox: -14.66, oy: 21.01 },
+  "g-hana": { s: 0.0955, ox: -16.84, oy: 16.32 },
+};
+
+// 옆모습에서 머리가 길어 몸 아래로 흘러내리는 것들 — 몸을 가장 위 레이어로 올린다.
+export const SIDE_LONG_HAIR = new Set(["g-lucia", "g-sarah", "g-eve", "g-hana"]);
+
 export const SHOES_COLORS = [
   "#292524", "#7c2d12", "#f8fafc", "#dc2626",
   "#1d4ed8", "#15803d", "#facc15", "#a855f7",

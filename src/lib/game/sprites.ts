@@ -2,7 +2,7 @@
 import type { CharacterAppearance, Direction, PlayerCosmetics, UserStatus } from "./types";
 import { TILE_INFO, type MapObject } from "./maps";
 import { OBJECT_DEFS } from "./objects";
-import { HEAD_HAIR_COLORS, LONG_BACK_HAIR_HEADS, STATUS_META, TILE, headImgUrl, resolveHeadImgKey } from "./constants";
+import { HEAD_HAIR_COLORS, LONG_BACK_HAIR_HEADS, SIDE_HEAD_TF, SIDE_LONG_HAIR, STATUS_META, TILE, headImgUrl, resolveHeadImgKey, sideHeadImgUrl } from "./constants";
 import { SHOP_MAP } from "./shop";
 
 // ---------- 유틸 ----------
@@ -95,34 +95,6 @@ function getImage(url: string): HTMLImageElement | null {
   img.onload = () => imgCache.set(url, img);
   img.src = url;
   return null;
-}
-
-// 이미지 실루엣(알파)을 단색으로 채운 캔버스 캐시.
-// 뒷모습 머리는 얼굴이 보이면 안 되므로, 머리 PNG의 실루엣을
-// 머리카락 색 하나로 통째로 칠해 "뒤통수"로 사용한다.
-const tintCache = new Map<string, HTMLCanvasElement | null>();
-function getTintedImage(url: string, color: string): HTMLCanvasElement | null {
-  const key = `${url}|${color}`;
-  const cached = tintCache.get(key);
-  if (cached !== undefined) return cached;
-  const img = getImage(url);
-  if (!img) return null; // 원본 아직 로딩 중 — 다음 프레임에 재시도
-  const w = img.naturalWidth || img.width;
-  const h = img.naturalHeight || img.height;
-  const cvs = document.createElement("canvas");
-  cvs.width = w;
-  cvs.height = h;
-  const ictx = cvs.getContext("2d");
-  if (!ictx) {
-    tintCache.set(key, null);
-    return null;
-  }
-  ictx.drawImage(img, 0, 0);
-  ictx.globalCompositeOperation = "source-in"; // 알파가 있는 픽셀만 단색으로
-  ictx.fillStyle = color;
-  ictx.fillRect(0, 0, w, h);
-  tintCache.set(key, cvs);
-  return cvs;
 }
 
 // ---------- 타일 ----------
@@ -2435,38 +2407,34 @@ export function drawCharacter(
   const headImg = !robot ? getImage(headImgUrl(headImgKey)) : null;
   // 뒤통수/옆머리 색은 PNG 앞머리 색과 맞춘다(픽셀 머리는 app.hairColor 그대로).
   const headHairC = HEAD_HAIR_COLORS[headImgKey] ?? hairC;
-  // 긴 생머리 PNG는 몸통 뒤로 넘겨 그려 앞으로 흘러내리지 않게 한다(정면·옆모습).
-  const drawHeadBehind = !!headImg && dir !== "up" && LONG_BACK_HAIR_HEADS.has(headImgKey);
+  const isProfile = dir === "left" || dir === "right";
+  // 긴 머리는 몸통 뒤로 넘겨 그린다. 정면은 LONG_BACK_HAIR_HEADS,
+  // 옆모습은 SIDE_LONG_HAIR 기준(옆모습에서 몸 아래로 흘러내리는 머리는 몸을 위 레이어로).
+  const drawHeadBehind =
+    !!headImg &&
+    ((dir === "down" && LONG_BACK_HAIR_HEADS.has(headImgKey)) ||
+      (isProfile && SIDE_LONG_HAIR.has(headImgKey)));
 
-  // 이미지 머리 렌더러 — 정면은 PNG 전체.
-  // 옆모습은 같은 PNG의 앞쪽 절반만 얼굴(눈 하나)로 쓰고, 뒤통수는 같은 PNG를
-  // 머리색으로 칠한 실루엣으로 채운다. 같은 이미지라 경계가 매끄럽게 맞물린다.
+  // 이미지 머리 렌더러 — 정면/뒷모습은 정면 PNG, 옆모습은 아티스트가 그린 옆모습 PNG.
+  // 옆모습 원본은 왼쪽을 바라보므로 오른쪽일 때 좌우 반전한다.
   const drawImageHead = () => {
     if (!headImg) return;
     const S = 72;
-    const profile = dir === "left" || dir === "right";
     ctx.save();
-    if (dir === "left") ctx.scale(-1, 1);
     ctx.imageSmoothingEnabled = true;
     ctx.shadowColor = "rgba(62,48,98,0.20)";
     ctx.shadowBlur = 4;
     ctx.shadowOffsetY = 1;
-    if (profile) {
-      const tinted = getTintedImage(headImgUrl(headImgKey), headHairC);
-      if (tinted) {
-        ctx.drawImage(tinted, -S / 2, headTop - 33, S, S); // 뒤통수(머리색 실루엣)
-        ctx.shadowBlur = 0;
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(-1 * u, headTop - 44, 60, 96); // 앞쪽(진행 방향) 절반만 얼굴로
-        ctx.clip();
-        ctx.drawImage(headImg, -S / 2, headTop - 33, S, S);
+    if (isProfile) {
+      const sideImg = getImage(sideHeadImgUrl(headImgKey));
+      const tf = SIDE_HEAD_TF[headImgKey];
+      if (sideImg && tf) {
+        if (dir === "right") ctx.scale(-1, 1); // 원본=왼쪽 바라봄 → 오른쪽은 반전
+        ctx.drawImage(sideImg, tf.ox, headTop - 33 + tf.oy, sideImg.width * tf.s, sideImg.height * tf.s);
         ctx.restore();
-      } else {
-        ctx.drawImage(headImg, -S / 2, headTop - 33, S, S); // 로딩 전 폴백
+        return;
       }
-      ctx.restore();
-      return;
+      // 폴백: 옆모습 PNG 로딩 전에는 정면 이미지로 대체
     }
     ctx.drawImage(headImg, -S / 2, headTop - 33, S, S);
     ctx.restore();
