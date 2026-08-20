@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessage, PlayerState } from "@/lib/game/types";
 import { PanelShell } from "./ui";
+import { Linkify } from "../Linkify";
 
 export type ChatTab = { kind: "room" } | { kind: "area" } | { kind: "dm"; to: string };
 
@@ -123,7 +124,7 @@ export default function ChatPanel({
               {m.from !== selfId && (
                 <div className="text-[10px] font-bold text-sky-500">{m.fromName}</div>
               )}
-              <div className="whitespace-pre-wrap break-words">{m.text}</div>
+              <div className="whitespace-pre-wrap break-words"><Linkify text={m.text} /></div>
               <div className="mt-0.5 text-right text-[9px] text-stone-400">
                 {new Date(m.at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
               </div>

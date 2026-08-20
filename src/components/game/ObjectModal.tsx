@@ -2,6 +2,7 @@
 
 // 오브젝트 상호작용 모달: 웹사이트/이미지/영상/외부회의/노트/외부게임/Spotify.
 import { Modal } from "./ui";
+import { Linkify } from "../Linkify";
 import { toSpotifyEmbed, toVideoEmbed } from "@/lib/embed";
 import type { InteractionKind, MapObject } from "@/lib/game/maps";
 import { objectInteraction } from "@/lib/game/maps";
@@ -105,7 +106,7 @@ export default function ObjectModal({
               <div className="mt-1 text-base font-bold text-stone-700">{subtitle}</div>
             </div>
           )}
-          {obj.props?.text || "내용이 없습니다."}
+          {obj.props?.text ? <Linkify text={obj.props.text} /> : "내용이 없습니다."}
         </div>
       );
       break;

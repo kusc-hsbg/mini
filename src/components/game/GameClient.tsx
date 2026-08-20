@@ -59,6 +59,7 @@ import ParticipantsPanel from "./ParticipantsPanel";
 import ChatPanel, { type ChatTab } from "./ChatPanel";
 import MeetingsPanel from "./MeetingsPanel";
 import ObjectModal from "./ObjectModal";
+import { Linkify } from "../Linkify";
 import WhiteboardModal from "./WhiteboardModal";
 import BulletinModal from "./BulletinModal";
 import TetrisModal from "./TetrisModal";
@@ -2683,13 +2684,20 @@ export default function GameClient({
                 <div className="text-[11px] font-bold text-cyan-600">{starhallExhibit.props?.filename}</div>
                 <div className="mt-1 text-lg font-black text-stone-800">{starhallExhibit.name}</div>
                 {starhallExhibit.props?.sourceUrl && (
-                  <div className="mt-1 truncate text-[11px] text-stone-400">{starhallExhibit.props.sourceUrl}</div>
+                  <a
+                    href={starhallExhibit.props.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="mt-1 block truncate text-[11px] text-accent underline underline-offset-2 hover:opacity-80"
+                  >
+                    🔗 {starhallExhibit.props.sourceUrl}
+                  </a>
                 )}
               </div>
             </div>
             {starhallExhibit.props?.text && (
               <p className="mt-3 whitespace-pre-wrap rounded-2xl bg-white/85 p-3 text-sm font-medium leading-relaxed text-stone-700 shadow-inner ring-1 ring-stone-100">
-                {starhallExhibit.props.text}
+                <Linkify text={starhallExhibit.props.text} />
               </p>
             )}
           </div>
@@ -3641,7 +3649,7 @@ function ExhibitModal({ obj, onClose }: { obj: MapObject; onClose: () => void })
           </div>
         </div>
         <p className="whitespace-pre-wrap rounded-xl bg-panel2 p-3 text-sm leading-relaxed text-stone-500">
-          {obj.props?.text ?? "소개가 준비 중입니다."}
+          {obj.props?.text ? <Linkify text={obj.props.text} /> : "소개가 준비 중입니다."}
         </p>
       </div>
     </Modal>

@@ -82,7 +82,7 @@ export default async function Landing({
           >
             <div className="text-3xl transition group-hover:scale-110">{f.icon}</div>
             <h3 className="mt-3 font-semibold text-white">{f.title}</h3>
-            <p className="mt-1 text-sm text-slate-400">{f.desc}</p>
+            <p className="mt-1 text-sm text-white/90">{f.desc}</p>
           </div>
         ))}
       </section>

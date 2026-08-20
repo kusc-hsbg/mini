@@ -2450,19 +2450,22 @@ export function drawCharacter(
     ctx.shadowBlur = 4;
     ctx.shadowOffsetY = 1;
     if (profile) {
-      // 뒤통수 볼륨(머리색) + 작은 귀(피부) — 측면 실루엣.
+      // 측면: 얼굴을 가로로 찌그러뜨리지 않는다(정면 비율 그대로).
+      // 대신 뒤통수 머리 볼륨 + 귀를 얼굴 뒤(진행 반대쪽)에 둥글게 그려
+      // 고개를 옆으로 살짝 돌린 자연스러운 3/4 측면 실루엣을 만든다.
       ctx.save();
       ctx.shadowBlur = 0;
+      // 뒤통수 볼륨(머리색) — 얼굴 뒤로 둥글게 드러나는 뒷머리
       ctx.fillStyle = headHairC;
-      roundRect(ctx, -5.5 * u, headTop + 0.5 * u, 4 * u, 6.5 * u, 4);
+      roundRect(ctx, -7 * u, headTop + 1 * u, 5 * u, 7.5 * u, 5);
       ctx.fill();
+      // 귀(피부) — 얼굴과 뒷머리 사이
       ctx.fillStyle = skin;
-      roundRect(ctx, -2.6 * u, headTop + 3.2 * u, 2 * u, 2.6 * u, 2);
+      roundRect(ctx, -2.4 * u, headTop + 3.6 * u, 1.9 * u, 2.6 * u, 2);
       ctx.fill();
       ctx.restore();
-      // 고개가 앞으로 빠지지 않도록(거북목 방지) 아주 살짝만 이동 + 가로 압축.
-      ctx.translate(1, 0);
-      ctx.scale(0.86, 1);
+      // 얼굴을 진행 방향으로만 살짝 이동(압축 없음) — 옆을 바라보는 느낌.
+      ctx.translate(1.8 * u, 0);
     }
     ctx.drawImage(headImg, -S / 2, headTop - 33, S, S);
     ctx.restore();

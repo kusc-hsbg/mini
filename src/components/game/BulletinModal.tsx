@@ -6,6 +6,7 @@ import { Modal } from "./ui";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { addBulletinPost, deleteBulletinPost } from "@/app/actions";
 import type { BulletinPost } from "@/lib/game/types";
+import { Linkify } from "../Linkify";
 
 export default function BulletinModal({
   spaceId,
@@ -132,7 +133,7 @@ export default function BulletinModal({
                     )}
                   </span>
                 </div>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-stone-600">{p.content}</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-stone-600"><Linkify text={p.content} /></p>
                 {p.url && (
                   <a
                     href={p.url}
