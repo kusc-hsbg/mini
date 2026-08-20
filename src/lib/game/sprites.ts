@@ -2435,107 +2435,22 @@ export function drawCharacter(
   const headImg = !robot ? getImage(headImgUrl(headImgKey)) : null;
   // 뒤통수/옆머리 색은 PNG 앞머리 색과 맞춘다(픽셀 머리는 app.hairColor 그대로).
   const headHairC = HEAD_HAIR_COLORS[headImgKey] ?? hairC;
-  // 긴 생머리 PNG는 정면에서만 몸통 뒤로 넘겨 그린다(옆모습은 코드로 그리므로 제외).
-  const drawHeadBehind = !!headImg && dir === "down" && LONG_BACK_HAIR_HEADS.has(headImgKey);
+  // 긴 생머리 PNG는 몸통 뒤로 넘겨 그려 앞으로 흘러내리지 않게 한다(정면·옆모습).
+  const drawHeadBehind = !!headImg && dir !== "up" && LONG_BACK_HAIR_HEADS.has(headImgKey);
 
-  // 옆모습(측면) 머리 — 정면 PNG는 눈이 두 개라 옆모습으로 쓰면 어색하므로,
-  // 머리색/피부색을 그대로 사용해 코드로 진짜 측면 얼굴을 그린다(오른쪽 바라봄).
-  const longHair = LONG_BACK_HAIR_HEADS.has(headImgKey);
-  const drawProfileHead = () => {
-    // --- 얼굴 베이스(피부): 둥근 머리 ---
-    ctx.save();
-    ctx.shadowColor = "rgba(62,48,98,0.20)";
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetY = 1;
-    ctx.fillStyle = skin;
-    roundRect(ctx, -4.6 * u, headTop + 0.8 * u, 9.4 * u, 9 * u, 4.2 * u);
-    ctx.fill();
-    ctx.restore();
-
-    // --- 코: 앞(오른쪽)으로 살짝 돌출 ---
-    ctx.fillStyle = skin;
-    ctx.beginPath();
-    ctx.ellipse(4.8 * u, headTop + 5.4 * u, 0.75 * u, 0.95 * u, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // --- 귀(피부): 얼굴 중앙 뒤쪽 ---
-    ctx.fillStyle = skin;
-    roundRect(ctx, -1 * u, headTop + 4.4 * u, 2 * u, 2.8 * u, 1.3);
-    ctx.fill();
-    ctx.fillStyle = darken(skin, 0.16);
-    roundRect(ctx, -0.2 * u, headTop + 5 * u, 0.9 * u, 1.5 * u, 0.8);
-    ctx.fill();
-
-    // --- 머리카락(머리색) ---
-    ctx.fillStyle = headHairC;
-    // 뒤통수(뒤=왼쪽) 볼륨
-    roundRect(ctx, -5.4 * u, headTop + 0.2 * u, 5.2 * u, longHair ? 10 * u : 9 * u, 2.5 * u);
-    ctx.fill();
-    if (longHair) {
-      // 긴 머리: 등 뒤로 흘러내리는 머릿단
-      roundRect(ctx, -5 * u, headTop + 7 * u, 3.4 * u, 7 * u, 1.6 * u);
-      ctx.fill();
-    }
-    // 윗머리: 정수리를 덮는 둥근 돔 + 앞이마로 흘러내리는 뱅
-    ctx.beginPath();
-    ctx.moveTo(-5.2 * u, headTop + 3.6 * u);
-    ctx.quadraticCurveTo(-5.7 * u, headTop - 1.6 * u, -0.2 * u, headTop - 1.5 * u); // 뒤통수→정수리
-    ctx.quadraticCurveTo(4.4 * u, headTop - 1.5 * u, 5.1 * u, headTop + 1 * u); // 정수리→앞
-    ctx.quadraticCurveTo(5.4 * u, headTop + 3.6 * u, 3.3 * u, headTop + 2.8 * u); // 앞머리 뱅 끝
-    ctx.quadraticCurveTo(2.4 * u, headTop + 1.7 * u, 0.2 * u, headTop + 2.4 * u); // 이마 라인
-    ctx.quadraticCurveTo(-3 * u, headTop + 2.6 * u, -3.4 * u, headTop + 3.8 * u); // 옆머리
-    ctx.closePath();
-    ctx.fill();
-    // 정수리 하이라이트(부드러운 광택)로 입체감
-    ctx.fillStyle = lighten(headHairC, 0.16);
-    ctx.beginPath();
-    ctx.ellipse(-1 * u, headTop + 0.3 * u, 1.9 * u, 0.9 * u, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-
-    // --- 눈(앞쪽/오른쪽): 진행 방향을 바라봄 ---
-    ctx.fillStyle = "#1f2937";
-    ctx.beginPath();
-    ctx.ellipse(2.9 * u, headTop + 4.8 * u, 1 * u, 1.35 * u, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#ffffff";
-    ctx.beginPath();
-    ctx.arc(3.25 * u, headTop + 4.35 * u, 0.36 * u, 0, Math.PI * 2);
-    ctx.fill();
-    // 눈썹
-    ctx.fillStyle = darken(headHairC, 0.1);
-    roundRect(ctx, 2 * u, headTop + 3 * u, 2 * u, 0.6 * u, 0.3);
-    ctx.fill();
-
-    // --- 볼터치 ---
-    ctx.fillStyle = "rgba(244,114,182,0.4)";
-    ctx.beginPath();
-    ctx.ellipse(3.6 * u, headTop + 6.3 * u, 0.95 * u, 0.7 * u, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // --- 입: 앞쪽 작은 미소 ---
-    ctx.strokeStyle = darken(skin, 0.4);
-    ctx.lineWidth = 1.1;
-    ctx.beginPath();
-    ctx.arc(3.3 * u, headTop + 6.8 * u, 1.1 * u, 0.15 * Math.PI, 0.6 * Math.PI);
-    ctx.stroke();
-  };
-
-  // 이미지 머리 렌더러 — 몸통 앞/뒤 어디서든 호출.
+  // 이미지 머리 렌더러 — 정면/옆모습 모두 같은 PNG를 그대로 사용해 스타일을 일치시킨다.
+  // 옆모습은 얼굴을 왜곡하지 않고, 진행 방향으로만 아주 살짝 기울여 방향감을 준다.
   const drawImageHead = () => {
     if (!headImg) return;
     const S = 72;
     const profile = dir === "left" || dir === "right";
     ctx.save();
-    if (dir === "left") ctx.scale(-1, 1); // 왼쪽은 오른쪽 프로필을 좌우 반전
-    if (profile) {
-      drawProfileHead();
-      ctx.restore();
-      return;
-    }
+    if (dir === "left") ctx.scale(-1, 1);
     ctx.imageSmoothingEnabled = true;
     ctx.shadowColor = "rgba(62,48,98,0.20)";
     ctx.shadowBlur = 4;
     ctx.shadowOffsetY = 1;
+    if (profile) ctx.translate(1.2 * u, 0); // 진행 방향으로 미세하게 이동(왜곡 없음)
     ctx.drawImage(headImg, -S / 2, headTop - 33, S, S);
     ctx.restore();
   };
