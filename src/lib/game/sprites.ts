@@ -2438,8 +2438,9 @@ export function drawCharacter(
   // 긴 생머리 PNG는 몸통 뒤로 넘겨 그려 앞으로 흘러내리지 않게 한다(정면·옆모습).
   const drawHeadBehind = !!headImg && dir !== "up" && LONG_BACK_HAIR_HEADS.has(headImgKey);
 
-  // 이미지 머리 렌더러 — 정면/옆모습 모두 같은 PNG를 그대로 사용해 스타일을 일치시킨다.
-  // 옆모습은 얼굴을 왜곡하지 않고, 진행 방향으로만 아주 살짝 기울여 방향감을 준다.
+  // 이미지 머리 렌더러 — 정면은 PNG 전체.
+  // 옆모습은 같은 PNG의 앞쪽 절반만 얼굴(눈 하나)로 쓰고, 뒤통수는 같은 PNG를
+  // 머리색으로 칠한 실루엣으로 채운다. 같은 이미지라 경계가 매끄럽게 맞물린다.
   const drawImageHead = () => {
     if (!headImg) return;
     const S = 72;
@@ -2450,7 +2451,23 @@ export function drawCharacter(
     ctx.shadowColor = "rgba(62,48,98,0.20)";
     ctx.shadowBlur = 4;
     ctx.shadowOffsetY = 1;
-    if (profile) ctx.translate(1.2 * u, 0); // 진행 방향으로 미세하게 이동(왜곡 없음)
+    if (profile) {
+      const tinted = getTintedImage(headImgUrl(headImgKey), headHairC);
+      if (tinted) {
+        ctx.drawImage(tinted, -S / 2, headTop - 33, S, S); // 뒤통수(머리색 실루엣)
+        ctx.shadowBlur = 0;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(-1 * u, headTop - 44, 60, 96); // 앞쪽(진행 방향) 절반만 얼굴로
+        ctx.clip();
+        ctx.drawImage(headImg, -S / 2, headTop - 33, S, S);
+        ctx.restore();
+      } else {
+        ctx.drawImage(headImg, -S / 2, headTop - 33, S, S); // 로딩 전 폴백
+      }
+      ctx.restore();
+      return;
+    }
     ctx.drawImage(headImg, -S / 2, headTop - 33, S, S);
     ctx.restore();
   };
@@ -2587,36 +2604,23 @@ export function drawCharacter(
     // 긴 생머리는 몸통 뒤에서 이미 그렸으니 여기선 건너뛴다.
     if (!drawHeadBehind) drawImageHead();
   } else if (headImg && dir === "up") {
-    // 위로 이동 = 뒷모습. 머리 PNG 실루엣을 머리카락 색으로 통째로 칠해
-    // 뒤통수로 사용한다(얼굴이 보이지 않게). 헤어스타일 실루엣은 그대로 유지.
-    const tinted = getTintedImage(headImgUrl(headImgKey), headHairC);
-    if (tinted) {
-      const S = 72;
-      ctx.save();
-      ctx.imageSmoothingEnabled = true;
-      ctx.shadowColor = "rgba(62,48,98,0.20)";
-      ctx.shadowBlur = 4;
-      ctx.shadowOffsetY = 1;
-      ctx.drawImage(tinted, -S / 2, headTop - 33, S, S);
-      ctx.restore();
-      // 정수리 하이라이트로 입체감
-      ctx.fillStyle = lighten(headHairC, 0.2);
-      roundRect(ctx, -3 * u, headTop + 0.5 * u, 3.4 * u, 1.7 * u, 3);
-      ctx.fill();
-    } else {
-      // 폴백: PNG 로딩 전 단색 뒤통수
+    // 위로 이동 = 뒷모습. 뒤통수 전체를 머리카락 색으로 깔끔하게 채운다.
+    ctx.fillStyle = headHairC;
+    roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
+    ctx.fill();
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 1.2;
+    roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
+    ctx.stroke();
+    // 정수리 하이라이트로 입체감
+    ctx.fillStyle = lighten(headHairC, 0.18);
+    roundRect(ctx, -3.5 * u, headTop + 0.6 * u, 4 * u, 2 * u, 3);
+    ctx.fill();
+    // 긴 머리 PNG는 뒷모습에서도 등 아래로 흘러내리는 머릿단을 표현.
+    if (LONG_BACK_HAIR_HEADS.has(headImgKey)) {
       ctx.fillStyle = headHairC;
-      roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
+      roundRect(ctx, -6 * u, headTop + 6 * u, 12 * u, 9 * u, 5);
       ctx.fill();
-      ctx.strokeStyle = OUTLINE;
-      ctx.lineWidth = 1.2;
-      roundRect(ctx, -5.5 * u, headTop, 11 * u, 10 * u, 6);
-      ctx.stroke();
-      if (LONG_BACK_HAIR_HEADS.has(headImgKey)) {
-        ctx.fillStyle = headHairC;
-        roundRect(ctx, -6 * u, headTop + 6 * u, 12 * u, 9 * u, 5);
-        ctx.fill();
-      }
     }
     drawHatPixel(ctx, u, headTop, app.hat, top);
   } else {
