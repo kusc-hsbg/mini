@@ -2508,8 +2508,14 @@ export function drawCharacter(
     const lB = sitting ? 0 : moving ? legLift[(step + 2) % 4] : dancing ? (1 - danceBeat) * 2 : 0;
     const legH = sitting ? 3 * u : 6 * u;
     if (dir === "left" || dir === "right") {
-      softRect(ctx, -3 * u + side * u, -legH - lA, 3 * u, legH, 2.5, pants);
-      softRect(ctx, 0 * u + side * u, -legH - lB, 3 * u, legH, 2.5, pants);
+      // 옆모습: 뒤쪽 다리(약간 어둡게, 뒤에) → 앞쪽 다리 순서로 그려 자연스러운 보폭/입체감.
+      const legW = 3 * u;
+      const backC = -side * 0.6 * u; // 뒤쪽 다리(진행 반대쪽)
+      const frontC = side * 1.8 * u; // 앞쪽 다리(진행 방향)
+      softRect(ctx, backC - legW / 2, -legH - lB, legW, legH, 2.5, darken(pants, 0.14));
+      softRect(ctx, backC - 1.6 * u, -1.5 * u - lB, 3.6 * u, 1.7 * u, 2, darken(shoesC, 0.16), false);
+      softRect(ctx, frontC - legW / 2, -legH - lA, legW, legH, 2.5, pants);
+      softRect(ctx, frontC - 1.6 * u + side * 0.6 * u, -1.5 * u - lA, 3.8 * u, 1.7 * u, 2, shoesC, false);
       if (sitting) {
         // 옆모습: 허벅지가 앞으로 나온다
         softRect(ctx, side * 2 * u, -legH, 3 * u, 1.6 * u, 2, pants, false);
@@ -2517,11 +2523,6 @@ export function drawCharacter(
     } else {
       softRect(ctx, -4 * u, -legH - lA, 3.5 * u, legH + lA, 2.5, pants);
       softRect(ctx, 0.5 * u, -legH - lB, 3.5 * u, legH + lB, 2.5, pants);
-    }
-    if (dir === "left" || dir === "right") {
-      softRect(ctx, -3 * u + side * u, -1.5 * u - lA, 3.8 * u, 1.7 * u, 2, shoesC, false);
-      softRect(ctx, 0 * u + side * u, -1.5 * u - lB, 3.8 * u, 1.7 * u, 2, shoesC, false);
-    } else {
       softRect(ctx, -4 * u, -1.5 * u - lA, 3.8 * u, 1.7 * u, 2, shoesC, false);
       softRect(ctx, 0.5 * u, -1.5 * u - lB, 3.8 * u, 1.7 * u, 2, shoesC, false);
     }
@@ -2558,8 +2559,10 @@ export function drawCharacter(
     if (upL) softRect(ctx, -7 * u, bodyTop - 7 * u, 2.7 * u, 2.7 * u, 3, skin);
     else softRect(ctx, 4.5 * u, bodyTop - 7 * u, 2.7 * u, 2.7 * u, 3, skin);
   } else if (dir === "left" || dir === "right") {
-    softRect(ctx, side * 4 * u - u, bodyTop + 1.5 * u + armSwing, 2.7 * u, 6 * u, 3, armC);
-    softRect(ctx, side * 4 * u - u, bodyTop + 7 * u + armSwing, 2.7 * u, 2.3 * u, 3, skin);
+    // 근접 팔: 몸 옆면을 따라 자연스럽게 내려오는 한 팔 + 손
+    const armX = side * 2.7 * u - 1.2 * u;
+    softRect(ctx, armX, bodyTop + 2 * u + armSwing, 2.4 * u, 5.4 * u, 2.6, armC);
+    softRect(ctx, armX + side * 0.2 * u, bodyTop + 6.8 * u + armSwing, 2.4 * u, 2.1 * u, 2.3, skin);
   } else {
     softRect(ctx, -7 * u, bodyTop + u + armSwing, 2.7 * u, 6 * u, 3, armC);
     if (handRaised) {
@@ -2631,7 +2634,7 @@ export function drawCharacter(
         ctx.fill();
       }
     }
-    drawHatPixel(ctx, u, headTop, app.hat, top);
+    // 이미지 머리는 모자를 쓰지 않는다(정면과 동일). 상의 색 모자가 뒤통수에 겹치던 문제 제거.
   } else {
   // 뒷모습(위로 이동)은 뒤통수를 머리카락 색으로 채워 얼굴이 보이지 않게 한다.
   // (민머리는 두피=피부색 유지) 로봇은 항상 금속색.
